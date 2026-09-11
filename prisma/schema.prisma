@@ -1,0 +1,45 @@
+// Read-only client pointed at the same local StudyPal Postgres DB
+// (C:\DEV\ubuntu-node). This schema is intentionally trimmed to just the
+// models the reel pipeline reads - it is not used to migrate the DB, only
+// to query it, so it doesn't need to track every table in the real app.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Book {
+  id       String        @id @default(uuid())
+  title    String
+  chapters BookChapter[]
+
+  @@map("books")
+}
+
+model BookChapter {
+  id      String       @id @default(uuid())
+  bookId  String       @map("book_id")
+  book    Book         @relation(fields: [bookId], references: [id])
+  title   String
+  order   Int          @default(0)
+  phrases BookPhrase[]
+
+  @@map("book_chapters")
+}
+
+model BookPhrase {
+  id              String      @id @default(uuid())
+  chapterId       String      @map("chapter_id")
+  chapter         BookChapter @relation(fields: [chapterId], references: [id])
+  phrase          String
+  translationSi   String?     @map("translation_si")
+  pronunciationSi String?     @map("pronunciation_si")
+  explanation     String
+  explanationSi   String?     @map("explanation_si")
+  order           Int         @default(0)
+
+  @@map("book_phrases")
+}

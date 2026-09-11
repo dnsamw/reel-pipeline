@@ -1,0 +1,766 @@
+<title>StudyPal Reel Studio</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  :root {
+    --ink: #09090b;
+    --muted: #6b6470;
+    --line: #e4dfec;
+    --surface: #ffffff;
+    --surface-2: #faf8fc;
+    --surface-3: #f2edf7;
+    --primary: #58238b;
+    --primary-2: #9c35b6;
+    --primary-tint: #f1e9f7;
+    --gold: #fab005;
+    --gold-ink: #8f5614;
+    --gold-tint: #fef3d9;
+    --success: #1c7c4d;
+    --success-tint: #e4f6ec;
+    --radius: 14px;
+    --font-display: "Poppins", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #f5f5f5;
+      --muted: #a9a7b4;
+      --line: #332b3b;
+      --surface: #150f1a;
+      --surface-2: #1c1424;
+      --surface-3: #241934;
+      --primary: #9b52e0;
+      --primary-2: #c262da;
+      --primary-tint: #2f1c40;
+      --gold: #fbc851;
+      --gold-ink: #f9d286;
+      --gold-tint: #3a2c14;
+      --success: #4ade95;
+      --success-tint: #16301f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #f5f5f5;
+    --muted: #a9a7b4;
+    --line: #332b3b;
+    --surface: #150f1a;
+    --surface-2: #1c1424;
+    --surface-3: #241934;
+    --primary: #9b52e0;
+    --primary-2: #c262da;
+    --primary-tint: #2f1c40;
+    --gold: #fbc851;
+    --gold-ink: #f9d286;
+    --gold-tint: #3a2c14;
+    --success: #4ade95;
+    --success-tint: #16301f;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--surface);
+    color: var(--ink);
+    font-family: var(--font-display);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 780px; margin: 0 auto; padding: 0 24px; }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar-inner {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 22px;
+  }
+  .topbar-mark {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-weight: 700;
+    font-size: 14.5px;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  .topbar-mark svg { flex: none; }
+  .topbar-nav {
+    display: flex;
+    gap: 18px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .topbar-nav::-webkit-scrollbar { display: none; }
+  .topbar-nav a {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--muted);
+    text-decoration: none;
+    white-space: nowrap;
+    padding: 4px 2px;
+    border-bottom: 2px solid transparent;
+  }
+  .topbar-nav a:hover { color: var(--primary); }
+  .topbar-nav a:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; border-radius: 4px; }
+
+  /* ---------- header ---------- */
+  header.hero { padding: 56px 0 40px; }
+  .eyebrow {
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--primary-2);
+    margin: 0 0 14px;
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: clamp(32px, 5vw, 44px);
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    margin: 0 0 16px;
+    text-wrap: balance;
+    color: var(--ink);
+  }
+  .lede {
+    font-size: 17px;
+    line-height: 1.6;
+    color: var(--muted);
+    max-width: 60ch;
+    margin: 0;
+  }
+
+  /* mini filmstrip */
+  .filmstrip {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 32px;
+  }
+  .frame {
+    aspect-ratio: 9 / 16;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px;
+    text-align: center;
+  }
+  .frame .tag {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    position: absolute;
+  }
+  .frame-1 { background: var(--surface-2); }
+  .frame-1 .en { font-weight: 700; font-size: 12.5px; color: var(--ink); }
+  .frame-1 .si { font-size: 9.5px; color: var(--muted); }
+  .frame-2 { background: var(--surface-2); }
+  .frame-2 .ring {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 3px solid var(--line); border-top-color: var(--gold);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono); font-weight: 700; font-size: 12px; color: var(--primary);
+  }
+  .frame-3 { background: var(--primary); }
+  .frame-3 .si { font-weight: 700; font-size: 12.5px; color: #fff; }
+  .frame-3 .card { background: rgba(255,255,255,0.14); border-radius: 6px; padding: 6px 8px; font-size: 8.5px; color: #fff; }
+  .frame-caption { text-align: center; font-size: 11.5px; color: var(--muted); margin-top: 8px; }
+
+  /* ---------- sections ---------- */
+  section { padding: 52px 0; border-top: 1px solid var(--line); }
+  section:first-of-type { border-top: none; }
+  .section-head { margin-bottom: 28px; }
+  .section-num {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--gold-ink);
+    background: var(--gold-tint);
+    border-radius: 999px;
+    padding: 3px 10px;
+    display: inline-block;
+    margin-bottom: 12px;
+  }
+  h2 {
+    font-size: 25px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 8px;
+    text-wrap: balance;
+  }
+  .section-sub { color: var(--muted); font-size: 15px; line-height: 1.55; margin: 0; max-width: 62ch; }
+
+  p { line-height: 1.65; font-size: 15.5px; color: var(--ink); }
+  p.muted { color: var(--muted); font-size: 14.5px; }
+  a.inline { color: var(--primary); font-weight: 600; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 2px; }
+
+  /* ---------- steps ---------- */
+  .steps { display: flex; flex-direction: column; }
+  .step {
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 16px;
+    padding: 22px 0;
+    border-top: 1px solid var(--line);
+  }
+  .step:first-child { border-top: none; padding-top: 0; }
+  .step-badge {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: var(--primary-tint);
+    color: var(--primary);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 14.5px;
+    font-family: var(--font-mono);
+  }
+  .step-title { font-weight: 700; font-size: 16.5px; margin: 4px 0 6px; }
+  .step-body p { margin: 0 0 10px; }
+  .step-body p:last-child { margin-bottom: 0; }
+
+  /* ---------- terminal / command block ---------- */
+  .term {
+    background: #1a1420;
+    border: 1px solid #362a44;
+    border-radius: 10px;
+    margin: 12px 0 4px;
+    overflow: hidden;
+  }
+  .term-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px;
+    background: #211a29;
+    border-bottom: 1px solid #362a44;
+  }
+  .term-dots { display: flex; gap: 6px; }
+  .term-dots span { width: 8px; height: 8px; border-radius: 50%; background: #4a3b5a; }
+  .term-label { font-family: var(--font-mono); font-size: 10.5px; color: #a798bb; letter-spacing: 0.03em; }
+  .copy-btn {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: #d8c9ea;
+    background: #2c2338;
+    border: 1px solid #40324f;
+    border-radius: 6px;
+    padding: 4px 9px;
+    cursor: pointer;
+  }
+  .copy-btn:hover { background: #382c46; color: #fff; }
+  .copy-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .copy-btn[data-copied="true"] { color: #9be8b8; border-color: #2f5a41; }
+  .term pre {
+    margin: 0;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    color: #ecdfff;
+  }
+  .term pre .flag { color: #ffcf6b; }
+  .term pre .val { color: #8fd6ff; }
+  .term pre .cmt { color: #7a6c8c; }
+
+  .note {
+    display: flex;
+    gap: 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 13px 15px;
+    margin-top: 14px;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--ink);
+  }
+  .note svg { flex: none; margin-top: 2px; color: var(--primary-2); }
+  .note.warn svg { color: var(--gold-ink); }
+  .note.warn { background: var(--gold-tint); border-color: color-mix(in srgb, var(--gold) 40%, var(--line)); }
+  .note strong { font-weight: 700; }
+
+  /* ---------- template gallery ---------- */
+  .templates {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 16px;
+  }
+  .tcard {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .tcard .swatch {
+    height: 64px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+  }
+  .swatch-1 { background: var(--surface-2); color: var(--primary); border: 1px solid var(--line); }
+  .swatch-2 { background: linear-gradient(135deg, var(--surface-2) 55%, var(--gold-tint) 100%); color: var(--primary); border: 1px solid var(--line); }
+  .swatch-3 { background: #150f1a; color: #c9a6ea; }
+  .tcard .flag-name {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    background: var(--surface-2);
+    border-radius: 6px;
+    padding: 2px 7px;
+    display: inline-block;
+    width: fit-content;
+  }
+  .tcard h3 { font-size: 16px; margin: 0; font-weight: 700; }
+  .tcard p { font-size: 13.5px; color: var(--muted); margin: 0; line-height: 1.5; }
+
+  /* ---------- toggle-style comparison ---------- */
+  .pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  @media (max-width: 560px) { .pair { grid-template-columns: 1fr; } }
+  .pair-card {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .pair-card .k {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--primary);
+    background: var(--primary-tint);
+    border-radius: 6px;
+    padding: 2px 7px;
+    display: inline-block;
+    margin-bottom: 8px;
+  }
+  .pair-card p { font-size: 13.5px; margin: 0; color: var(--muted); line-height: 1.5; }
+
+  /* ---------- cheat sheet ---------- */
+  .cheat { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .cheat-row {
+    display: grid;
+    grid-template-columns: 1fr 1.15fr;
+    gap: 18px;
+    padding: 14px 18px;
+    border-top: 1px solid var(--line);
+    align-items: center;
+  }
+  .cheat-row:first-child { border-top: none; background: var(--surface-2); }
+  .cheat-row:first-child span { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .cheat-row code {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    background: var(--surface-3);
+    border-radius: 5px;
+    padding: 2px 6px;
+  }
+  .cheat-row p { margin: 0; font-size: 13.5px; color: var(--muted); line-height: 1.45; }
+  @media (max-width: 560px) {
+    .cheat-row { grid-template-columns: 1fr; gap: 4px; }
+  }
+
+  footer {
+    padding: 44px 0 60px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 13.5px;
+    line-height: 1.6;
+  }
+</style>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-mark">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M7 10.3l2 2 4-4.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Reel Studio
+    </div>
+    <nav class="topbar-nav">
+      <a href="#start">Getting started</a>
+      <a href="#templates">Templates</a>
+      <a href="#voice">Narration</a>
+      <a href="#music">Music</a>
+      <a href="#output">Your videos</a>
+      <a href="#help">Help</a>
+      <a href="#cheatsheet">Cheat sheet</a>
+    </nav>
+  </div>
+</div>
+
+<div class="wrap">
+  <header class="hero">
+    <p class="eyebrow">For StudyPal book authors</p>
+    <h1>Turn phrasebook entries into ready-to-post reels</h1>
+    <p class="lede">
+      This tool takes phrases straight from your book's data and automatically builds short vertical videos —
+      the kind you post on Instagram or TikTok — complete with a countdown, spoken narration, background
+      music, and a call-to-action at the end. No editing software required.
+    </p>
+
+    <div class="filmstrip" aria-hidden="true">
+      <div class="frame frame-1">
+        <div class="en">I couldn't agree more.</div>
+        <div class="si">(අයි කුඩ්න්ට් අග්‍රී මෝර්)</div>
+      </div>
+      <div class="frame frame-2">
+        <div class="ring">3</div>
+      </div>
+      <div class="frame frame-3">
+        <div class="si">මමත් ඒකට සම්පූර්ණයෙන්ම එකඟයි.</div>
+        <div class="card">Used to show complete agreement…</div>
+      </div>
+    </div>
+    <p class="frame-caption">A typical reel: phrase → countdown → meaning revealed</p>
+  </header>
+
+  <section id="start">
+    <div class="section-head">
+      <span class="section-num">Getting started</span>
+      <h2>Make your first video</h2>
+      <p class="section-sub">
+        Someone technical (usually Dan) sets this tool up on your computer once. After that, everything
+        below is copy, paste, and wait.
+      </p>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-badge">1</div>
+        <div class="step-body">
+          <div class="step-title">Open the tool's folder in a command window</div>
+          <p>
+            In File Explorer, open the Reel Studio folder Dan gave you. Click once in the address bar at
+            the top, type <code style="font-family: var(--font-mono); background: var(--surface-2); padding: 1px 6px; border-radius: 4px;">powershell</code>,
+            and press Enter. A dark window will open — that's your command window, already pointed at the
+            right folder.
+          </p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-badge">2</div>
+        <div class="step-body">
+          <div class="step-title">Generate one test video</div>
+          <p>Paste this into the command window and press Enter. It makes exactly one video, so you can check things look right before generating a whole batch.</p>
+          <div class="term">
+            <div class="term-bar">
+              <div class="term-dots"><span></span><span></span><span></span></div>
+              <span class="term-label">powershell</span>
+              <button class="copy-btn" data-copy="npm run render:batch -- --chapters=0-0 --limit=1">Copy</button>
+            </div>
+            <pre>npm run render:batch -- <span class="flag">--chapters=</span><span class="val">0-0</span> <span class="flag">--limit=</span><span class="val">1</span></pre>
+          </div>
+          <p class="muted">The first thing it prints is a numbered list of chapters — see the tip below for what those numbers mean.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-badge">3</div>
+        <div class="step-body">
+          <div class="step-title">Watch the finished video</div>
+          <p>
+            Open the <code style="font-family: var(--font-mono); background: var(--surface-2); padding: 1px 6px; border-radius: 4px;">output</code>
+            folder inside the tool's folder. Your video will be there as an <code style="font-family: var(--font-mono); background: var(--surface-2); padding: 1px 6px; border-radius: 4px;">.mp4</code> file —
+            double-click to play it like any other video.
+          </p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-badge">4</div>
+        <div class="step-body">
+          <div class="step-title">Happy with it? Generate the whole chapter</div>
+          <p>Same command, just drop <code style="font-family: var(--font-mono); background: var(--surface-2); padding: 1px 6px; border-radius: 4px;">--limit</code> so it doesn't stop early. This produces one video per group of 3 phrases in that chapter.</p>
+          <div class="term">
+            <div class="term-bar">
+              <div class="term-dots"><span></span><span></span><span></span></div>
+              <span class="term-label">powershell</span>
+              <button class="copy-btn" data-copy="npm run render:batch -- --chapters=0-0">Copy</button>
+            </div>
+            <pre>npm run render:batch -- <span class="flag">--chapters=</span><span class="val">0-0</span></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.4"/><path d="M8 7.2v4M8 5.1v.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      <span>
+        <strong>About chapter numbers.</strong> The tool counts chapters starting at 0, not 1 — so "Chapter 1"
+        in the book is usually <code style="font-family: var(--font-mono);">0</code>, "Chapter 2" is
+        <code style="font-family: var(--font-mono);">1</code>, and so on. Don't guess: run any command once and
+        the very first lines printed are a list like <code style="font-family: var(--font-mono);">0: Posh විදිහට English කතා කරමු</code> —
+        that number is what goes in <code style="font-family: var(--font-mono);">--chapters=</code>. If you started
+        the wrong thing, press <code style="font-family: var(--font-mono);">Ctrl</code> + <code style="font-family: var(--font-mono);">C</code> to stop it immediately.
+      </span>
+    </div>
+
+    <div class="note">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.4"/><path d="M8 7.2v4M8 5.1v.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      <span>
+        <strong>It's safe to re-run.</strong> The tool remembers what it already made and skips those videos
+        automatically — so if you run the same command again later (say, after more phrases are added to a
+        chapter), it only generates what's new. To force it to redo everything anyway, add
+        <code style="font-family: var(--font-mono);">--force</code>.
+      </span>
+    </div>
+  </section>
+
+  <section id="templates">
+    <div class="section-head">
+      <span class="section-num">Look &amp; feel</span>
+      <h2>Choose a template</h2>
+      <p class="section-sub">
+        There are three different visual styles to choose from. Add <code style="font-family: var(--font-mono); background: var(--surface-2); padding: 1px 6px; border-radius: 4px;">--template=</code>
+        to any generate command — it defaults to Template 1 if you leave it out.
+      </p>
+    </div>
+
+    <div class="templates">
+      <div class="tcard">
+        <div class="swatch swatch-1">Phrase → Countdown → Meaning</div>
+        <span class="flag-name">--template=1</span>
+        <h3>Template 1 — Classic</h3>
+        <p>Light background. Each part of the reel is its own screen: the phrase, then the countdown, then the reveal.</p>
+      </div>
+      <div class="tcard">
+        <div class="swatch swatch-2">Phrase stays on screen</div>
+        <span class="flag-name">--template=2</span>
+        <h3>Template 2 — Side-by-side</h3>
+        <p>Light background. The phrase shrinks and stays visible while the countdown runs, then the meaning appears underneath it — good for memorizing, since both are on screen together at the end.</p>
+      </div>
+      <div class="tcard">
+        <div class="swatch swatch-3">Sinhala first, English revealed</div>
+        <span class="flag-name">--template=3</span>
+        <h3>Template 3 — Reversed, dark</h3>
+        <p>Dark background. Flips the game: shows the Sinhala meaning first and asks viewers to guess the English phrase.</p>
+      </div>
+    </div>
+
+    <div class="term" style="margin-top: 20px;">
+      <div class="term-bar">
+        <div class="term-dots"><span></span><span></span><span></span></div>
+        <span class="term-label">powershell — example</span>
+        <button class="copy-btn" data-copy="npm run render:batch -- --chapters=0-0 --template=2">Copy</button>
+      </div>
+      <pre>npm run render:batch -- <span class="flag">--chapters=</span><span class="val">0-0</span> <span class="flag">--template=</span><span class="val">2</span></pre>
+    </div>
+
+    <div class="note">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.4"/><path d="M8 7.2v4M8 5.1v.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      <span>
+        Templates are independent — generating the same chapter in Template 2 and Template 3 won't overwrite
+        or skip anything, so it's safe to try a chapter in all three and compare.
+      </span>
+    </div>
+  </section>
+
+  <section id="voice">
+    <div class="section-head">
+      <span class="section-num">Sound</span>
+      <h2>Turn narration on or off</h2>
+      <p class="section-sub">
+        By default, reels are silent except for background music and sound effects. Add
+        <code style="font-family: var(--font-mono); background: var(--surface-2); padding: 1px 6px; border-radius: 4px;">--tts=true</code>
+        to have a voice read the English phrase and the Sinhala meaning aloud.
+      </p>
+    </div>
+
+    <div class="pair">
+      <div class="pair-card">
+        <span class="k">--tts=false (default)</span>
+        <p>Text on screen only, plus music and the countdown tick. Faster to generate.</p>
+      </div>
+      <div class="pair-card">
+        <span class="k">--tts=true</span>
+        <p>Adds a spoken voice reading each phrase and its meaning — alternates between a male and female voice from one video to the next.</p>
+      </div>
+    </div>
+
+    <div class="term" style="margin-top: 16px;">
+      <div class="term-bar">
+        <div class="term-dots"><span></span><span></span><span></span></div>
+        <span class="term-label">powershell — example</span>
+        <button class="copy-btn" data-copy="npm run render:batch -- --chapters=0-0 --tts=true">Copy</button>
+      </div>
+      <pre>npm run render:batch -- <span class="flag">--chapters=</span><span class="val">0-0</span> <span class="flag">--tts=</span><span class="val">true</span></pre>
+    </div>
+  </section>
+
+  <section id="music">
+    <div class="section-head">
+      <span class="section-num">Sound</span>
+      <h2>Add more background music</h2>
+      <p class="section-sub">
+        The tool rotates through whatever tracks it finds in one folder — adding more is as simple as
+        copying files in. No command needed, and nothing to tell the tool about it.
+      </p>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-badge">1</div>
+        <div class="step-body">
+          <div class="step-title">Find the music folder</div>
+          <p>Inside the tool's folder, open <code style="font-family: var(--font-mono); background: var(--surface-2); padding: 1px 6px; border-radius: 4px;">assets</code>, then <code style="font-family: var(--font-mono); background: var(--surface-2); padding: 1px 6px; border-radius: 4px;">music</code>.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-badge">2</div>
+        <div class="step-body">
+          <div class="step-title">Drop your track in</div>
+          <p>Copy any <code style="font-family: var(--font-mono); background: var(--surface-2); padding: 1px 6px; border-radius: 4px;">.mp3</code>, <code style="font-family: var(--font-mono); background: var(--surface-2); padding: 1px 6px; border-radius: 4px;">.wav</code>, <code style="font-family: var(--font-mono); background: var(--surface-2); padding: 1px 6px; border-radius: 4px;">.m4a</code>, or <code style="font-family: var(--font-mono); background: var(--surface-2); padding: 1px 6px; border-radius: 4px;">.ogg</code> file into that folder. That's it — nothing to rename or register.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-badge">3</div>
+        <div class="step-body">
+          <div class="step-title">It's in the rotation from your next generation onward</div>
+          <p>Every video you generate after this automatically has a chance of using the new track. Videos already made won't change.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="note warn">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2l6.9 12H1.1L8 2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 6.5v3.3M8 11.5v.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      <span>
+        <strong>Check the license before posting.</strong> Only add tracks you have the rights to use commercially.
+        Music pulled from a platform's own free audio library (like Instagram's or Facebook's) usually only
+        covers posting on that platform, not everywhere — check with Dan if you're unsure.
+      </span>
+    </div>
+  </section>
+
+  <section id="output">
+    <div class="section-head">
+      <span class="section-num">Results</span>
+      <h2>Where your videos (and captions) end up</h2>
+    </div>
+    <p>
+      Every finished video is saved in the <code style="font-family: var(--font-mono); background: var(--surface-2); padding: 1px 6px; border-radius: 4px;">output</code>
+      folder, named after the chapter and phrases it covers — for example
+      <code style="font-family: var(--font-mono); background: var(--surface-2); padding: 1px 6px; border-radius: 4px;">ch000-000-002.mp4</code>
+      is chapter 0, phrases 0 through 2. A Template 2 or 3 version of the same phrases gets
+      <code style="font-family: var(--font-mono); background: var(--surface-2); padding: 1px 6px; border-radius: 4px;">-t2</code> or
+      <code style="font-family: var(--font-mono); background: var(--surface-2); padding: 1px 6px; border-radius: 4px;">-t3</code> added to the name, so nothing overwrites anything else.
+    </p>
+    <p>
+      A ready-made caption suggestion (with hashtags) is generated for every video too, saved alongside them
+      in a file called <code style="font-family: var(--font-mono); background: var(--surface-2); padding: 1px 6px; border-radius: 4px;">manifest.json</code>.
+      It's a technical-looking file — ask Dan to pull the captions out for you if you don't want to open it yourself.
+    </p>
+  </section>
+
+  <section id="help">
+    <div class="section-head">
+      <span class="section-num">If something looks off</span>
+      <h2>Troubleshooting</h2>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-badge">?</div>
+        <div class="step-body">
+          <div class="step-title">Nothing happens after I press Enter</div>
+          <p>It's probably working — the first video can take under a minute, but a full chapter can take a while since each video renders one at a time. Leave the window open and check the <code style="font-family: var(--font-mono); background: var(--surface-2); padding: 1px 6px; border-radius: 4px;">output</code> folder for new files.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-badge">?</div>
+        <div class="step-body">
+          <div class="step-title">Red text appears and it stops</div>
+          <p>That's an error. Take a screenshot of the whole window and send it to Dan — don't try to fix it yourself.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-badge">?</div>
+        <div class="step-body">
+          <div class="step-title">A video looks or sounds wrong</div>
+          <p>Note which file it is (the exact name in the <code style="font-family: var(--font-mono); background: var(--surface-2); padding: 1px 6px; border-radius: 4px;">output</code> folder) and what's wrong, and send both to Dan — pacing, colors, and audio balance are all things that can be adjusted.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="cheatsheet">
+    <div class="section-head">
+      <span class="section-num">Reference</span>
+      <h2>Command cheat sheet</h2>
+      <p class="section-sub">Every command starts the same way — mix and match the pieces on the right.</p>
+    </div>
+
+    <div class="cheat">
+      <div class="cheat-row"><span>Piece</span><span>What it does</span></div>
+      <div class="cheat-row"><code>npm run render:batch --</code><p>Always comes first. Starts the generator.</p></div>
+      <div class="cheat-row"><code>--chapters=0-0</code><p>Which chapter(s) to generate, by number (see the tip above about counting from 0). Use a range like <code>0-2</code> for chapters 1 through 3.</p></div>
+      <div class="cheat-row"><code>--limit=1</code><p>Stop after this many new videos. Leave it out to generate everything in scope.</p></div>
+      <div class="cheat-row"><code>--template=2</code><p>1, 2, or 3. Defaults to 1 if left out.</p></div>
+      <div class="cheat-row"><code>--tts=true</code><p>Turns on spoken narration. Defaults to off.</p></div>
+      <div class="cheat-row"><code>--force</code><p>Redo videos that already exist instead of skipping them.</p></div>
+    </div>
+
+    <div class="term" style="margin-top: 20px;">
+      <div class="term-bar">
+        <div class="term-dots"><span></span><span></span><span></span></div>
+        <span class="term-label">powershell — everything at once</span>
+        <button class="copy-btn" data-copy="npm run render:batch -- --chapters=1-3 --template=2 --tts=true">Copy</button>
+      </div>
+      <pre>npm run render:batch -- <span class="flag">--chapters=</span><span class="val">1-3</span> <span class="flag">--template=</span><span class="val">2</span> <span class="flag">--tts=</span><span class="val">true</span></pre>
+    </div>
+  </section>
+
+  <footer>
+    Made for the StudyPal phrasebook team. If a command in this guide stops matching what the tool actually
+    does, that's on the setup side to fix — ping Dan rather than guessing.
+  </footer>
+</div>
+
+<script>
+  document.querySelectorAll(".copy-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const text = btn.getAttribute("data-copy") || "";
+      try {
+        await navigator.clipboard.writeText(text);
+        const original = btn.textContent;
+        btn.textContent = "Copied";
+        btn.setAttribute("data-copied", "true");
+        setTimeout(() => {
+          btn.textContent = original;
+          btn.removeAttribute("data-copied");
+        }, 1600);
+      } catch (e) {
+        /* clipboard permissions vary by viewer sandbox - fail silently, text is still selectable */
+      }
+    });
+  });
+</script>
