@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { mkdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { bundle } from "@remotion/bundler";
 import { renderMedia, selectComposition } from "@remotion/renderer";
@@ -10,6 +10,8 @@ import { findTickFile } from "../audio/tick";
 import { findRevealSound } from "../audio/revealSound";
 import { pickIntroVoice } from "../audio/voice";
 import { synthesizeSpeech } from "../audio/tts";
+import { isFfmpegAvailable } from "../audio/ffmpeg";
+import { applyMusicSidechain } from "./sidechain";
 import { loadManifest, saveManifest, isRendered, type ManifestEntry } from "./manifest";
 import { buildCaption } from "./caption";
 import type { ReelProps } from "../compositions/Reel";
@@ -27,6 +29,9 @@ import type { ReelProps } from "../compositions/Reel";
  *   npm run render:batch -- --tts=true             # override config.ttsEnabled for this run
  *   npm run render:batch -- --template=2           # 1 (default) | 2 | 3 - see src/compositions/ReelTemplate2.tsx/ReelTemplate3.tsx
  *   npm run render:batch -- --book=volume-2        # Book.id or a substring of Book.title - required once more than one book exists (see docs/ARCHITECTURE.md)
+ *   npm run render:batch -- --sidechain=true        # duck music under dialogue/sfx via ffmpeg sidechaincompress (see render/sidechain.ts) -
+ *                                                    # costs a second full render pass per batch; falls back to the normal single-pass mix
+ *                                                    # with a console warning if ffmpeg isn't on PATH
  */
 type Template = "1" | "2" | "3";
 
@@ -44,6 +49,7 @@ function parseArgs(argv: string[]) {
     tts: args.tts === "true" ? true : args.tts === "false" ? false : null,
     template,
     book: typeof args.book === "string" ? args.book : null,
+    sidechain: args.sidechain === "true",
   };
 }
 
@@ -87,10 +93,22 @@ function manifestKey(batch: ReelBatch, template: Template): string {
 }
 
 async function main() {
-  const { chapters, limit, force, tts, template, book } = parseArgs(process.argv.slice(2));
+  const { chapters, limit, force, tts, template, book, sidechain } = parseArgs(process.argv.slice(2));
   const compositionId = COMPOSITION_IDS[template];
   const introVoiceKeyword = INTRO_VOICE_KEYWORDS[template];
   const bookTag = book ? sanitizeTag(book) : null;
+
+  // Checked once up front (not per-batch) so a missing ffmpeg doesn't fail
+  // partway through a run - falls back to the normal single-pass render,
+  // same as how a missing Azure key only breaks the TTS step, not the whole batch.
+  let sidechainEnabled = sidechain;
+  if (sidechainEnabled && !isFfmpegAvailable()) {
+    console.warn("--sidechain=true was passed but ffmpeg isn't on PATH - falling back to the normal (non-ducked) music mix.");
+    sidechainEnabled = false;
+  }
+  if (sidechainEnabled) {
+    console.log("Sidechain ducking enabled - each batch gets a second render pass to duck music under dialogue/sfx via ffmpeg.");
+  }
 
   const config: ReelConfig = { ...defaultConfig };
   if (chapters) {
@@ -180,11 +198,18 @@ async function main() {
   for (const { batch, index } of toRender) {
     const plan = audioPlan.get(batch.id)!;
     const outputPath = join(config.outputDir, outputFilename(batch, template, bookTag));
+    // Only worth ducking if there's actually a music track playing - with no
+    // musicFile, sidechain would just be a wasted second render pass.
+    const duckThisBatch = sidechainEnabled && plan.musicFile != null;
+    const renderTarget = duckThisBatch ? `${outputPath}.dialogue.mp4` : outputPath;
 
     const inputProps: ReelProps = {
       phrases: batch.phrases,
       config,
-      musicFile: plan.musicFile,
+      // Music is left out of the Remotion mix entirely when ducking - the
+      // real track gets layered back in afterward by applyMusicSidechain,
+      // compressed against this render's dialogue/sfx audio as the trigger.
+      musicFile: duckThisBatch ? null : plan.musicFile,
       musicStartFrame: plan.musicStartFrame,
       tickFile,
       revealSoundFile,
@@ -201,8 +226,22 @@ async function main() {
       composition,
       inputProps,
       codec: "h264",
-      outputLocation: outputPath,
+      outputLocation: renderTarget,
     });
+
+    if (duckThisBatch) {
+      console.log(`[${index + 1}/${batches.length}] Ducking music against dialogue/sfx via ffmpeg...`);
+      applyMusicSidechain({
+        dialogueVideoPath: renderTarget,
+        musicDir: config.musicDir,
+        musicFile: plan.musicFile!,
+        musicStartFrame: plan.musicStartFrame,
+        fps: config.fps,
+        durationInFrames: composition.durationInFrames,
+        outputPath,
+      });
+      unlinkSync(renderTarget);
+    }
 
     const entry: ManifestEntry = {
       batchId: batch.id,
@@ -218,6 +257,7 @@ async function main() {
       ttsEnabled: config.ttsEnabled,
       ttsPhraseFiles: plan.ttsPhraseFiles,
       ttsRevealFiles: plan.ttsRevealFiles,
+      sidechain: duckThisBatch,
       outputPath,
       renderedAt: new Date().toISOString(),
       suggestedCaption: buildCaption(batch, config.ctaUrl),

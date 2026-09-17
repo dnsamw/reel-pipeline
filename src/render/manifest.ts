@@ -16,6 +16,8 @@ export interface ManifestEntry {
   ttsEnabled: boolean;
   ttsPhraseFiles: (string | null)[];
   ttsRevealFiles: (string | null)[];
+  /** Whether the music track was ducked against dialogue/sfx via ffmpeg's sidechaincompress - see --sidechain in renderBatch.ts. */
+  sidechain: boolean;
   outputPath: string;
   renderedAt: string;
   suggestedCaption: string;

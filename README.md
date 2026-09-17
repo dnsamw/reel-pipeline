@@ -36,6 +36,8 @@ exists separately — ask whoever maintains this repo for the current link.
   uses)
 - An [Azure Speech](https://azure.microsoft.com/en-us/products/ai-services/ai-speech) resource, only if you
   want narrated (`--tts=true`) reels — see [Setup](#setup)
+- `ffmpeg` on your `PATH`, only if you want music ducked under dialogue/sfx (`--sidechain=true`) — checked
+  once at startup; if it's missing, the run warns and falls back to the normal mix instead of failing
 
 ## Setup
 
@@ -77,6 +79,9 @@ npm run render:batch -- --chapters=0-0
 
 # A specific template, with narration on
 npm run render:batch -- --chapters=0-0 --template=2 --tts=true
+
+# Duck background music under dialogue/sfx (real sidechain compression via ffmpeg)
+npm run render:batch -- --chapters=0-0 --tts=true --sidechain=true
 ```
 
 Finished videos land in `output/`, alongside `manifest.json` (what's been rendered, with what settings, plus
@@ -91,6 +96,7 @@ a suggested social caption for each). Re-running the same command later only ren
 | `--tts=true\|false` | Voiced narration on/off (default `false`) |
 | `--limit=N` | Stop after N *new* renders this run |
 | `--force` | Re-render even batches already in the manifest |
+| `--sidechain=true\|false` | Duck background music under dialogue/sfx via ffmpeg's real `sidechaincompress` filter (default `false`). Costs a second render pass per batch (~10-20% more total time, measured — not a flat 2x, since frame-painting isn't the dominant render cost here). Requires `ffmpeg` on `PATH`; if it's missing, the whole run warns once and falls back to the normal single-pass mix instead of failing |
 
 Add more background music any time by dropping `.mp3`/`.wav`/`.m4a`/`.ogg` files into `assets/music/` — new
 tracks are automatically included in the rotation for the next generation, no config change needed.
@@ -108,9 +114,9 @@ src/
   data/            DB access + phrase batching (Node-only)
   theme/           Brand colors/fonts (ported from the main StudyPal app)
   config/          All tunable durations/volumes/text, as a Zod schema
-  audio/           Music/sfx/voice/TTS selection (Node-only)
+  audio/           Music/sfx/voice/TTS selection + ffmpeg availability check (Node-only)
   compositions/    The Remotion video templates + shared scene components
-  render/          The batch runner (renderBatch.ts) + manifest tracking
+  render/          The batch runner (renderBatch.ts), manifest tracking, and sidechain ducking post-process
 assets/            fonts, music, sfx, voice-over, and generated TTS audio
 output/            Rendered videos + manifest.json (gitignored)
 ```

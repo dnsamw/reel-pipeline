@@ -12,6 +12,7 @@ you.
 - [Data flow, end to end](#data-flow-end-to-end)
 - [The config system](#the-config-system)
 - [Audio system](#audio-system)
+- [Sidechain ducking (--sidechain=true)](#sidechain-ducking---sidechaintrue)
 - [How a template is put together](#how-a-template-is-put-together)
 - [Building a new template](#building-a-new-template)
 - [Switching to a new book (e.g. Volume 2)](#switching-to-a-new-book-eg-volume-2)
@@ -74,6 +75,7 @@ studypal-reels/
       listAudioFiles.ts        Lists audio files in a dir (Node-only)
       music.ts / tick.ts / revealSound.ts / voice.ts   Pick-a-file-by-keyword helpers (Node-only)
       tts.ts                   Azure Speech synthesis + content-hash caching (Node-only)
+      ffmpeg.ts                isFfmpegAvailable() - PATH check gating --sidechain (Node-only)
     compositions/
       Root.tsx                 Registers every Composition Studio/render can target
       timings.ts               Per-template timeline math (frame counts, single source of truth)
@@ -86,6 +88,7 @@ studypal-reels/
       renderBatch.ts           The batch runner (Node-only, the only place everything meets)
       manifest.ts              Manifest read/write/resumability types
       caption.ts                Suggested social caption text per batch
+      sidechain.ts             --sidechain=true post-process: real ffmpeg sidechaincompress ducking (Node-only)
   assets/
     fonts/  music/  sfx/  voice/  tts/     Served via Remotion's staticFile() - see remotion.config.ts's publicDir
   output/                                   Rendered .mp4s + manifest.json (gitignored)
@@ -108,8 +111,10 @@ Running `npm run render:batch -- --chapters=0-0 --template=2 --tts=true` does, i
 5. **Bundle the Remotion project** once (`@remotion/bundler`'s `bundle()`).
 6. **For each selected batch**: pick a music track + tick/reveal sfx + intro voice file (all by scanning
    `assets/*` for filename keywords — see [Audio system](#audio-system)), call `renderMedia()` to produce the
-   `.mp4`, then write a manifest entry recording exactly what was used (so a rerun is reproducible and the
-   suggested caption is generated).
+   `.mp4` (if `--sidechain=true` and a music track was picked, this render omits the music track and a second
+   ffmpeg pass ducks it in afterward — see [Sidechain ducking](#sidechain-ducking---sidechaintrue)), then
+   write a manifest entry recording exactly what was used (so a rerun is reproducible and the suggested
+   caption is generated).
 
 Everything downstream of step 3 is per-batch; steps 1–3 happen once per run.
 
@@ -156,6 +161,50 @@ TTS (`src/audio/tts.ts`) is the one slot that calls an external API (Azure Speec
 folder. It's cached by `sha256(voice + ":" + text)` under `assets/tts/`, which is also the folder Remotion
 serves via `staticFile()` — the cache dir and the servable dir are deliberately the same folder, so nothing
 needs copying between them.
+
+## Sidechain ducking (--sidechain=true)
+
+By default, `config.musicVolume` is a flat multiplier — the background track plays at one volume for the
+whole reel, which can bury quiet TTS/sfx under a loud music bed. `--sidechain=true` fixes this with **real**
+sidechain compression (ffmpeg's `sidechaincompress` filter reacting to actual dialogue/sfx loudness), not a
+scripted volume keyframe — the composition timeline is deterministic, but TTS clip length within a scene
+isn't (a short clip in a long scene shouldn't keep the music ducked for the whole scene), so a real trigger
+signal handles that correctly without needing to know exact clip durations.
+
+This is a **post-process**, not a Remotion-native feature — Remotion composites a component tree into a
+video, it isn't a live audio mixer with real-time effects. `renderBatch.ts` implements it as two passes per
+batch (only when a music track was actually picked - `applyMusicSidechain` in `render/sidechain.ts`):
+
+1. **Render with `musicFile: null`.** Same video, but Remotion's own audio mix now contains only
+   dialogue/sfx (voice-over + countdown tick + reveal stinger) - no music. This becomes both the final
+   video track and the sidechain *trigger* signal.
+2. **Build a raw music stem with ffmpeg**, replicating the exact `[trimBefore, loop]` window
+   `Reel.tsx`'s `<Html5Audio loop trimBefore={musicStartFrame}>` would have played: seek past the trimmed
+   head first, then loop *only the remainder* (looping from frame 0 instead would replay the trimmed-off
+   intro on every wrap - audibly different from what Remotion actually renders), then cut to the exact
+   composition duration (`durationInFrames / fps`, taken from `selectComposition()`'s return value, not
+   ffprobe - it's already exact).
+3. **`sidechaincompress` the music stem against the dialogue/sfx track**, mix the ducked music back in with
+   the (untouched) dialogue/sfx, and remux with `-c:v copy` (video stream untouched - this pass only ever
+   re-encodes audio) onto the real output path.
+
+`isFfmpegAvailable()` (`audio/ffmpeg.ts`) is checked once per `renderBatch.ts` run, not per batch - a missing
+`ffmpeg` prints a warning and disables sidechain for the whole run rather than failing mid-batch. Ducking is
+skipped per-batch (falls back to Remotion's normal single-pass mix) whenever no music track was picked at
+all, since there'd be nothing to duck.
+
+**Cost**: measured on this project at ~1.1-1.2x a normal render (a 4-batch run went from 399.6s to 446.3s) -
+notably less than the naive "two full Chromium passes = ~2x" estimate, because this composition's
+frame-painting cost isn't the dominant part of `renderMedia()`'s total time. Re-measure if you significantly
+change scene complexity or reel length; the ratio isn't guaranteed to hold.
+
+**Keep in sync**: the ffmpeg filter graph in `sidechain.ts` hand-replicates `Reel.tsx`'s music
+`<Html5Audio loop trimBefore={...}>` semantics. If that loop/trim behavior ever changes (e.g. a `trimAfter`
+is added, or looping is removed), `sidechain.ts`'s `aloop`/`atrim` filter chain must be updated to match, or
+the ducked music stem will audibly drift from what Remotion would have rendered directly. `ReelTemplate2.tsx`/
+`ReelTemplate3.tsx` share the same music-mounting pattern, so this applies to all three templates uniformly -
+sidechain ducking itself is template-agnostic (it only touches the rendered `.mp4` + the raw source music
+file, never composition code), so no template-specific wiring is needed when adding a Template 4.
 
 ## How a template is put together
 
@@ -267,3 +316,9 @@ sound different."
 - **The `bookId` field lives on `config`, not as a top-level batch-runner concept** — it flows through
   `ReelConfig` like every other setting, which also means it shows up in Studio's props panel (harmless,
   since Studio previews use static `sample-data.json` regardless of `bookId`).
+- **`output/` is gitignored, so there's no version history for rendered `.mp4`s or `manifest.json`.**
+  `--force`-rerunning a batch overwrites its existing file in place with no way to recover the previous
+  bytes. The pipeline is deterministic (same DB content + config ⇒ same audio/voice picks), so a plain
+  `--force` rerun reproduces an equivalent video, but not a byte-identical one (Chromium encode timing isn't
+  perfectly reproducible) — be deliberate about which batches a `--force`/`--limit` combination will actually
+  touch before running it, especially with a broad `--chapters` range.
