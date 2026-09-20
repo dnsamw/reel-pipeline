@@ -1,0 +1,32 @@
+{
+  "id": "romantic-76ac1f8e",
+  "name": "Romantic",
+  "description": "Soft, passionate, moody, and intimate tones.",
+  "templateNumber": "3",
+  "config": {
+    "theme": {
+      "light": {
+        "primary": "#b32c37",
+        "brand2": "#b8644e",
+        "gold": "#F4A261",
+        "goldInk": "#FCEFE3",
+        "foreground": "#170D10",
+        "mutedForeground": "#978a8d",
+        "border": "#dcced1",
+        "background": "#FFF0F3"
+      },
+      "dark": {
+        "primary": "#E63946",
+        "brand2": "#E07A5F",
+        "gold": "#F4A261",
+        "goldInk": "#FCEFE3",
+        "foreground": "#FFF0F3",
+        "mutedForeground": "#9E8C8E",
+        "border": "#2C1A1E",
+        "background": "#170D10"
+      }
+    }
+  },
+  "createdAt": "2026-09-20T10:53:41.345Z",
+  "updatedAt": "2026-09-20T10:53:41.345Z"
+}

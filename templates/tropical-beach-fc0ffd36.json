@@ -1,0 +1,32 @@
+{
+  "id": "tropical-beach-fc0ffd36",
+  "name": "Tropical Beach",
+  "description": "Sun-bleached sand, vibrant turquoise waters, and tropical warmth.",
+  "templateNumber": "3",
+  "config": {
+    "theme": {
+      "light": {
+        "primary": "#00a1a3",
+        "brand2": "#34b8ab",
+        "gold": "#FFD700",
+        "goldInk": "#FFE680",
+        "foreground": "#0A151A",
+        "mutedForeground": "#919490",
+        "border": "#dad9d0",
+        "background": "#FFFBF0"
+      },
+      "dark": {
+        "primary": "#00CED1",
+        "brand2": "#40E0D0",
+        "gold": "#FFD700",
+        "goldInk": "#FFE680",
+        "foreground": "#FFFBF0",
+        "mutedForeground": "#8FA3A3",
+        "border": "#13292B",
+        "background": "#0A151A"
+      }
+    }
+  },
+  "createdAt": "2026-09-20T10:53:41.342Z",
+  "updatedAt": "2026-09-20T10:53:41.342Z"
+}

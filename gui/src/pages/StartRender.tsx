@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
-import type { Book, Chapter, ReelConfig, TemplateRecord } from "../types";
+import { TemplatePicker } from "../components/TemplatePicker";
+import type { Book, Chapter, ReelConfig, ReelTheme, TemplateRecord } from "../types";
 
 export function StartRender() {
   const navigate = useNavigate();
@@ -9,6 +10,7 @@ export function StartRender() {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [templates, setTemplates] = useState<TemplateRecord[]>([]);
   const [defaults, setDefaults] = useState<ReelConfig | null>(null);
+  const [defaultTheme, setDefaultTheme] = useState<ReelTheme | null>(null);
 
   const [book, setBook] = useState<string>("");
   const [minOrder, setMinOrder] = useState<number | "">("");
@@ -33,6 +35,7 @@ export function StartRender() {
         setDefaults(d);
       })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+    api.defaultTheme().then(setDefaultTheme).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -47,6 +50,17 @@ export function StartRender() {
       })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, [book]);
+
+  // Picking a preset re-points the Composition dropdown at the composition
+  // it was designed for - a preset's color/theme overrides only apply to
+  // one of the three compositions (light for 1/2, dark for 3), so rendering
+  // it against a mismatched composition silently produces unstyled output
+  // (looks like "my colors were ignored"). Only fires on templateId/list
+  // changes, so manually changing the dropdown afterward still overrides it.
+  useEffect(() => {
+    const selected = templates.find((t) => t.id === templateId);
+    if (selected) setTemplate(selected.templateNumber);
+  }, [templateId, templates]);
 
   useEffect(() => {
     if (!defaults) return;
@@ -165,23 +179,20 @@ export function StartRender() {
           <div className="grid">
             <div className="field">
               <label>Apply a saved template preset</label>
-              <select value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-                <option value="">None - use defaultConfig</option>
-                {templates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+              <TemplatePicker templates={templates} value={templateId} onChange={setTemplateId} defaultTheme={defaultTheme} />
               <span className="hint">Overrides durations/volumes/theme/TTS rate for this run. See Templates page.</span>
             </div>
             <div className="field">
-              <label>Composition (visual template)</label>
+              <label>Composition</label>
               <select value={template} onChange={(e) => setTemplate(e.target.value as "1" | "2" | "3")}>
                 <option value="1">1 - Classic</option>
                 <option value="2">2 - Side-by-side</option>
                 <option value="3">3 - Reversed (dark)</option>
               </select>
+              <span className="hint">
+                Auto-set from the preset above (a preset's colors only apply to the composition it was made
+                for). Change it here to override.
+              </span>
             </div>
           </div>
         </div>

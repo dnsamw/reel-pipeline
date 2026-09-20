@@ -1,0 +1,32 @@
+{
+  "id": "military-7f85d16c",
+  "name": "Military",
+  "description": "Tactical, rugged, olive drab, and stealth aesthetics.",
+  "templateNumber": "3",
+  "config": {
+    "theme": {
+      "light": {
+        "primary": "#425325",
+        "brand2": "#75754b",
+        "gold": "#D4AF37",
+        "goldInk": "#E6D59C",
+        "foreground": "#111410",
+        "mutedForeground": "#8e908b",
+        "border": "#d3d3ce",
+        "background": "#F5F5F0"
+      },
+      "dark": {
+        "primary": "#556B2F",
+        "brand2": "#8F8F5C",
+        "gold": "#D4AF37",
+        "goldInk": "#E6D59C",
+        "foreground": "#F5F5F0",
+        "mutedForeground": "#7C7E7A",
+        "border": "#20241E",
+        "background": "#111410"
+      }
+    }
+  },
+  "createdAt": "2026-09-20T10:53:41.346Z",
+  "updatedAt": "2026-09-20T10:53:41.346Z"
+}

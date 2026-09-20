@@ -1,0 +1,57 @@
+{
+  "id": "test-template-1-1b2a8af0",
+  "name": "Cyber Neon & Electric Blue",
+  "description": "",
+  "templateNumber": "3",
+  "config": {
+    "phrasesPerReel": 3,
+    "introSeconds": 3,
+    "phraseSeconds": 4.5,
+    "countdownSeconds": 5,
+    "revealSeconds": 5,
+    "outroSeconds": 3,
+    "transitionSeconds": 0.5,
+    "chapterOrderRange": null,
+    "bookId": null,
+    "ttsEnabled": false,
+    "ttsRate": 1,
+    "musicVolume": 0.3,
+    "tickVolume": 0.6,
+    "revealSoundVolume": 0.8,
+    "introVoiceVolume": 1,
+    "phraseVoiceVolume": 1,
+    "revealVoiceVolume": 1,
+    "outputDir": "output",
+    "ttsDir": "assets/tts",
+    "musicDir": "assets/music",
+    "sfxDir": "assets/sfx",
+    "voiceDir": "assets/voice",
+    "manifestPath": "output/manifest.json",
+    "ctaUrl": "studypal.store",
+    "introText": "සිංහල අර්ථය කුමක්ද?",
+    "theme": {
+      "light": {
+        "primary": "#00A8B5",
+        "brand2": "#0284C7",
+        "gold": "#0284C7",
+        "goldInk": "#EAB308",
+        "foreground": "#0F172A",
+        "mutedForeground": "#64748B",
+        "border": "#CBD5E1",
+        "background": "#F1F5F9"
+      },
+      "dark": {
+        "primary": "#00F2FE",
+        "brand2": "#4FACFE",
+        "gold": "#FFE600",
+        "goldInk": "#FFF066",
+        "foreground": "#FFFFFF",
+        "mutedForeground": "#8A99AD",
+        "border": "#1E293B",
+        "background": "#0B0F19"
+      }
+    }
+  },
+  "createdAt": "2026-09-20T07:19:08.391Z",
+  "updatedAt": "2026-09-20T10:24:02.474Z"
+}
