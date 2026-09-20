@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { AbsoluteFill } from "remotion";
-import { colors, primaryTint, goldTint, darkColors, darkPrimaryTint, darkGoldTint, fontFamily } from "../../theme/tokens";
+import { fontFamily } from "../../theme/tokens";
+import { usePalette } from "../../theme/ThemeContext";
 
 /**
  * Shared chrome for the phrase/countdown/reveal scenes: soft background
@@ -19,9 +20,9 @@ export function SceneFrame({
   theme?: "light" | "dark";
   progress?: { current: number; total: number };
 }) {
-  const c = theme === "dark" ? darkColors : colors;
-  const pTint = theme === "dark" ? darkPrimaryTint : primaryTint;
-  const gTint = theme === "dark" ? darkGoldTint : goldTint;
+  const c = usePalette(theme);
+  const pTint = c.primaryTint;
+  const gTint = c.goldTint;
 
   return (
     <AbsoluteFill style={{ backgroundColor: c.background, overflow: "hidden" }}>

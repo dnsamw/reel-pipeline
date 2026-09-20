@@ -7,6 +7,7 @@ import { GuessRevealSceneT2 } from "./scenes/GuessRevealSceneT2";
 import { OutroScene } from "./scenes/OutroScene";
 import { buildTimelineT2, totalDuration } from "./timings";
 import { type ReelProps, reelPropsSchema, reelDefaultProps } from "./Reel";
+import { ThemeProvider } from "../theme/ThemeContext";
 
 // Template 2 reuses the exact same props shape as Template 1 (see Reel.tsx)
 // - the DB/TTS data prep doesn't change per template, only which text is
@@ -41,7 +42,7 @@ export function ReelTemplate2({
   const lastGuessRevealIndex = timeline.map((item) => item.type).lastIndexOf("guessReveal");
 
   return (
-    <>
+    <ThemeProvider theme={config.theme}>
       {musicFile && (
         <Html5Audio src={staticFile(`music/${musicFile}`)} loop trimBefore={musicStartFrame} volume={config.musicVolume} />
       )}
@@ -82,6 +83,6 @@ export function ReelTemplate2({
           );
         })}
       </TransitionSeries>
-    </>
+    </ThemeProvider>
   );
 }

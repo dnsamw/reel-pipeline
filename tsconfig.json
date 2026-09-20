@@ -17,5 +17,5 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["src", "remotion.config.ts"]
+  "include": ["src", "remotion.config.ts", "server", "gui/src"]
 }

@@ -1,4 +1,4 @@
-import { mkdirSync, unlinkSync } from "node:fs";
+import { mkdirSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { bundle } from "@remotion/bundler";
 import { renderMedia, selectComposition } from "@remotion/renderer";
@@ -32,6 +32,10 @@ import type { ReelProps } from "../compositions/Reel";
  *   npm run render:batch -- --sidechain=true        # duck music under dialogue/sfx via ffmpeg sidechaincompress (see render/sidechain.ts) -
  *                                                    # costs a second full render pass per batch; falls back to the normal single-pass mix
  *                                                    # with a console warning if ffmpeg isn't on PATH
+ *   npm run render:batch -- --presetFile=path.json  # merge a JSON ReelConfig (partial) into defaultConfig as the baseline for this run,
+ *                                                    # before the flags above are applied - this is how the GUI's template library
+ *                                                    # (server/templates.ts) applies a saved preset (durations/volumes/theme/ttsRate/etc.)
+ *                                                    # without needing a dedicated CLI flag per config field
  */
 type Template = "1" | "2" | "3";
 
@@ -50,6 +54,7 @@ function parseArgs(argv: string[]) {
     template,
     book: typeof args.book === "string" ? args.book : null,
     sidechain: args.sidechain === "true",
+    presetFile: typeof args.presetFile === "string" ? args.presetFile : null,
   };
 }
 
@@ -93,7 +98,7 @@ function manifestKey(batch: ReelBatch, template: Template): string {
 }
 
 async function main() {
-  const { chapters, limit, force, tts, template, book, sidechain } = parseArgs(process.argv.slice(2));
+  const { chapters, limit, force, tts, template, book, sidechain, presetFile } = parseArgs(process.argv.slice(2));
   const compositionId = COMPOSITION_IDS[template];
   const introVoiceKeyword = INTRO_VOICE_KEYWORDS[template];
   const bookTag = book ? sanitizeTag(book) : null;
@@ -111,6 +116,13 @@ async function main() {
   }
 
   const config: ReelConfig = { ...defaultConfig };
+  // Applied before the flag overrides below so a preset (a saved GUI
+  // template) sets the baseline, but --chapters/--tts/--book etc. on the
+  // same command line still win for a one-off tweak.
+  if (presetFile) {
+    const preset = JSON.parse(readFileSync(presetFile, "utf-8")) as Partial<ReelConfig>;
+    Object.assign(config, preset);
+  }
   if (chapters) {
     const [min, max] = chapters.split("-").map(Number);
     config.chapterOrderRange = [min, max];
@@ -164,8 +176,10 @@ async function main() {
     const ttsRevealFiles: (string | null)[] = [];
     if (config.ttsEnabled) {
       for (const phrase of batch.phrases) {
-        ttsPhraseFiles.push(await synthesizeSpeech(phrase.phrase, voicePair.en, config.ttsDir));
-        ttsRevealFiles.push(await synthesizeSpeech(phrase.translationSi ?? phrase.phrase, voicePair.si, config.ttsDir));
+        ttsPhraseFiles.push(await synthesizeSpeech(phrase.phrase, voicePair.en, config.ttsDir, config.ttsRate));
+        ttsRevealFiles.push(
+          await synthesizeSpeech(phrase.translationSi ?? phrase.phrase, voicePair.si, config.ttsDir, config.ttsRate),
+        );
       }
     } else {
       batch.phrases.forEach(() => {

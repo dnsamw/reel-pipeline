@@ -1,5 +1,6 @@
 import { Html5Audio, Sequence, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import { darkColors, darkPrimaryTint, fontFamily } from "../../theme/tokens";
+import { fontFamily } from "../../theme/tokens";
+import { usePalette } from "../../theme/ThemeContext";
 import type { Phrase } from "../../data/phrase";
 import { SceneFrame } from "./SceneFrame";
 import { computeGuessRevealPhases } from "./guessRevealPhases";
@@ -40,6 +41,8 @@ export function GuessRevealSceneT3({
 }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const darkColors = usePalette("dark");
+  const darkPrimaryTint = darkColors.primaryTint;
   const { promptTranslateY, promptScale, ringOpacity, ringProgress, countdownNumber, answerOpacity } =
     computeGuessRevealPhases({ frame, fps, promptFrames, countdownFrames });
 
