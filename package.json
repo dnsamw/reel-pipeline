@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "studio": "remotion studio src/compositions/Root.tsx",
-    "render:batch": "tsx src/render/renderBatch.ts",
-    "data:export-sample": "tsx src/data/exportSample.ts",
+    "render:batch": "tsx --env-file=.env src/render/renderBatch.ts",
+    "data:export-sample": "tsx --env-file=.env src/data/exportSample.ts",
+    "data:import-eng-book": "tsx --env-file=.env src/data/importFromEngBookDb.ts",
     "prisma:pull": "prisma db pull",
     "prisma:generate": "prisma generate"
   },
@@ -16,6 +17,7 @@
     "@remotion/cli": "4.0.523",
     "@remotion/fonts": "4.0.523",
     "@remotion/google-fonts": "4.0.523",
+    "@remotion/media-parser": "4.0.523",
     "@remotion/renderer": "4.0.523",
     "@remotion/transitions": "4.0.523",
     "microsoft-cognitiveservices-speech-sdk": "^1.42.0",

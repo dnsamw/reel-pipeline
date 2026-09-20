@@ -3,7 +3,7 @@ import { dirname } from "node:path";
 
 export interface ManifestEntry {
   batchId: string;
-  /** "1" | "2" | "3" - see renderBatch.ts's Template type / --template flag. */
+  /** "1" | "2" | "3" | "4" - see renderBatch.ts's Template type / --template flag. */
   template: string;
   chapterOrder: number;
   chapterTitle: string;

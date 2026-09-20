@@ -106,7 +106,7 @@ export function GuessRevealSceneT3({
               fontSize: 60,
               lineHeight: 1.3,
               textAlign: "center",
-              color: darkColors.primary,
+              color: "#ffffff",
               margin: 0,
             }}
           >

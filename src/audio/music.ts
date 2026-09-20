@@ -1,3 +1,6 @@
+import { join } from "node:path";
+import { parseMedia } from "@remotion/media-parser";
+import { nodeReader } from "@remotion/media-parser/node";
 import { listAudioFiles } from "./listAudioFiles";
 
 /**
@@ -13,14 +16,31 @@ export function pickMusicTrack(musicDir: string, batchIndex: number): string | n
 }
 
 /**
- * Deterministic start offset (in frames) into the chosen track, so reusing
- * a handful of multi-minute tracks across hundreds of reels doesn't replay
- * the same opening bars every time. Capped at 30s, which is safe for the
- * ~2-4 minute tracks these are meant for - revisit if much shorter tracks
- * are ever added to assets/music.
+ * Node-only - reads just enough of the file to get its duration, so
+ * pickMusicStartFrame can stay within the track's actual length instead of
+ * assuming every track is multiple minutes long (see it below).
  */
-export function pickMusicStartFrame(batchIndex: number, fps: number): number {
-  const maxOffsetSeconds = 30;
-  const offsetSeconds = (batchIndex * 47) % maxOffsetSeconds;
+export async function getAudioDurationSeconds(musicDir: string, file: string): Promise<number> {
+  const { slowDurationInSeconds } = await parseMedia({
+    src: join(musicDir, file),
+    reader: nodeReader,
+    fields: { slowDurationInSeconds: true },
+    acknowledgeRemotionLicense: true,
+  });
+  return slowDurationInSeconds;
+}
+
+/**
+ * Deterministic start offset (in frames) into the chosen track, so reusing
+ * a handful of tracks across hundreds of reels doesn't replay the same
+ * opening bars every time. Capped at 30s, but never past (durationSeconds -
+ * 1) - the Html5Audio `loop` prop wraps this in a Remotion <Loop>, whose
+ * durationInFrames is trackDuration - trimBefore, and that must stay
+ * positive or the render crashes (it went negative once assets/music picked
+ * up tracks shorter than the previously-assumed 2-4 minutes).
+ */
+export function pickMusicStartFrame(batchIndex: number, fps: number, durationSeconds: number): number {
+  const maxOffsetSeconds = Math.min(30, Math.max(0, durationSeconds - 1));
+  const offsetSeconds = maxOffsetSeconds > 0 ? (batchIndex * 47) % maxOffsetSeconds : 0;
   return Math.round(offsetSeconds * fps);
 }

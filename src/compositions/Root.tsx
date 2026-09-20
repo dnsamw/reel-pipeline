@@ -3,6 +3,7 @@ import { registerFonts } from "../theme/fonts";
 import { Reel, calculateReelMetadata, reelDefaultProps, reelPropsSchema, sampleBatches } from "./Reel";
 import { ReelTemplate2, calculateReelTemplate2Metadata, reelTemplate2DefaultProps, reelTemplate2PropsSchema } from "./ReelTemplate2";
 import { ReelTemplate3, calculateReelTemplate3Metadata, reelTemplate3DefaultProps, reelTemplate3PropsSchema } from "./ReelTemplate3";
+import { ReelTemplate4, calculateReelTemplate4Metadata, reelTemplate4DefaultProps, reelTemplate4PropsSchema } from "./ReelTemplate4";
 
 // Fires once when the bundle loads; loadFont/loadCustomFont each call
 // Remotion's delayRender/continueRender internally, so this blocks any
@@ -51,6 +52,19 @@ function RemotionRoot() {
         defaultProps={reelTemplate3DefaultProps}
       />
       <SampleReelsT3 />
+
+      <Composition
+        id="Reel-T4"
+        component={ReelTemplate4}
+        schema={reelTemplate4PropsSchema}
+        calculateMetadata={calculateReelTemplate4Metadata}
+        durationInFrames={300}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={reelTemplate4DefaultProps}
+      />
+      <SampleReelsT4 />
     </>
   );
 }
@@ -105,6 +119,23 @@ function SampleReelsT3() {
       width={1080}
       height={1920}
       defaultProps={{ ...reelTemplate3DefaultProps, phrases }}
+    />
+  ));
+}
+
+function SampleReelsT4() {
+  return sampleBatches.map((phrases, i) => (
+    <Composition
+      key={i}
+      id={`Reel-T4-Sample-${i + 1}`}
+      component={ReelTemplate4}
+      schema={reelTemplate4PropsSchema}
+      calculateMetadata={calculateReelTemplate4Metadata}
+      durationInFrames={300}
+      fps={30}
+      width={1080}
+      height={1920}
+      defaultProps={{ ...reelTemplate4DefaultProps, phrases }}
     />
   ));
 }

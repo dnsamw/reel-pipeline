@@ -5,7 +5,7 @@ import { renderMedia, selectComposition } from "@remotion/renderer";
 import { getPhrases, disconnect } from "../data/getPhrases";
 import { batchPhrases, type ReelBatch } from "../data/batch";
 import { defaultConfig, type ReelConfig } from "../config/config";
-import { pickMusicTrack, pickMusicStartFrame } from "../audio/music";
+import { pickMusicTrack, pickMusicStartFrame, getAudioDurationSeconds } from "../audio/music";
 import { findTickFile } from "../audio/tick";
 import { findRevealSound } from "../audio/revealSound";
 import { pickIntroVoice } from "../audio/voice";
@@ -27,13 +27,13 @@ import type { ReelProps } from "../compositions/Reel";
  *   npm run render:batch -- --limit=3             # render at most 3 NEW reels this run, then stop (skips still count toward nothing - already-rendered batches don't consume the limit)
  *   npm run render:batch -- --force                # re-render even batches already in the manifest
  *   npm run render:batch -- --tts=true             # override config.ttsEnabled for this run
- *   npm run render:batch -- --template=2           # 1 (default) | 2 | 3 - see src/compositions/ReelTemplate2.tsx/ReelTemplate3.tsx
+ *   npm run render:batch -- --template=2           # 1 (default) | 2 | 3 | 4 - see src/compositions/ReelTemplate2.tsx/ReelTemplate3.tsx/ReelTemplate4.tsx
  *   npm run render:batch -- --book=volume-2        # Book.id or a substring of Book.title - required once more than one book exists (see docs/ARCHITECTURE.md)
  *   npm run render:batch -- --sidechain=true        # duck music under dialogue/sfx via ffmpeg sidechaincompress (see render/sidechain.ts) -
  *                                                    # costs a second full render pass per batch; falls back to the normal single-pass mix
  *                                                    # with a console warning if ffmpeg isn't on PATH
  */
-type Template = "1" | "2" | "3";
+type Template = "1" | "2" | "3" | "4";
 
 function parseArgs(argv: string[]) {
   const args: Record<string, string | boolean> = {};
@@ -41,7 +41,8 @@ function parseArgs(argv: string[]) {
     const match = arg.match(/^--([^=]+)(?:=(.*))?$/);
     if (match) args[match[1]] = match[2] ?? true;
   }
-  const template: Template = args.template === "2" ? "2" : args.template === "3" ? "3" : "1";
+  const template: Template =
+    args.template === "2" ? "2" : args.template === "3" ? "3" : args.template === "4" ? "4" : "1";
   return {
     chapters: typeof args.chapters === "string" ? args.chapters : null,
     limit: typeof args.limit === "string" ? parseInt(args.limit, 10) : null,
@@ -58,11 +59,16 @@ function sanitizeTag(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
-const COMPOSITION_IDS: Record<Template, string> = { "1": "Reel", "2": "Reel-T2", "3": "Reel-T3" };
-// Template 3 reverses direction (asks for the English meaning instead of
-// the Sinhala one), so it needs the separate "WhatIsEnglishMeaning_*" intro
+const COMPOSITION_IDS: Record<Template, string> = { "1": "Reel", "2": "Reel-T2", "3": "Reel-T3", "4": "Reel-T4" };
+// Templates 3/4 reverse direction (ask for the English meaning instead of
+// the Sinhala one), so they need the separate "WhatIsEnglishMeaning_*" intro
 // voice set - see audio/voice.ts.
-const INTRO_VOICE_KEYWORDS: Record<Template, "sinhala" | "english"> = { "1": "sinhala", "2": "sinhala", "3": "english" };
+const INTRO_VOICE_KEYWORDS: Record<Template, "sinhala" | "english"> = {
+  "1": "sinhala",
+  "2": "sinhala",
+  "3": "english",
+  "4": "english",
+};
 
 // English/Sinhala voice pairs, alternated per reel so the same two voices
 // aren't used for every single video - female pairs with female, male with
@@ -77,8 +83,8 @@ function paddedOrder(n: number): string {
 }
 
 // Template 1 keeps its original (unsuffixed) filenames/manifest keys so
-// already-rendered production reels stay recognized as done - only 2/3 (new,
-// nothing to preserve) get a suffix, so the three templates never collide
+// already-rendered production reels stay recognized as done - only 2/3/4
+// (new, nothing to preserve) get a suffix, so the templates never collide
 // when rendering the same phrase range.
 function outputFilename(batch: ReelBatch, template: Template, bookTag: string | null): string {
   const first = batch.phrases[0].order;
@@ -173,9 +179,11 @@ async function main() {
         ttsRevealFiles.push(null);
       });
     }
+    const musicFile = pickMusicTrack(config.musicDir, index);
+    const musicDurationSeconds = musicFile ? await getAudioDurationSeconds(config.musicDir, musicFile) : 0;
     audioPlan.set(batch.id, {
-      musicFile: pickMusicTrack(config.musicDir, index),
-      musicStartFrame: pickMusicStartFrame(index, config.fps),
+      musicFile,
+      musicStartFrame: musicFile ? pickMusicStartFrame(index, config.fps, musicDurationSeconds) : 0,
       introVoiceFile: pickIntroVoice(config.voiceDir, index, introVoiceKeyword),
       ttsPhraseFiles,
       ttsRevealFiles,
