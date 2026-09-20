@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
-import type { Book, Chapter, ReelConfig, TemplateRecord } from "../types";
+import { TemplatePicker } from "../components/TemplatePicker";
+import type { Book, Chapter, ReelConfig, ReelTheme, TemplateRecord } from "../types";
 
 export function StartRender() {
   const navigate = useNavigate();
@@ -9,6 +10,7 @@ export function StartRender() {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [templates, setTemplates] = useState<TemplateRecord[]>([]);
   const [defaults, setDefaults] = useState<ReelConfig | null>(null);
+  const [defaultTheme, setDefaultTheme] = useState<ReelTheme | null>(null);
 
   const [book, setBook] = useState<string>("");
   const [minOrder, setMinOrder] = useState<number | "">("");
@@ -33,6 +35,7 @@ export function StartRender() {
         setDefaults(d);
       })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+    api.defaultTheme().then(setDefaultTheme).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -176,14 +179,7 @@ export function StartRender() {
           <div className="grid">
             <div className="field">
               <label>Apply a saved template preset</label>
-              <select value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-                <option value="">None - use defaultConfig</option>
-                {templates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+              <TemplatePicker templates={templates} value={templateId} onChange={setTemplateId} defaultTheme={defaultTheme} />
               <span className="hint">Overrides durations/volumes/theme/TTS rate for this run. See Templates page.</span>
             </div>
             <div className="field">
