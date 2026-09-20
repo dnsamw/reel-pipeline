@@ -1,0 +1,32 @@
+{
+  "id": "forest-55bd7c46",
+  "name": "Forest",
+  "description": "Earth tones, organic greens, and deep woodlands.",
+  "templateNumber": "3",
+  "config": {
+    "theme": {
+      "light": {
+        "primary": "#246c44",
+        "brand2": "#759a75",
+        "gold": "#E9B136",
+        "goldInk": "#F3D894",
+        "foreground": "#121711",
+        "mutedForeground": "#8e928c",
+        "border": "#d2d5cf",
+        "background": "#F4F6F0"
+      },
+      "dark": {
+        "primary": "#2E8B57",
+        "brand2": "#8FBC8F",
+        "gold": "#E9B136",
+        "goldInk": "#F3D894",
+        "foreground": "#F4F6F0",
+        "mutedForeground": "#7C857E",
+        "border": "#242922",
+        "background": "#121711"
+      }
+    }
+  },
+  "createdAt": "2026-09-20T10:53:41.342Z",
+  "updatedAt": "2026-09-20T10:53:41.342Z"
+}

@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
-import type { TemplateRecord } from "../types";
+import { ThemePreviewPair } from "../components/ThemeThumbnail";
+import type { ReelTheme, TemplateRecord } from "../types";
 
 export function Templates() {
   const [templates, setTemplates] = useState<TemplateRecord[]>([]);
+  const [defaultTheme, setDefaultTheme] = useState<ReelTheme | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   function reload() {
@@ -12,6 +14,9 @@ export function Templates() {
   }
 
   useEffect(reload, []);
+  useEffect(() => {
+    api.defaultTheme().then(setDefaultTheme).catch(() => {});
+  }, []);
 
   async function onDelete(id: string) {
     if (!confirm(`Delete template "${id}"? This removes it from SQLite and templates/${id}.json (uncommitted deletion won't affect git history until pushed).`)) return;
@@ -36,9 +41,10 @@ export function Templates() {
         ) : (
           templates.map((t) => (
             <div className="template-list-item" key={t.id}>
-              <div>
+              {(t.config.theme ?? defaultTheme) && <ThemePreviewPair theme={t.config.theme ?? defaultTheme!} />}
+              <div className="template-list-info">
                 <div>
-                  <strong>{t.name}</strong> <span className="hint">(template {t.templateNumber})</span>
+                  <strong>{t.name}</strong> <span className="hint">(Composition {t.templateNumber})</span>
                 </div>
                 <div className="meta">{t.description || "No description"} · updated {new Date(t.updatedAt).toLocaleString()}</div>
               </div>

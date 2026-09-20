@@ -1,0 +1,32 @@
+{
+  "id": "vice-city-neon-cc9f70a0",
+  "name": "Vice City Neon",
+  "description": "80s sunset, Miami nights, and retro synthwave vibes.",
+  "templateNumber": "3",
+  "config": {
+    "theme": {
+      "light": {
+        "primary": "#9300c7",
+        "brand2": "#d13c82",
+        "gold": "#FFD700",
+        "goldInk": "#FFF176",
+        "foreground": "#0F0916",
+        "mutedForeground": "#938b93",
+        "border": "#dbd2d8",
+        "background": "#FFF5FA"
+      },
+      "dark": {
+        "primary": "#BD00FF",
+        "brand2": "#FF499E",
+        "gold": "#FFD700",
+        "goldInk": "#FFF176",
+        "foreground": "#FFF5FA",
+        "mutedForeground": "#8F859B",
+        "border": "#231A2C",
+        "background": "#0F0916"
+      }
+    }
+  },
+  "createdAt": "2026-09-20T10:53:41.341Z",
+  "updatedAt": "2026-09-20T10:53:41.341Z"
+}

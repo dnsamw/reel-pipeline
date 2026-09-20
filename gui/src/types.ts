@@ -14,9 +14,13 @@ export interface ReelTheme {
   dark: Palette;
 }
 
-// Mirrors src/config/config.ts's ReelConfig - kept as a separate, decoupled
-// copy here (the gui/ Vite app doesn't import server/src TS directly) so the
-// two projects can't accidentally end up depending on each other's build.
+// Mirrors src/config/config.ts's ReelConfig field-for-field - kept as a
+// separate copy (rather than importing config.ts's type) so the two
+// projects can't accidentally end up depending on each other's build.
+// MUST stay a complete structural match: ReelPreview.tsx passes an object
+// of this shape straight into the real Reel/ReelTemplate2/ReelTemplate3
+// components, which expect the real (complete) ReelConfig - a field missing
+// here is a compile error there, not a silent gap.
 export interface ReelConfig {
   phrasesPerReel: number;
   introSeconds: number;
@@ -28,6 +32,8 @@ export interface ReelConfig {
   fps: number;
   width: number;
   height: number;
+  chapterOrderRange: [number, number] | null;
+  bookId: string | null;
   ttsEnabled: boolean;
   ttsRate: number;
   theme: ReelTheme | null;
@@ -37,6 +43,12 @@ export interface ReelConfig {
   introVoiceVolume: number;
   phraseVoiceVolume: number;
   revealVoiceVolume: number;
+  outputDir: string;
+  ttsDir: string;
+  musicDir: string;
+  sfxDir: string;
+  voiceDir: string;
+  manifestPath: string;
   ctaUrl: string;
   introText: string;
   [key: string]: unknown;

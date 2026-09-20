@@ -60,6 +60,14 @@ Then generate the Prisma client against the schema in this repo:
 npm run prisma:generate
 ```
 
+`npm run studio` and the GUI's template color preview both need real sample phrases to display -
+`src/compositions/sample-data.json`, gitignored since it's DB content, isn't in the repo yet. Generate it once
+(needs `DATABASE_URL` working):
+
+```bash
+npm run data:export-sample
+```
+
 ## Usage
 
 Preview compositions and live-tweak settings (durations, volumes, colors, text) in a real UI:

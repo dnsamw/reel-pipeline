@@ -20,6 +20,7 @@
     "@remotion/cli": "4.0.523",
     "@remotion/fonts": "4.0.523",
     "@remotion/google-fonts": "4.0.523",
+    "@remotion/player": "4.0.523",
     "@remotion/renderer": "4.0.523",
     "@remotion/transitions": "4.0.523",
     "better-sqlite3": "^11.8.1",

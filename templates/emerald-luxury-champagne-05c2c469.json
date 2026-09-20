@@ -1,0 +1,32 @@
+{
+  "id": "emerald-luxury-champagne-05c2c469",
+  "name": "Emerald Luxury & Champagne",
+  "description": "Sophisticated, premium, and calm - ideal for high-end services, finance, or elegant branding.",
+  "templateNumber": "3",
+  "config": {
+    "theme": {
+      "light": {
+        "primary": "#0c9065",
+        "brand2": "#2bad7d",
+        "gold": "#D4AF37",
+        "goldInk": "#F3E5AB",
+        "foreground": "#111827",
+        "mutedForeground": "#91949c",
+        "border": "#d6d8db",
+        "background": "#F9FAFB"
+      },
+      "dark": {
+        "primary": "#10B981",
+        "brand2": "#34D399",
+        "gold": "#D4AF37",
+        "goldInk": "#F3E5AB",
+        "foreground": "#F9FAFB",
+        "mutedForeground": "#9CA3AF",
+        "border": "#1F2937",
+        "background": "#111827"
+      }
+    }
+  },
+  "createdAt": "2026-09-20T10:53:41.330Z",
+  "updatedAt": "2026-09-20T10:53:41.330Z"
+}

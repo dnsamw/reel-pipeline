@@ -1,0 +1,32 @@
+{
+  "id": "uk-flag-union-jack-22e496ef",
+  "name": "UK Flag (Union Jack)",
+  "description": "Classic British red, white, and deep navy blue palette.",
+  "templateNumber": "3",
+  "config": {
+    "theme": {
+      "light": {
+        "primary": "#011a52",
+        "brand2": "#001e67",
+        "gold": "#C5A059",
+        "goldInk": "#E6D2A5",
+        "foreground": "#040814",
+        "mutedForeground": "#8e9095",
+        "border": "#d9dadc",
+        "background": "#FFFFFF"
+      },
+      "dark": {
+        "primary": "#012169",
+        "brand2": "#00247D",
+        "gold": "#C5A059",
+        "goldInk": "#E6D2A5",
+        "foreground": "#FFFFFF",
+        "mutedForeground": "#7E8A9E",
+        "border": "#0A1128",
+        "background": "#040814"
+      }
+    }
+  },
+  "createdAt": "2026-09-20T10:53:41.347Z",
+  "updatedAt": "2026-09-20T10:53:41.347Z"
+}
