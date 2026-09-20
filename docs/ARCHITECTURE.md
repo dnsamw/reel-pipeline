@@ -15,7 +15,9 @@ you.
 - [Sidechain ducking (--sidechain=true)](#sidechain-ducking---sidechaintrue)
 - [How a template is put together](#how-a-template-is-put-together)
 - [Building a new template](#building-a-new-template)
+- [Theming (per-template color overrides)](#theming-per-template-color-overrides)
 - [Switching to a new book (e.g. Volume 2)](#switching-to-a-new-book-eg-volume-2)
+- [GUI: batch monitor + template library](#gui-batch-monitor--template-library)
 - [Known limitations & gotchas](#known-limitations--gotchas)
 
 ## Mental model
@@ -264,6 +266,26 @@ Say you want a Template 4. The fastest path is to copy the closest existing temp
    (extract a still per phase with ffmpeg, `ffprobe`/`silencedetect` the audio) before trusting it at scale —
    this is exactly how Templates 2 and 3 were verified.
 
+## Theming (per-template color overrides)
+
+Every scene component (`SceneFrame`, `IntroScene`, `OutroScene`, `PhraseScene`, `CountdownScene`, `RevealScene`,
+`GuessRevealSceneT2`/`T3`) reads its palette via `usePalette(variant)` (`src/theme/ThemeContext.tsx`) instead
+of importing `colors`/`darkColors` from `theme/tokens.ts` directly. `Reel.tsx`/`ReelTemplate2.tsx`/
+`ReelTemplate3.tsx` each wrap their render tree in `<ThemeProvider theme={config.theme}>` — when
+`config.theme` is `null` (the default), `usePalette` falls back to the built-in brand palette
+(`theme/tokens.ts`'s `colors`/`darkColors`), so nothing changes for existing renders.
+
+This is what lets a **template library preset** (see [GUI](#gui-batch-monitor--template-library) below) ship
+its own full light+dark palette (`configSchema`'s `theme` field — a `{ light: Palette, dark: Palette }` object,
+`Palette` being the same 8-key shape as `colors`/`darkColors`) without touching scene code — a preset is just
+a `ReelConfig` with `theme` set, passed through `--presetFile` at render time.
+
+**If you add a new scene component**, read colors via `usePalette("light" | "dark")`, never by importing
+`colors`/`darkColors` directly — otherwise that component silently ignores template color overrides, which is
+exactly the bug this refactor exists to prevent. `OutroScene` is the one component that reads *both*
+`usePalette("light")` and `usePalette("dark")` at once (its contrast effect deliberately borrows the other
+palette's primary color as an accent) — copy that pattern if a new scene needs the same cross-palette trick.
+
 ## Switching to a new book (e.g. Volume 2)
 
 The DB schema (`Book` → `BookChapter` → `BookPhrase`) already supports multiple books; as of this change,
@@ -278,10 +300,11 @@ so does this pipeline. What you actually need to do once a second `Book` row exi
    sanitized version of what you typed (`volume-2-ch000-000-002.mp4`), so two books' overlapping
    chapter/phrase numbers never overwrite each other. Manifest keys never collide either way, since they're
    derived from phrase UUIDs, which are globally unique regardless of book.
-3. **Branding/theme**: if the new book has different brand colors, update `theme/tokens.ts`'s `colors`/
-   `darkColors` — everything downstream (all three templates) reads from those constants, nothing is
-   hardcoded per-scene. If it's the *same* StudyPal brand (likely, for a second phrasebook volume), no theme
-   change is needed at all.
+3. **Branding/theme**: if the new book has different brand colors, either update `theme/tokens.ts`'s `colors`/
+   `darkColors` (changes the default for every render that doesn't specify a template preset) or save a GUI
+   template preset with its own `theme` override scoped to just that book's renders — see
+   [Theming](#theming-per-template-color-overrides). If it's the *same* StudyPal brand (likely, for a second
+   phrasebook volume), no theme change is needed at all.
 4. **Outro copy**: `OutroScene.tsx`'s "Get the full phrasebook" / "200+ everyday English phrases..." text is
    currently hardcoded, not book-aware. If Volume 2 needs different outro copy (a different phrase count,
    different tagline), either parameterize `OutroScene` with a `headline`/`subhead` prop sourced from
@@ -296,6 +319,49 @@ so does this pipeline. What you actually need to do once a second `Book` row exi
 In short: **for a same-brand second volume with the same reel format, the only required change is adding
 `--book=` to your commands.** Everything else in this list is "only if Volume 2 actually needs to look or
 sound different."
+
+## GUI (batch monitor + template library)
+
+`server/` (Express) + `gui/` (React/Vite) is a control panel wrapped *around* the CLI in this document, not a
+second render path — every render it triggers still runs as an ordinary `npm run render:batch -- ...`
+subprocess (`server/renderRunner.ts` spawns it with `child_process.spawn`, no shell interpretation, and
+streams stdout/stderr back to the browser via polling). If something here seems to behave differently from
+the CLI, the bug is almost certainly in how the GUI is invoking `render:batch`, not in `render:batch` itself.
+
+**Storage split, and why**: book/chapter/phrase data stays in the shared Postgres DB via Prisma exactly as
+described above — the GUI's `server/` never writes to it, only reads (`listBooks`/`listChapters` in
+`src/data/getPhrases.ts`, added for the GUI's chapter picker). Everything GUI-specific (saved template
+presets) lives in **SQLite** (`server/db.ts`, file at `data/gui.db`, gitignored) instead — that Postgres
+schema is documented as read-only and shared with the separate `ubuntu-node` app, so it was deliberately not
+extended for tool-local state.
+
+**Template library = saved `ReelConfig` overrides, not a second config system**. A "template" record
+(`server/templates.ts`) is `{ name, description, templateNumber, config }`, where `config` is a
+`Partial<ReelConfig>` — the exact same shape `defaultConfig` is. Applying a template at render time
+(`POST /api/render/start` with a `templateId`) writes that `config` to a temp JSON file and passes
+`--presetFile=<path>` to `render:batch` (see [Usage](../README.md#usage) and the `--presetFile` doc comment
+in `renderBatch.ts`) — `main()` merges it onto `defaultConfig` *before* applying `--chapters`/`--tts`/`--book`
+etc., so a template sets the baseline and any explicit flag on the same run still wins. This is also what
+makes per-template TTS speed (`config.ttsRate`, plumbed into `src/audio/tts.ts` as an SSML `<prosody rate>`
+when non-default) and per-template colors (`config.theme`, see [Theming](#theming-per-template-color-overrides))
+actually take effect, rather than being GUI-only cosmetic fields that don't affect the rendered video.
+
+**Git as the templates' version history, SQLite as the query store**: every template save
+(`saveTemplate` in `server/templates.ts`) writes the SQLite row *and* re-exports `templates/<id>.json` in the
+same call, so they can't drift apart. Committing/pushing that JSON (`POST /api/templates/:id/push`, wired to
+the GUI's "Push to GitHub" button) is a **separate, explicit action** — saving a template never commits or
+pushes on its own, same as any other git client. JSON (one file per template) was chosen over committing the
+`.db` file directly because SQLite's binary format doesn't diff or merge in git; `data/gui.db` itself is
+gitignored for exactly this reason.
+
+**Intro/outro video clips are spec'd, not implemented.** `IntroScene`/`OutroScene` are still plain
+React+CSS+`Html5Audio` (see [How a template is put together](#how-a-template-is-put-together)) — there is no
+`OffthreadVideo`/clip-embedding code anywhere in `src/compositions/`. The GUI's Video Spec page
+(`gui/src/pages/VideoSpecPage.tsx`, data from `GET /api/video-spec` / `server/videoSpec.ts`) exists so the
+standard to produce clips against (container/codec, exact 1080×1920 @ 30fps, the baked-in-audio-vs-silent
+decision, fixed-vs-variable duration, `assets/intro-videos/`/`assets/outro-videos/` naming) is written down
+*before* anyone shoots footage, even though the pipeline can't play those clips back yet. Building that
+playback is a separate, larger change — see the trade-offs it involves in that section of the spec doc.
 
 ## Known limitations & gotchas
 
@@ -322,3 +388,10 @@ sound different."
   `--force` rerun reproduces an equivalent video, but not a byte-identical one (Chromium encode timing isn't
   perfectly reproducible) — be deliberate about which batches a `--force`/`--limit` combination will actually
   touch before running it, especially with a broad `--chapters` range.
+- **The GUI's render-run tracking is in-memory only** (`server/renderRunner.ts`) — restarting the API server
+  loses the log/status of any run that was in flight (the render subprocess itself keeps running independently
+  and still writes to `manifest.json` normally; only the GUI's live-log view for that run is lost). The
+  Monitor page's manifest table is unaffected since it reads `output/manifest.json` fresh each poll.
+- **`better-sqlite3` is a native module.** `npm install` needs to either download a prebuilt binary for your
+  platform or compile it locally; if that ever fails on a new machine, it's almost always a missing build
+  toolchain (Python + a C++ compiler), not a bug in `server/db.ts`.

@@ -1,5 +1,6 @@
 import { Html5Audio, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import { colors, primaryTint, fontFamily } from "../../theme/tokens";
+import { fontFamily } from "../../theme/tokens";
+import { usePalette } from "../../theme/ThemeContext";
 import type { Phrase } from "../../data/phrase";
 import { SceneFrame } from "./SceneFrame";
 
@@ -21,6 +22,7 @@ export function PhraseScene({
   const enter = spring({ frame, fps, config: { damping: 200 } });
   const translateY = interpolate(enter, [0, 1], [24, 0]);
   const opacity = interpolate(enter, [0, 1], [0, 1]);
+  const colors = usePalette("light");
 
   return (
     <SceneFrame progress={{ current: index, total }}>
@@ -41,7 +43,7 @@ export function PhraseScene({
             width: 72,
             height: 72,
             borderRadius: "50%",
-            backgroundColor: primaryTint,
+            backgroundColor: colors.primaryTint,
             color: colors.primary,
             display: "flex",
             alignItems: "center",

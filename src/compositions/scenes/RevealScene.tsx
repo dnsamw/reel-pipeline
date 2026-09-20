@@ -1,5 +1,6 @@
 import { Html5Audio, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import { colors, primaryTint, fontFamily } from "../../theme/tokens";
+import { fontFamily } from "../../theme/tokens";
+import { usePalette } from "../../theme/ThemeContext";
 import type { Phrase } from "../../data/phrase";
 import { SceneFrame } from "./SceneFrame";
 
@@ -25,6 +26,7 @@ export function RevealScene({
   const enter = spring({ frame, fps, config: { damping: 200 } });
   const scale = interpolate(enter, [0, 1], [0.92, 1]);
   const opacity = interpolate(enter, [0, 1], [0, 1]);
+  const colors = usePalette("light");
 
   return (
     <SceneFrame progress={{ current: index, total }}>
@@ -58,7 +60,7 @@ export function RevealScene({
         )}
         <div
           style={{
-            backgroundColor: primaryTint,
+            backgroundColor: colors.primaryTint,
             borderRadius: 28,
             padding: "34px 38px",
             display: "flex",

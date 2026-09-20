@@ -88,6 +88,20 @@ Finished videos land in `output/`, alongside `manifest.json` (what's been render
 a suggested social caption for each). Re-running the same command later only renders what's new — add
 `--force` to redo everything anyway.
 
+### GUI (batch monitor, start-render form, template library)
+
+A local React + Express control panel wraps the CLI above — same `render:batch` underneath, just with a form
+instead of flags, a live view of `manifest.json`/running renders, and a library of saved config/color presets
+("templates" in the GUI sense, not to be confused with the three visual Templates 1/2/3).
+
+```bash
+npm run gui   # starts the API server (:4300) and the Vite dev server (:5183) together
+```
+
+Then open `http://localhost:5183`. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#gui-batch-monitor--template-library)
+for how it's wired together, what "template" presets can and can't do yet, and where intro/outro video-clip
+support (not implemented yet) fits in.
+
 | Flag | Meaning |
 |---|---|
 | `--chapters=0-2` | Chapter range to render, by `BookChapter.order` (counts from 0) |
@@ -97,6 +111,7 @@ a suggested social caption for each). Re-running the same command later only ren
 | `--limit=N` | Stop after N *new* renders this run |
 | `--force` | Re-render even batches already in the manifest |
 | `--sidechain=true\|false` | Duck background music under dialogue/sfx via ffmpeg's real `sidechaincompress` filter (default `false`). Costs a second render pass per batch (~10-20% more total time, measured — not a flat 2x, since frame-painting isn't the dominant render cost here). Requires `ffmpeg` on `PATH`; if it's missing, the whole run warns once and falls back to the normal single-pass mix instead of failing |
+| `--presetFile=path.json` | Merge a JSON `ReelConfig` (partial) into `defaultConfig` as this run's baseline, before the flags above apply — how the GUI's template library applies a saved preset. Rarely hand-written; see [Template library](docs/ARCHITECTURE.md#template-library) |
 
 Add more background music any time by dropping `.mp3`/`.wav`/`.m4a`/`.ogg` files into `assets/music/` — new
 tracks are automatically included in the rotation for the next generation, no config change needed.
@@ -112,11 +127,15 @@ tracks are automatically included in the rotation for the next generation, no co
 prisma/           Read-only schema, points at StudyPal's real DB
 src/
   data/            DB access + phrase batching (Node-only)
-  theme/           Brand colors/fonts (ported from the main StudyPal app)
-  config/          All tunable durations/volumes/text, as a Zod schema
+  theme/           Brand colors/fonts (ported from the main StudyPal app) + ThemeContext for per-template overrides
+  config/          All tunable durations/volumes/text/theme/TTS rate, as a Zod schema
   audio/           Music/sfx/voice/TTS selection + ffmpeg availability check (Node-only)
   compositions/    The Remotion video templates + shared scene components
   render/          The batch runner (renderBatch.ts), manifest tracking, and sidechain ducking post-process
+server/            Express API for the GUI - template library (SQLite + git export), render orchestration, chapter/book lookups
+gui/               React + Vite control panel (batch monitor, start-render form, template library, video-clip spec reference)
+templates/         Git-tracked JSON export of every saved template preset (one file per template) - see server/templates.ts
+data/              SQLite db for the GUI's template library (gitignored - templates/*.json is the source of truth in git)
 assets/            fonts, music, sfx, voice-over, and generated TTS audio
 output/            Rendered videos + manifest.json (gitignored)
 ```

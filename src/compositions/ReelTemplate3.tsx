@@ -7,6 +7,7 @@ import { GuessRevealSceneT3 } from "./scenes/GuessRevealSceneT3";
 import { OutroScene } from "./scenes/OutroScene";
 import { buildTimelineT2, totalDuration } from "./timings";
 import { type ReelProps, reelPropsSchema, reelDefaultProps } from "./Reel";
+import { ThemeProvider } from "../theme/ThemeContext";
 
 // Template 3's on-screen intro caption, paired with the
 // WhatIsEnglishMeaning_Female/Male.mp3 voice-over in assets/voice/.
@@ -42,7 +43,7 @@ export function ReelTemplate3({
   const lastGuessRevealIndex = timeline.map((item) => item.type).lastIndexOf("guessReveal");
 
   return (
-    <>
+    <ThemeProvider theme={config.theme}>
       {musicFile && (
         <Html5Audio src={staticFile(`music/${musicFile}`)} loop trimBefore={musicStartFrame} volume={config.musicVolume} />
       )}
@@ -85,6 +86,6 @@ export function ReelTemplate3({
           );
         })}
       </TransitionSeries>
-    </>
+    </ThemeProvider>
   );
 }

@@ -48,6 +48,35 @@ export async function getPhrases(
   );
 }
 
+/** Node-only, used by the GUI server's "start render" screen to populate a book picker. */
+export async function listBooks(): Promise<{ id: string; title: string }[]> {
+  return prisma.book.findMany({ select: { id: true, title: true }, orderBy: { title: "asc" } });
+}
+
+/**
+ * Chapter list (with phrase counts) for a book, or every book if `bookId` is
+ * null - Node-only, used by the GUI server's "start render" screen to show a
+ * live chapter picker instead of the user guessing --chapters values blind.
+ */
+export async function listChapters(bookId: string | null = null): Promise<
+  { id: string; title: string; order: number; bookId: string; bookTitle: string; phraseCount: number }[]
+> {
+  const chapters = await prisma.bookChapter.findMany({
+    where: bookId ? { book: { OR: [{ id: bookId }, { title: { contains: bookId, mode: "insensitive" } }] } } : {},
+    orderBy: { order: "asc" },
+    include: { book: { select: { id: true, title: true } }, _count: { select: { phrases: true } } },
+  });
+
+  return chapters.map((c) => ({
+    id: c.id,
+    title: c.title,
+    order: c.order,
+    bookId: c.book.id,
+    bookTitle: c.book.title,
+    phraseCount: c._count.phrases,
+  }));
+}
+
 export async function disconnect() {
   await prisma.$disconnect();
 }
