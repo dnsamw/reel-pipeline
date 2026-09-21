@@ -1,8 +1,14 @@
+import { z } from "zod";
 import { Composition, registerRoot } from "remotion";
 import { registerFonts } from "../theme/fonts";
 import { reelDefaultProps, sampleBatches } from "./reelProps";
 import { makeCompositionFromRecipe, CompositionFromRecipeDynamic, calculateMetadataForRecipeDynamic, reelPropsWithRecipeSchema } from "./recipe/CompositionFromRecipe";
 import { builtInRecipes } from "./recipe/recipes";
+import { configSchema, defaultConfig } from "../config/config";
+import { phraseSchema } from "../data/phrase";
+import { LayerRenderer } from "./recipe/layers/LayerRenderer";
+import { customBeatSchema } from "./recipe/layers/schema";
+import { pocBeat } from "./recipe/layers/poc";
 
 // Fires once when the bundle loads; loadFont/loadCustomFont each call
 // Remotion's delayRender/continueRender internally, so this blocks any
@@ -58,8 +64,30 @@ function RemotionRoot() {
       />
 
       <SampleReels />
+
+      {/* Phase 1 proof of docs/COMPOSITION_DESIGNER.md's draft layer schema
+          (recipe/layers/) - a generic LayerRenderer interpreting a
+          hand-written CustomBeat as pure data. Standalone and unwired from
+          the production beat system (beatSchema/CompositionFromRecipe.tsx)
+          on purpose - see the doc for the phased plan this is step 1 of. */}
+      <Composition
+        id="LayerDesignerPOC"
+        component={LayerDesignerPOC}
+        schema={layerDesignerPocPropsSchema}
+        durationInFrames={pocBeat.durationInFrames}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{ beat: pocBeat, phrase: sampleBatches[0][0], config: defaultConfig }}
+      />
     </>
   );
+}
+
+const layerDesignerPocPropsSchema = z.object({ beat: customBeatSchema, phrase: phraseSchema.nullable(), config: configSchema });
+
+function LayerDesignerPOC({ beat, phrase, config }: z.infer<typeof layerDesignerPocPropsSchema>) {
+  return <LayerRenderer beat={beat} phrase={phrase} config={config} />;
 }
 
 function SampleReels() {

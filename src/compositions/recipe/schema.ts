@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { customBeatSchema } from "./layers/schema";
 
 /**
  * A "composition recipe": data describing which of the existing scene
@@ -73,12 +74,20 @@ export const beatSchema = z.discriminatedUnion("kind", [
   revealBeatSchema,
   guessRevealBeatSchema,
   outroBeatSchema,
+  customBeatSchema,
 ]);
 
 export type Beat = z.infer<typeof beatSchema>;
 
-/** A beat that can repeat once per phrase in the batch - excludes intro/outro, which only ever appear once. */
-const perPhraseBeatSchema = z.discriminatedUnion("kind", [phraseBeatSchema, countdownBeatSchema, revealBeatSchema, guessRevealBeatSchema]);
+/**
+ * A beat that can repeat once per phrase in the batch - excludes intro/
+ * outro, which only ever appear once. `custom` (recipe/layers/schema.ts) is
+ * the one beat kind here whose visual content is itself data (a Layer[])
+ * instead of a fixed scene component - see CompositionFromRecipe.tsx's
+ * dispatch and timeline.ts's duration handling for the two places that
+ * treat it differently from the other 4.
+ */
+const perPhraseBeatSchema = z.discriminatedUnion("kind", [phraseBeatSchema, countdownBeatSchema, revealBeatSchema, guessRevealBeatSchema, customBeatSchema]);
 
 export const compositionRecipeSchema = z.object({
   id: z.string().describe('Matches the CLI/GUI "template" number today (1/2/3) for the built-ins; a free string for a new recipe'),

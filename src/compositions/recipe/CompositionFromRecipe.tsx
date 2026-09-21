@@ -9,6 +9,7 @@ import { CountdownScene } from "../scenes/CountdownScene";
 import { RevealScene } from "../scenes/RevealScene";
 import { OutroScene } from "../scenes/OutroScene";
 import { GuessRevealScene } from "../scenes/GuessRevealScene";
+import { LayerRenderer } from "./layers/LayerRenderer";
 import { ThemeProvider } from "../../theme/ThemeContext";
 import type { ReelConfig } from "../../config/config";
 import { reelPropsSchema, reelDefaultProps, type ReelProps } from "../reelProps";
@@ -166,6 +167,8 @@ export function CompositionFromRecipeDynamic({
                 answerTtsVolume={answerTts.volume}
               />
             );
+          } else if (item.type === "custom") {
+            content = <LayerRenderer beat={item.beat} phrase={phrases[item.phraseIndex]} config={config} />;
           } else {
             content = <OutroScene ctaUrl={config.ctaUrl} theme={recipe.outro.theme} />;
           }

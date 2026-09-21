@@ -1,17 +1,19 @@
 import { z } from "zod";
 
 /**
- * DRAFT - design sketch only, not wired into anything yet.
- *
  * `compositionRecipeSchema` (../schema.ts) recombines the *existing* 6 beat
  * components (intro/phrase/countdown/reveal/guessReveal/outro) but can't
  * invent a new visual layout - fonts/positions/colors/animation curves are
- * still hardcoded inside each scene's .tsx. This file sketches what a beat
- * would need to look like as DATA instead, so a genuinely new layout could
- * be built (eventually, in a canvas editor) without writing a new component.
- * See docs/COMPOSITION_DESIGNER.md, "A concrete design for the true visual
- * designer" for the full write-up, scope estimate, and what's deliberately
- * left out of this sketch.
+ * still hardcoded inside each scene's .tsx. This file adds a 7th beat kind,
+ * `custom`, whose visual content is pure data instead - a sequence of
+ * `Layer`s interpreted generically by `LayerRenderer.tsx`, so a genuinely
+ * new layout (once a GUI editor exists for it) doesn't need a new scene
+ * component. `custom` is wired into ../schema.ts's `perPhraseBeatSchema`
+ * union. See docs/COMPOSITION_DESIGNER.md, "A concrete design for the true
+ * visual designer" for the full write-up, scope estimate, and what's
+ * deliberately left out (still no canvas editor - recipes/GUI author a
+ * `custom` beat's layers as hand-written JSON today, same as any other
+ * recipe field).
  */
 
 const themeSchema = z.enum(["light", "dark"]);
@@ -51,7 +53,7 @@ const colorRefSchema = z.union([
     token: z.enum(["primary", "brand2", "gold", "goldInk", "foreground", "mutedForeground", "border", "background"]),
   }),
   /** OutroScene.tsx's existing cross-palette contrast rule, made selectable instead of hardcoded - "the accent from the palette THIS beat's theme isn't using". */
-  z.object({ source: z.literal("oppositeThemeToken"), token: z.enum(["primary", "gold"]) }),
+  z.object({ source: z.literal("oppositeThemeToken"), token: z.enum(["primary", "brand2", "gold"]) }),
 ]);
 
 const textRefSchema = z.union([
@@ -59,7 +61,8 @@ const textRefSchema = z.union([
   z.object({ source: z.literal("config"), path: z.enum(["introText"]) }), // grows as more config fields become bindable
   z.object({
     source: z.literal("phraseField"),
-    field: z.enum(["phrase", "translationSi", "pronunciation", "explanationEn", "explanationSi"]),
+    // Matches data/phrase.ts's Phrase fields exactly.
+    field: z.enum(["phrase", "translationSi", "pronunciationSi", "explanation", "explanationSi"]),
   }),
 ]);
 
@@ -147,3 +150,5 @@ export const customBeatSchema = z.object({
 
 export type CustomBeat = z.infer<typeof customBeatSchema>;
 export type Layer = z.infer<typeof layerSchema>;
+export type ColorRef = z.infer<typeof colorRefSchema>;
+export type TextRef = z.infer<typeof textRefSchema>;
