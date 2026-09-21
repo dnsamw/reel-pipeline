@@ -41,6 +41,9 @@ import type { ReelProps } from "../compositions/Reel";
  *                                                    # (no need for --force). This is how the GUI's Queue Render page (server/index.ts's
  *                                                    # /api/queue + /api/render/start) targets one specific reel instead of "whatever
  *                                                    # the chapter range's next unrendered batch happens to be" - see ARCHITECTURE.md.
+ *   npm run render:batch -- --useRecipeRenderer=true # EXPERIMENTAL (docs/COMPOSITION_DESIGNER.md) - renders via Root.tsx's
+ *                                                    # Reel-Recipe-N compositions instead of the hand-written Reel/ReelTemplate2/
+ *                                                    # ReelTemplate3. Not the default; nothing else about this run changes.
  */
 type Template = "1" | "2" | "3";
 
@@ -61,6 +64,11 @@ function parseArgs(argv: string[]) {
     sidechain: args.sidechain === "true",
     presetFile: typeof args.presetFile === "string" ? args.presetFile : null,
     phraseIds: typeof args.phraseIds === "string" ? args.phraseIds.split(",").filter(Boolean) : null,
+    // Experimental (feature/composition-designer-schema, docs/COMPOSITION_DESIGNER.md)
+    // - opt-in only, renders via Root.tsx's Reel-Recipe-N compositions
+    // instead of the hand-written Reel/ReelTemplate2/ReelTemplate3. Default
+    // (flag omitted) is completely unchanged.
+    useRecipeRenderer: args.useRecipeRenderer === "true",
   };
 }
 
@@ -70,6 +78,7 @@ function sanitizeTag(s: string): string {
 }
 
 const COMPOSITION_IDS: Record<Template, string> = { "1": "Reel", "2": "Reel-T2", "3": "Reel-T3" };
+const RECIPE_COMPOSITION_IDS: Record<Template, string> = { "1": "Reel-Recipe-1", "2": "Reel-Recipe-2", "3": "Reel-Recipe-3" };
 // Template 3 reverses direction (asks for the English meaning instead of
 // the Sinhala one), so it needs the separate "WhatIsEnglishMeaning_*" intro
 // voice set - see audio/voice.ts.
@@ -104,8 +113,8 @@ function manifestKey(batch: ReelBatch, template: Template): string {
 }
 
 async function main() {
-  const { chapters, limit, force, tts, template, book, sidechain, presetFile, phraseIds } = parseArgs(process.argv.slice(2));
-  const compositionId = COMPOSITION_IDS[template];
+  const { chapters, limit, force, tts, template, book, sidechain, presetFile, phraseIds, useRecipeRenderer } = parseArgs(process.argv.slice(2));
+  const compositionId = useRecipeRenderer ? RECIPE_COMPOSITION_IDS[template] : COMPOSITION_IDS[template];
   const introVoiceKeyword = INTRO_VOICE_KEYWORDS[template];
   const bookTag = book ? sanitizeTag(book) : null;
 
