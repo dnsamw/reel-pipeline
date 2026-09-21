@@ -8,11 +8,11 @@ import { computeGuessRevealPhases } from "./guessRevealPhases";
 export type GuessRevealField = "phrase" | "translationSi";
 
 /**
- * Generic replacement for GuessRevealSceneT2/T3 (both left untouched, still
- * used by ReelTemplate2.tsx/ReelTemplate3.tsx directly) - parameterized by
- * which Phrase field plays "prompt" vs "answer" instead of having that
- * choice hardcoded into two near-duplicate files. Verified byte-identical
- * against both for the two combos they already implement - see
+ * Generic replacement for the old GuessRevealSceneT2/T3 (two near-duplicate
+ * files, preserved on the backup/legacy-composition-renderer branch) -
+ * parameterized by which Phrase field plays "prompt" vs "answer" instead of
+ * having that choice hardcoded per file. Verified byte-identical against
+ * both for the two combos they implemented before being retired - see
  * docs/COMPOSITION_DESIGNER.md.
  *
  * Every visual difference between the old T2/T3 files turned out to be

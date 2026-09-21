@@ -3,10 +3,12 @@ import { z } from "zod";
 /**
  * A "composition recipe": data describing which of the existing scene
  * components (the "beat vocabulary" below) a composition sequences, and the
- * handful of per-beat choices that today get hardcoded differently across
- * Reel.tsx/ReelTemplate2.tsx/ReelTemplate3.tsx - so a new composition that
- * recombines the SAME beat kinds into a new order/mix becomes a JSON file
- * instead of a new .tsx + a new <Composition> registration in Root.tsx.
+ * handful of per-beat choices that used to be hardcoded differently across
+ * one hand-written .tsx per composition (Reel.tsx/ReelTemplate2.tsx/
+ * ReelTemplate3.tsx, preserved on the backup/legacy-composition-renderer
+ * branch) - so a new composition that recombines the SAME beat kinds into a
+ * new order/mix is a JSON file instead of a new .tsx + a new <Composition>
+ * registration in Root.tsx.
  *
  * Deliberately does NOT attempt to make font sizes, pixel positions, colors,
  * or animation curves into data - those already come from `config`/theme

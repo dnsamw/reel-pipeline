@@ -18,9 +18,10 @@ export interface ReelTheme {
 // separate copy (rather than importing config.ts's type) so the two
 // projects can't accidentally end up depending on each other's build.
 // MUST stay a complete structural match: ReelPreview.tsx passes an object
-// of this shape straight into the real Reel/ReelTemplate2/ReelTemplate3
-// components, which expect the real (complete) ReelConfig - a field missing
-// here is a compile error there, not a silent gap.
+// of this shape straight into the real recipe-driven composition components
+// (see src/compositions/recipe/CompositionFromRecipe.tsx), which expect the
+// real (complete) ReelConfig - a field missing here is a compile error
+// there, not a silent gap.
 export interface ReelConfig {
   phrasesPerReel: number;
   introSeconds: number;

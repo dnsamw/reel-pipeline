@@ -10,7 +10,7 @@ import { OutroScene } from "../scenes/OutroScene";
 import { GuessRevealScene } from "../scenes/GuessRevealScene";
 import { ThemeProvider } from "../../theme/ThemeContext";
 import type { ReelConfig } from "../../config/config";
-import { reelPropsSchema, reelDefaultProps, type ReelProps } from "../Reel";
+import { reelPropsSchema, reelDefaultProps, type ReelProps } from "../reelProps";
 import { buildTimelineFromRecipe, totalDurationFromRecipe } from "./timeline";
 import type { CompositionRecipe } from "./schema";
 
@@ -44,9 +44,10 @@ export const calculateMetadataForRecipe =
 
 /**
  * Interprets a CompositionRecipe at render time - one component instead of
- * a hand-written Reel*.tsx per composition. Dispatches each timeline beat to
- * the SAME scene components Reel.tsx/ReelTemplate2.tsx/ReelTemplate3.tsx
- * already use; nothing about those scene components changes.
+ * a hand-written Reel*.tsx per composition (the old per-template files this
+ * replaced are preserved on the backup/legacy-composition-renderer branch).
+ * Dispatches each timeline beat to the scene component that kind already
+ * has - see src/compositions/scenes/.
  */
 export function makeCompositionFromRecipe(recipe: CompositionRecipe) {
   function CompositionFromRecipe({

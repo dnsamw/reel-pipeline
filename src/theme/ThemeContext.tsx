@@ -17,10 +17,10 @@ export const defaultTheme: ReelTheme = { light: colors, dark: darkColors };
 const ThemeCtx = createContext<ReelTheme>(defaultTheme);
 
 /**
- * Wraps a whole Reel/ReelTemplate2/ReelTemplate3 render tree so every scene
- * underneath reads the same palette without each one needing a theme prop
- * threaded through render props - only the composition root needs to know
- * about `config.theme`.
+ * Wraps a whole composition's render tree (see
+ * recipe/CompositionFromRecipe.tsx) so every scene underneath reads the same
+ * palette without each one needing a theme prop threaded through render
+ * props - only the composition root needs to know about `config.theme`.
  */
 export function ThemeProvider({ theme, children }: { theme: ReelTheme | null; children: ReactNode }) {
   return <ThemeCtx.Provider value={theme ?? defaultTheme}>{children}</ThemeCtx.Provider>;

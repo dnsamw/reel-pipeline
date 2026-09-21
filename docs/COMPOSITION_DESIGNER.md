@@ -1,20 +1,22 @@
 # Toward a composition designer
 
-Today, adding a new visual composition means writing a new `Reel*.tsx` (its own `if/else` over a
-hand-rolled timeline, its own `<Composition>` registration in `Root.tsx`, its own copy of the
-prop-passing boilerplate) even when it would reuse scenes that already exist. This is a first step
-toward not needing that: a schema for describing a composition as **data**, checked against all
-three existing templates to see how much of them it actually covers.
+Before this branch, adding a new visual composition meant writing a new `Reel*.tsx` (its own
+`if/else` over a hand-rolled timeline, its own `<Composition>` registration in `Root.tsx`, its own
+copy of the prop-passing boilerplate) even when it would reuse scenes that already exist. This
+started as a check on whether that could become data instead - a schema for describing a
+composition as a sequence of *beats*, checked against all three existing templates to see how much
+of them it actually covers - and ended up replacing the old approach outright.
 
-**Status: schema, validated recipes, a working generic renderer with a genuinely generic
-`guessReveal` beat, and an opt-in path through the real production renderer - all verified
-byte-identical to the current output, on `feature/composition-designer-schema`.**
-`Reel.tsx`/`ReelTemplate2.tsx`/`ReelTemplate3.tsx` (and `GuessRevealSceneT2`/`T3`) are still
-unchanged and still what `renderBatch.ts`/the GUI use **by default** - the recipe renderer is only
-reached via an explicit opt-in flag (`--useRecipeRenderer=true`), not the default. Whether to flip
-that default, or retire the old files, is a separate decision this branch deliberately leaves open -
-see [Full production-pipeline verification](#full-production-pipeline-verification) and
-[What this doesn't do yet](#what-this-doesnt-do-yet).
+**Status: this is now the production default, on `feature/composition-designer-schema`.** All three
+templates render through the recipe interpreter (`src/compositions/recipe/CompositionFromRecipe.tsx`)
+unconditionally - no opt-in flag anymore. The old hand-written approach
+(`Reel.tsx`/`ReelTemplate2.tsx`/`ReelTemplate3.tsx`/`GuessRevealSceneT2.tsx`/`GuessRevealSceneT3.tsx`/
+`timings.ts`) has been deleted from this branch and **preserved on the `backup/legacy-composition-renderer`
+branch** (a snapshot taken right before the flip, with the old files present and still the default
+there, reachable behind the since-removed `--useRecipeRenderer=true` flag) - not lost, just retired.
+See [Full production-pipeline verification](#full-production-pipeline-verification) for how this was
+proven safe *before* flipping, and [What this doesn't do yet](#what-this-doesnt-do-yet) for what's
+still open.
 
 ## The finding this is built on
 
@@ -79,11 +81,12 @@ nothing needed approximating or dropping to fit.
 ## Verified: byte-identical output
 
 `src/compositions/recipe/CompositionFromRecipe.tsx` (`makeCompositionFromRecipe`) interprets a
-recipe at render time - one `buildTimelineFromRecipe()` (parallel to `timings.ts`'s
-`buildTimeline`/`buildTimelineT2`) plus a single `if/else` dispatching each beat to the *same* scene
-components `Reel*.tsx` already use. `Root.tsx` registers it three times, once per built-in recipe,
-as `Reel-Recipe-1`/`Reel-Recipe-2`/`Reel-Recipe-3` - visible in Studio right alongside `Reel`/
-`Reel-T2`/`Reel-T3`.
+recipe at render time - one `buildTimelineFromRecipe()` plus a single `if/else` dispatching each
+beat to a scene component. This section describes how it was checked **before** it replaced the old
+files - at the time, `Root.tsx` registered it alongside the (then still-present) hand-written
+compositions under temporary `Reel-Recipe-1/2/3` ids for side-by-side comparison; today `Root.tsx`
+only has the recipe-driven ones, under the original `Reel`/`Reel-T2`/`Reel-T3` ids (the old files
+are on `backup/legacy-composition-renderer` if you want to reproduce this comparison yourself).
 
 Checked with `npx remotion still`, comparing each original composition against its recipe-driven
 counterpart at the same frame, same default sample data:
@@ -120,10 +123,11 @@ gets the explanation card, font sizes/spacing) was hardcoded per file in `GuessR
 requested.
 
 **Closed**: `src/compositions/scenes/GuessRevealScene.tsx` is a new, generic component
-parameterized by `promptField`/`answerField`/`theme`, used only by `CompositionFromRecipe.tsx` -
-`GuessRevealSceneT2.tsx`/`GuessRevealSceneT3.tsx` are untouched and still exactly what
-`ReelTemplate2.tsx`/`ReelTemplate3.tsx` use directly. Every visual difference between the old two
-files turned out to be derivable from field identity, not from "which composition": each field has
+parameterized by `promptField`/`answerField`/`theme`, used by `CompositionFromRecipe.tsx` - at the
+time this was built, `GuessRevealSceneT2.tsx`/`GuessRevealSceneT3.tsx` were left untouched
+(verification target, not modified), since deleted along with the rest of the old approach (see
+`backup/legacy-composition-renderer`). Every visual difference between the old two files turned out
+to be derivable from field identity, not from "which composition": each field has
 a fixed identity (`phrase`: sans font, `foreground` color, larger size, an optional pronunciation
 secondary line; `translationSi`: sinhala font, `primary` color, smaller size, no secondary), and the
 answer block's spacing (vertical position, explanation-card padding/margin/font size) is
@@ -160,51 +164,47 @@ what this branch builds.
 
 ## Full production-pipeline verification
 
-Everything above was checked with `remotion still` - real rendering, but not the actual production
-path (`renderMedia`/`selectComposition` via `renderBatch.ts`, real TTS synthesis, real audio
-mixing, real h264 encoding). `src/render/renderBatch.ts` now has one new, **opt-in, off-by-default**
-flag, `--useRecipeRenderer=true`, that points it at `Root.tsx`'s `Reel-Recipe-N` compositions
-instead of `Reel`/`Reel-T2`/`Reel-T3` - nothing else about a run changes, and omitting the flag
-(every existing call site, every real production render) is byte-for-byte the same code path as
-before this branch existed.
+Frame stills prove visual equivalence, but not the actual production path (`renderMedia`/
+`selectComposition` via `renderBatch.ts`, real TTS synthesis, real audio mixing, real h264
+encoding). Before flipping the default, `renderBatch.ts` temporarily had an opt-in
+`--useRecipeRenderer=true` flag (since removed - the recipe path is unconditional now) pointing it
+at the (then side-by-side) `Reel-Recipe-N` compositions.
 
 Verified with two full, real `render:batch` runs against actual DB phrases, TTS **on**
 (chapter 0, template 2 - the composition whose beat kind changed the most in this branch), each
 pointed at an isolated `outputDir`/`manifestPath` via `--presetFile` so neither touched the real
-`output/`/`data/gui.db` state, deleted afterward:
+`output/`/`data/gui.db` state, deleted afterward - one via the (then still-present) old path, one
+via the opt-in flag:
 
 ```
 npm run render:batch -- --chapters=0-0 --limit=1 --force --template=2 --tts=true --presetFile=<old-dirs>.json
 npm run render:batch -- --chapters=0-0 --limit=1 --force --template=2 --tts=true --useRecipeRenderer=true --presetFile=<new-dirs>.json
 ```
 
-**The two resulting `.mp4` files are byte-for-byte identical** (`cmp -s`, same file size down to
+**The two resulting `.mp4` files were byte-for-byte identical** (`cmp -s`, same file size down to
 the byte) - not just visually equivalent stills, but the actual encoded video+audio output of the
 real production renderer, including real Azure TTS synthesis and Remotion's audio mixing. Manifest
 entries were identical apart from the (expected) output path and timestamp.
 
-So the recipe renderer isn't just theoretically equivalent - it produces the literal same file as
-today's production path, for the one template most likely to reveal a difference if one existed.
+So the recipe renderer wasn't just theoretically equivalent before it replaced the old files - it
+produced the literal same file as the then-current production path, for the one template most
+likely to reveal a difference if one existed. This evidence is what the decision to flip the
+default (below) was based on.
 
 ## What this doesn't do yet
 
-Not yet built, and the natural next steps, roughly in order of value:
+The default has been flipped and the old files retired to `backup/legacy-composition-renderer`.
+Not yet built, roughly in order of value:
 
-1. **Decide whether to flip the default, or retire the old files.** This branch deliberately stops
-   at "opt-in and fully verified" - making `Reel-Recipe-N` the *default* (or deleting
-   `Reel.tsx`/`ReelTemplate2.tsx`/`ReelTemplate3.tsx`/`GuessRevealSceneT2.tsx`/`GuessRevealSceneT3.tsx`
-   in favor of it) is a codebase-direction call, not a verification question - the evidence above
-   supports it, but that's a decision for whoever owns this repo to make explicitly, not something
-   to do silently as a "cleanup."
-2. Once a recipe is trusted as the real thing, the GUI's "Composition" dropdown (currently a
-   hardcoded `1|2|3`) could become "pick a recipe," with a recipe editable the same way template
-   color presets already are (`server/templates.ts`'s SQLite + git-export pattern) - a form, not a
-   canvas, with a live preview reusing `ReelPreview.tsx`.
-3. **Known real gap surfaced by this exercise, independent of the designer work**: Template 3's
-   intro text is a hardcoded constant that ignores `config.introText`/a saved template's override -
-   the recipe models this correctly (`text: {source: "literal", ...}` vs `{source: "config.introText"}`,
-   and `CompositionFromRecipe.tsx` already honors it), but the actual `ReelTemplate3.tsx` still has
-   this inconsistency until step 1 replaces it.
-4. A new beat kind (a genuinely new visual layout) still requires writing a new scene component in
+1. The GUI's "Composition" dropdown (currently a hardcoded `1|2|3`) could become "pick a recipe,"
+   with a recipe editable the same way template color presets already are (`server/templates.ts`'s
+   SQLite + git-export pattern) - a form, not a canvas, with a live preview reusing `ReelPreview.tsx`.
+2. **Known real gap surfaced by this exercise, independent of the designer work**: Template 3's
+   old intro text was a hardcoded constant that ignored `config.introText`/a saved template's
+   override - the recipe models this correctly (`text: {source: "literal", ...}`), and this is now
+   actually what runs, but that constant's original value (`T3_INTRO_TEXT`) simply got copied into
+   `template-3.json` verbatim rather than the underlying "should this respect `config.introText`
+   like the other two do" question being revisited - worth deciding deliberately, not by inertia.
+3. A new beat kind (a genuinely new visual layout) still requires writing a new scene component in
    code and adding one match arm to `CompositionFromRecipe.tsx` - by design, see
    [What this doesn't cover](#what-this-doesnt-cover-and-wont-without-more-work).

@@ -14,7 +14,7 @@ import { isFfmpegAvailable } from "../audio/ffmpeg";
 import { applyMusicSidechain } from "./sidechain";
 import { loadManifest, saveManifest, isRendered, type ManifestEntry } from "./manifest";
 import { buildCaption } from "./caption";
-import type { ReelProps } from "../compositions/Reel";
+import type { ReelProps } from "../compositions/reelProps";
 
 /**
  * Bulk, resumable production renderer. Node-only (Prisma + fs + the
@@ -27,7 +27,7 @@ import type { ReelProps } from "../compositions/Reel";
  *   npm run render:batch -- --limit=3             # render at most 3 NEW reels this run, then stop (skips still count toward nothing - already-rendered batches don't consume the limit)
  *   npm run render:batch -- --force                # re-render even batches already in the manifest
  *   npm run render:batch -- --tts=true             # override config.ttsEnabled for this run
- *   npm run render:batch -- --template=2           # 1 (default) | 2 | 3 - see src/compositions/ReelTemplate2.tsx/ReelTemplate3.tsx
+ *   npm run render:batch -- --template=2           # 1 (default) | 2 | 3 - see src/compositions/recipe/recipes/template-2.json/template-3.json
  *   npm run render:batch -- --book=volume-2        # Book.id or a substring of Book.title - required once more than one book exists (see docs/ARCHITECTURE.md)
  *   npm run render:batch -- --sidechain=true        # duck music under dialogue/sfx via ffmpeg sidechaincompress (see render/sidechain.ts) -
  *                                                    # costs a second full render pass per batch; falls back to the normal single-pass mix
@@ -41,9 +41,6 @@ import type { ReelProps } from "../compositions/Reel";
  *                                                    # (no need for --force). This is how the GUI's Queue Render page (server/index.ts's
  *                                                    # /api/queue + /api/render/start) targets one specific reel instead of "whatever
  *                                                    # the chapter range's next unrendered batch happens to be" - see ARCHITECTURE.md.
- *   npm run render:batch -- --useRecipeRenderer=true # EXPERIMENTAL (docs/COMPOSITION_DESIGNER.md) - renders via Root.tsx's
- *                                                    # Reel-Recipe-N compositions instead of the hand-written Reel/ReelTemplate2/
- *                                                    # ReelTemplate3. Not the default; nothing else about this run changes.
  */
 type Template = "1" | "2" | "3";
 
@@ -64,11 +61,6 @@ function parseArgs(argv: string[]) {
     sidechain: args.sidechain === "true",
     presetFile: typeof args.presetFile === "string" ? args.presetFile : null,
     phraseIds: typeof args.phraseIds === "string" ? args.phraseIds.split(",").filter(Boolean) : null,
-    // Experimental (feature/composition-designer-schema, docs/COMPOSITION_DESIGNER.md)
-    // - opt-in only, renders via Root.tsx's Reel-Recipe-N compositions
-    // instead of the hand-written Reel/ReelTemplate2/ReelTemplate3. Default
-    // (flag omitted) is completely unchanged.
-    useRecipeRenderer: args.useRecipeRenderer === "true",
   };
 }
 
@@ -77,8 +69,11 @@ function sanitizeTag(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
+// Backed by the recipe renderer (src/compositions/recipe/) as of
+// feature/composition-designer-schema - see docs/COMPOSITION_DESIGNER.md.
+// The old hand-written Reel/ReelTemplate2/ReelTemplate3 these ids used to
+// point at are preserved on the backup/legacy-composition-renderer branch.
 const COMPOSITION_IDS: Record<Template, string> = { "1": "Reel", "2": "Reel-T2", "3": "Reel-T3" };
-const RECIPE_COMPOSITION_IDS: Record<Template, string> = { "1": "Reel-Recipe-1", "2": "Reel-Recipe-2", "3": "Reel-Recipe-3" };
 // Template 3 reverses direction (asks for the English meaning instead of
 // the Sinhala one), so it needs the separate "WhatIsEnglishMeaning_*" intro
 // voice set - see audio/voice.ts.
@@ -113,8 +108,8 @@ function manifestKey(batch: ReelBatch, template: Template): string {
 }
 
 async function main() {
-  const { chapters, limit, force, tts, template, book, sidechain, presetFile, phraseIds, useRecipeRenderer } = parseArgs(process.argv.slice(2));
-  const compositionId = useRecipeRenderer ? RECIPE_COMPOSITION_IDS[template] : COMPOSITION_IDS[template];
+  const { chapters, limit, force, tts, template, book, sidechain, presetFile, phraseIds } = parseArgs(process.argv.slice(2));
+  const compositionId = COMPOSITION_IDS[template];
   const introVoiceKeyword = INTRO_VOICE_KEYWORDS[template];
   const bookTag = book ? sanitizeTag(book) : null;
 
