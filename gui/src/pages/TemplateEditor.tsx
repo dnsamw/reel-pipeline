@@ -158,6 +158,12 @@ export function TemplateEditor() {
             <div className="field" style={{ gridColumn: "1 / -1" }}>
               <label>Intro text</label>
               <input type="text" value={(config.introText as string) ?? ""} onChange={(e) => setField("introText", e.target.value)} />
+              {templateNumber === "3" && (
+                <span className="hint">
+                  Composition 3's intro asks the reverse question ("how do you say this in English?") and
+                  isn't affected by this field - see template-3.json's own fixed intro text.
+                </span>
+              )}
             </div>
           </div>
         </div>

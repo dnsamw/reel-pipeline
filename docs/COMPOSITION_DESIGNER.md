@@ -199,12 +199,15 @@ Not yet built, roughly in order of value:
 1. The GUI's "Composition" dropdown (currently a hardcoded `1|2|3`) could become "pick a recipe,"
    with a recipe editable the same way template color presets already are (`server/templates.ts`'s
    SQLite + git-export pattern) - a form, not a canvas, with a live preview reusing `ReelPreview.tsx`.
-2. **Known real gap surfaced by this exercise, independent of the designer work**: Template 3's
-   old intro text was a hardcoded constant that ignored `config.introText`/a saved template's
-   override - the recipe models this correctly (`text: {source: "literal", ...}`), and this is now
-   actually what runs, but that constant's original value (`T3_INTRO_TEXT`) simply got copied into
-   `template-3.json` verbatim rather than the underlying "should this respect `config.introText`
-   like the other two do" question being revisited - worth deciding deliberately, not by inertia.
-3. A new beat kind (a genuinely new visual layout) still requires writing a new scene component in
+2. A new beat kind (a genuinely new visual layout) still requires writing a new scene component in
    code and adding one match arm to `CompositionFromRecipe.tsx` - by design, see
    [What this doesn't cover](#what-this-doesnt-cover-and-wont-without-more-work).
+
+**Resolved**: Template 3's intro text staying a fixed literal (`template-3.json`'s
+`text: {source: "literal", ...}`) rather than reading `config.introText` was flagged above as
+needing a deliberate decision rather than inertia. Decided: **keep it fixed, by design, not a gap.**
+Template 3 asks the *reverse* question ("how do you say this in English?") from what
+`config.introText` means for Templates 1/2 ("what does this mean?") - sharing the field would put
+wrong-direction copy on screen by default, since the two questions aren't interchangeable text, they
+ask for different things. The GUI's Template Editor "Intro text" field now shows a hint when
+Composition 3 is selected, explaining it doesn't apply there, instead of silently doing nothing.
