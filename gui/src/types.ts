@@ -96,8 +96,82 @@ export interface OutroBeat {
   kind: "outro";
   theme: ThemeVariant;
 }
-export type PerPhraseBeat = PhraseBeat | CountdownBeat | RevealBeat | GuessRevealBeat;
-export const PER_PHRASE_BEAT_KINDS = ["phrase", "countdown", "reveal", "guessReveal"] as const;
+
+// Mirrors src/compositions/recipe/layers/schema.ts field-for-field - the
+// `custom` beat kind, whose visual content is a Layer[] interpreted
+// generically by LayerRenderer.tsx instead of a fixed scene component. See
+// docs/COMPOSITION_DESIGNER.md's "A concrete design for the true visual
+// designer".
+export type Anchor = "top-left" | "top-center" | "top-right" | "center-left" | "center" | "center-right" | "bottom-left" | "bottom-center" | "bottom-right";
+
+export interface LayerBox {
+  position: { xPct: number; yPct: number };
+  anchor: Anchor;
+  widthPct?: number;
+  heightPct?: number;
+  rotationDeg: number;
+  zIndex: number;
+}
+
+export type ColorRef = { source: "literal"; hex: string } | { source: "theme"; token: keyof Palette } | { source: "oppositeThemeToken"; token: "primary" | "brand2" | "gold" };
+
+export type PhraseTextField = "phrase" | "translationSi" | "pronunciationSi" | "explanation" | "explanationSi";
+export type TextRef = { source: "literal"; value: string } | { source: "config"; path: "introText" } | { source: "phraseField"; field: PhraseTextField };
+
+export type AnimationStep =
+  | { type: "none" }
+  | { type: "fade"; durationInFrames: number }
+  | { type: "slide"; from: "top" | "bottom" | "left" | "right"; durationInFrames: number }
+  | { type: "scaleSpring"; fromScale: number };
+
+export interface AnimationSpec {
+  enter: AnimationStep;
+  exit: AnimationStep;
+  delayFrames: number;
+}
+
+export interface TextLayer {
+  kind: "text";
+  id: string;
+  box: LayerBox;
+  text: TextRef;
+  font: "sans" | "sinhala";
+  fontSizePx: number;
+  fontWeight: number;
+  color: ColorRef;
+  align: "left" | "center" | "right";
+  animation: AnimationSpec;
+}
+export interface ImageLayer {
+  kind: "image";
+  id: string;
+  box: LayerBox;
+  src: { source: "asset"; path: string } | { source: "sceneFrameChrome" };
+  animation: AnimationSpec;
+}
+export interface ShapeLayer {
+  kind: "shape";
+  id: string;
+  box: LayerBox;
+  shape: "rect" | "circle" | "ring";
+  fill?: ColorRef;
+  stroke?: ColorRef;
+  strokeWidthPx?: number;
+  cornerRadiusPx?: number;
+  progress?: { source: "countdownProgress" };
+  animation: AnimationSpec;
+}
+export type Layer = TextLayer | ImageLayer | ShapeLayer;
+
+export interface CustomBeat {
+  kind: "custom";
+  theme: ThemeVariant;
+  durationInFrames: number;
+  layers: Layer[];
+}
+
+export type PerPhraseBeat = PhraseBeat | CountdownBeat | RevealBeat | GuessRevealBeat | CustomBeat;
+export const PER_PHRASE_BEAT_KINDS = ["phrase", "countdown", "reveal", "guessReveal", "custom"] as const;
 
 export interface CompositionRecipe {
   id: string;

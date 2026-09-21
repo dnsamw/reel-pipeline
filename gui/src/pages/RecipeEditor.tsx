@@ -2,17 +2,42 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { ReelPreview } from "../components/ReelPreview";
-import type { CompositionRecipe, GuessRevealField, IntroBeat, OutroBeat, PerPhraseBeat, RecipeRecord, ReelConfig, ThemeVariant } from "../types";
+import { LayerEditor } from "../components/LayerEditor";
+import type { CompositionRecipe, CustomBeat, GuessRevealField, IntroBeat, OutroBeat, PerPhraseBeat, RecipeRecord, ReelConfig, ThemeVariant } from "../types";
 
 const BEAT_KIND_LABEL: Record<PerPhraseBeat["kind"], string> = {
   phrase: "Phrase",
   countdown: "Countdown",
   reveal: "Reveal",
   guessReveal: "Guess + Reveal (combined)",
+  custom: "Custom (layers)",
 };
+
+function defaultCustomBeat(): CustomBeat {
+  return {
+    kind: "custom",
+    theme: "light",
+    durationInFrames: 90,
+    layers: [
+      {
+        kind: "text",
+        id: `layer-${Math.random().toString(36).slice(2, 9)}`,
+        box: { position: { xPct: 50, yPct: 50 }, anchor: "center", widthPct: 70, rotationDeg: 0, zIndex: 1 },
+        text: { source: "phraseField", field: "phrase" },
+        font: "sans",
+        fontSizePx: 56,
+        fontWeight: 700,
+        color: { source: "theme", token: "foreground" },
+        align: "center",
+        animation: { enter: { type: "fade", durationInFrames: 15 }, exit: { type: "none" }, delayFrames: 0 },
+      },
+    ],
+  };
+}
 
 function defaultBeat(kind: PerPhraseBeat["kind"]): PerPhraseBeat {
   if (kind === "guessReveal") return { kind, theme: "light", prompt: "phrase", answer: "translationSi" };
+  if (kind === "custom") return defaultCustomBeat();
   return { kind };
 }
 
@@ -260,6 +285,7 @@ export function RecipeEditor() {
                       </>
                     )}
                   </div>
+                  {beat.kind === "custom" && <LayerEditor beat={beat} onChange={(next) => updateBeat(i, next)} fps={defaults?.fps ?? 30} />}
                   <div className="button-row">
                     <button type="button" className="secondary" disabled={i === 0} onClick={() => moveBeat(i, -1)}>
                       ↑ Move up
