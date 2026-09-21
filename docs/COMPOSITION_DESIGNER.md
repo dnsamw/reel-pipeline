@@ -215,7 +215,9 @@ Still not built:
 
 1. A new beat kind (a genuinely new visual layout) still requires writing a new scene component in
    code and adding one match arm to `CompositionFromRecipe.tsx` - by design, see
-   [What this doesn't cover](#what-this-doesnt-cover-and-wont-without-more-work).
+   [What this doesn't cover](#what-this-doesnt-cover-and-wont-without-more-work) and, for a concrete
+   (not yet built) sketch of what would remove that limitation,
+   [A concrete design for the true visual designer](#a-concrete-design-for-the-true-visual-designer-not-built).
 2. The beat editor's "Direction" control only covers `guessReveal` beats (the only kind with a
    field choice today); `phrase`/`countdown`/`reveal` beats have nothing to configure yet since
    nothing about them varies - see [Coverage](#coverage-does-it-actually-cover-the-3-existing-templates).
@@ -228,3 +230,60 @@ Template 3 asks the *reverse* question ("how do you say this in English?") from 
 wrong-direction copy on screen by default, since the two questions aren't interchangeable text, they
 ask for different things. The GUI's Template Editor "Intro text" field now shows a hint when
 Composition 3 is selected, explaining it doesn't apply there, instead of silently doing nothing.
+
+## A concrete design for the true visual designer (not built)
+
+[What this doesn't cover](#what-this-doesnt-cover-and-wont-without-more-work) called a real
+drag/resize designer "a much more elaborate data model... a separate, considerably larger project."
+Not *impossible* - the pattern is well-trodden (After Effects/Lottie-style layer graphs, Figma's
+scene model) - just a genuinely different system from the beat-recipe schema above, which only
+recombines existing *components*. A true designer needs each beat's *contents* to become data too.
+
+**Draft schema**: `src/compositions/recipe/layers/schema.ts` (unwired - not imported by anything,
+exists to make this concrete and to type-check on its own). Sketch:
+
+- A `custom` beat kind (`layers: Layer[]`), sitting alongside the existing 6 in `beatSchema`'s union
+  rather than replacing them - existing compositions keep the hand-written, already-proven-
+  byte-identical scene components; `custom` is what a canvas editor would produce for a layout none
+  of the 6 cover.
+- Three layer kinds - `text`, `image`, `shape` - since every existing scene's visible content is one
+  of these three. Each has a `box` (position/anchor/size in *percent of canvas*, matching how every
+  scene already centers/offsets content, plus rotation/z-index), not pixel coordinates.
+- **Data binding is a closed union, not a free expression language**: a text layer's `text` is
+  `{source: "literal", value}` or `{source: "phraseField", field: "phrase"|"translationSi"|...}` or
+  `{source: "config", path: "introText"}` - a simple switch in the renderer, no `eval()`/template
+  parsing, every possible value stays grep-able. Same pattern for `color` (`literal` hex, or
+  `{source: "theme", token: "primary"|...}` mirroring `theme/tokens.ts`'s `Palette` keys exactly).
+- **Animation is a closed set of shapes** (`fade`/`slide`/`scaleSpring`/`none`, each with the same
+  frame-timing knobs every scene's `interpolate()`/`spring()` calls already use), not arbitrary
+  keyframes - a real curve editor is a separate problem this sketch doesn't attempt to solve.
+- Two things that are currently *hardcoded logic*, not data, get explicit escape hatches instead of
+  being silently unavailable to a custom beat: `SceneFrame`'s background-blob chrome becomes an
+  opt-in `{source: "sceneFrameChrome"}` image layer (today it's unconditional on every themed beat);
+  `OutroScene.tsx`'s cross-palette contrast rule (light mode borrows the dark palette's accent, and
+  vice versa) becomes a `{source: "oppositeThemeToken", token: "primary"|"gold"}` color ref.
+- `CountdownScene`'s ring fill is frame-driven, not a static prop - represented as a shape layer's
+  optional `progress: {source: "countdownProgress"}` binding rather than a new layer kind.
+
+**What a real build-out looks like, in phases** (this sketch is phase 0 - nothing below it is built):
+
+1. **Generic renderer, Studio-only.** A `LayerRenderer.tsx` that walks a `Layer[]` and maps each one
+   to `interpolate()`/`spring()`-driven styles, the same way the 6 existing scenes already do by
+   hand. Prove it by hand-writing one `custom` beat JSON (like `template-{1,2,3}.json` were
+   hand-derived), registering it as a one-off Studio composition, and eyeballing/still-comparing it
+   - no GUI editor yet. Roughly the same size as the original beat-recipe schema work above.
+2. **Migrate the chrome/contrast escape hatches for real** - wire `sceneFrameChrome` and
+   `oppositeThemeToken` so a `custom` beat can actually reproduce an existing built-in's chrome
+   exactly (currently just sketched as schema shapes above, not implemented).
+3. **The canvas editor.** The actually large chunk: drag/resize/rotate handles on a scaled-down
+   1080x1920 canvas, a property panel per selected layer, snapping/alignment - a new editing surface
+   in `RecipeEditor.tsx`, not an extension of its current list-based form. This is most of the total
+   effort.
+4. **Wire `custom` into the real union** - add it to `beatSchema`/`perPhraseBeatSchema` in
+   `../schema.ts`, `CompositionFromRecipe.tsx`'s dispatch, `renderBatch.ts` - mechanical, the same
+   shape as adding any new beat kind.
+
+Phase 1 alone is buildable next with the same rigor as everything else in this doc (byte-level
+verification before trusting it). Phases 3-4 are a multi-week UI project, not an incremental add to
+`feature/recipe-picker` - worth doing if a real visual designer becomes a priority, but a deliberate,
+separate scope decision rather than something to fall into.
