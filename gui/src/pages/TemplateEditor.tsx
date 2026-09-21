@@ -2,71 +2,10 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import { ReelPreview } from "../components/ReelPreview";
+import { ReelConfigNumberFields, ReelConfigPaletteFields } from "../components/ReelConfigFields";
 import type { Palette, ReelConfig, ReelTheme, TemplateRecord } from "../types";
 
 type ConfigOverrides = Partial<ReelConfig>;
-
-const NUMBER_FIELDS: { key: keyof ReelConfig; label: string; step?: number; min?: number; max?: number }[] = [
-  { key: "phrasesPerReel", label: "Phrases per reel", step: 1, min: 1, max: 6 },
-  { key: "introSeconds", label: "Intro seconds", step: 0.5, min: 0, max: 10 },
-  { key: "phraseSeconds", label: "Phrase seconds", step: 0.5, min: 0.5, max: 12 },
-  { key: "countdownSeconds", label: "Countdown seconds", step: 1, min: 1, max: 15 },
-  { key: "revealSeconds", label: "Reveal seconds", step: 0.5, min: 0.5, max: 12 },
-  { key: "outroSeconds", label: "Outro seconds", step: 0.5, min: 0.5, max: 10 },
-  { key: "transitionSeconds", label: "Transition seconds", step: 0.1, min: 0, max: 3 },
-  { key: "ttsRate", label: "TTS speed (1 = normal)", step: 0.05, min: 0.5, max: 2 },
-  { key: "musicVolume", label: "Music volume", step: 0.05, min: 0, max: 1 },
-  { key: "tickVolume", label: "Tick volume", step: 0.05, min: 0, max: 1 },
-  { key: "revealSoundVolume", label: "Reveal sound volume", step: 0.05, min: 0, max: 1 },
-  { key: "introVoiceVolume", label: "Intro voice volume", step: 0.05, min: 0, max: 1 },
-  { key: "phraseVoiceVolume", label: "Phrase voice volume", step: 0.05, min: 0, max: 1 },
-  { key: "revealVoiceVolume", label: "Reveal voice volume", step: 0.05, min: 0, max: 1 },
-];
-
-function isValidHex(v: string): boolean {
-  return /^#[0-9a-fA-F]{6}$/.test(v);
-}
-
-// A real <input type="text"> is the primary control here, not <input
-// type="color"> - typing into that native color swatch's hex sub-field
-// works, but pasting into it doesn't reliably register in Chromium (the
-// paste event isn't forwarded to that shadow-DOM field the way it is for a
-// normal text input). The swatch stays as a secondary visual-picker button.
-function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return (
-    <div className="field">
-      <label>{label}</label>
-      <div className="color-input-row">
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="#58238b"
-          spellCheck={false}
-          className="color-hex-input"
-        />
-        <input
-          type="color"
-          value={isValidHex(value) ? value : "#000000"}
-          onChange={(e) => onChange(e.target.value)}
-          title="Pick visually"
-          className="color-swatch-input"
-        />
-      </div>
-    </div>
-  );
-}
-
-const PALETTE_FIELDS: { key: keyof Palette; label: string }[] = [
-  { key: "primary", label: "Primary" },
-  { key: "brand2", label: "Brand 2" },
-  { key: "gold", label: "Gold" },
-  { key: "goldInk", label: "Gold ink (text on gold)" },
-  { key: "foreground", label: "Foreground (text)" },
-  { key: "mutedForeground", label: "Muted text" },
-  { key: "border", label: "Border" },
-  { key: "background", label: "Background" },
-];
 
 export function TemplateEditor() {
   const { id } = useParams();
@@ -206,21 +145,7 @@ export function TemplateEditor() {
 
         <div className="card">
           <h2>Timing &amp; audio</h2>
-          <div className="grid">
-            {NUMBER_FIELDS.map((f) => (
-              <div className="field" key={f.key}>
-                <label>{f.label}</label>
-                <input
-                  type="number"
-                  step={f.step}
-                  min={f.min}
-                  max={f.max}
-                  value={(config[f.key] as number | undefined) ?? ""}
-                  onChange={(e) => setField(f.key, (e.target.value === "" ? undefined : Number(e.target.value)) as never)}
-                />
-              </div>
-            ))}
-          </div>
+          <ReelConfigNumberFields config={config} onChange={setField} />
         </div>
 
         <div className="card">
@@ -246,29 +171,11 @@ export function TemplateEditor() {
           {themeEnabled && lightPalette && darkPalette && (
             <>
               <h2 style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: "0.04em" }}>Light scenes</h2>
-              <div className="grid">
-                {PALETTE_FIELDS.map((f) => (
-                  <ColorField
-                    key={`light-${f.key}`}
-                    label={f.label}
-                    value={lightPalette[f.key]}
-                    onChange={(v) => setPaletteField("light", f.key, v)}
-                  />
-                ))}
-              </div>
+              <ReelConfigPaletteFields variant="light" palette={lightPalette} onChange={(k, v) => setPaletteField("light", k, v)} />
               <h2 style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: 18 }}>
                 Dark scenes (Template 3)
               </h2>
-              <div className="grid">
-                {PALETTE_FIELDS.map((f) => (
-                  <ColorField
-                    key={`dark-${f.key}`}
-                    label={f.label}
-                    value={darkPalette[f.key]}
-                    onChange={(v) => setPaletteField("dark", f.key, v)}
-                  />
-                ))}
-              </div>
+              <ReelConfigPaletteFields variant="dark" palette={darkPalette} onChange={(k, v) => setPaletteField("dark", k, v)} />
             </>
           )}
         </div>
