@@ -15,6 +15,8 @@ import { applyMusicSidechain } from "./sidechain";
 import { loadManifest, saveManifest, isRendered, type ManifestEntry } from "./manifest";
 import { buildCaption } from "./caption";
 import type { ReelProps } from "../compositions/reelProps";
+import type { ReelPropsWithRecipe } from "../compositions/recipe/CompositionFromRecipe";
+import { compositionRecipeSchema, type CompositionRecipe } from "../compositions/recipe/schema";
 
 /**
  * Bulk, resumable production renderer. Node-only (Prisma + fs + the
@@ -41,6 +43,11 @@ import type { ReelProps } from "../compositions/reelProps";
  *                                                    # (no need for --force). This is how the GUI's Queue Render page (server/index.ts's
  *                                                    # /api/queue + /api/render/start) targets one specific reel instead of "whatever
  *                                                    # the chapter range's next unrendered batch happens to be" - see ARCHITECTURE.md.
+ *   npm run render:batch -- --recipeFile=path.json  # render through a CUSTOM (non-built-in) CompositionRecipe instead of --template's
+ *                                                    # 3 built-ins - the file is a full CompositionRecipe (src/compositions/recipe/schema.ts),
+ *                                                    # e.g. one exported by the GUI's Recipe library (server/recipes.ts's writeRecipeFile).
+ *                                                    # Takes precedence over --template; the recipe's own `id` becomes the manifest-key/
+ *                                                    # output-filename "template" tag instead of "1"/"2"/"3".
  */
 type Template = "1" | "2" | "3";
 
@@ -61,6 +68,7 @@ function parseArgs(argv: string[]) {
     sidechain: args.sidechain === "true",
     presetFile: typeof args.presetFile === "string" ? args.presetFile : null,
     phraseIds: typeof args.phraseIds === "string" ? args.phraseIds.split(",").filter(Boolean) : null,
+    recipeFile: typeof args.recipeFile === "string" ? args.recipeFile : null,
   };
 }
 
@@ -93,9 +101,10 @@ function paddedOrder(n: number): string {
 
 // Template 1 keeps its original (unsuffixed) filenames/manifest keys so
 // already-rendered production reels stay recognized as done - only 2/3 (new,
-// nothing to preserve) get a suffix, so the three templates never collide
-// when rendering the same phrase range.
-function outputFilename(batch: ReelBatch, template: Template, bookTag: string | null): string {
+// nothing to preserve) get a suffix, so the templates never collide when
+// rendering the same phrase range. Takes a plain string (not just Template)
+// so a custom recipe's own `id` works the same way - see --recipeFile.
+function outputFilename(batch: ReelBatch, template: string, bookTag: string | null): string {
   const first = batch.phrases[0].order;
   const last = batch.phrases[batch.phrases.length - 1].order;
   const suffix = template === "1" ? "" : `-t${template}`;
@@ -103,14 +112,29 @@ function outputFilename(batch: ReelBatch, template: Template, bookTag: string | 
   return `${prefix}ch${paddedOrder(batch.chapterOrder)}-${paddedOrder(first)}-${paddedOrder(last)}${suffix}.mp4`;
 }
 
-function manifestKey(batch: ReelBatch, template: Template): string {
+function manifestKey(batch: ReelBatch, template: string): string {
   return template === "1" ? batch.id : `t${template}-${batch.id}`;
 }
 
 async function main() {
-  const { chapters, limit, force, tts, template, book, sidechain, presetFile, phraseIds } = parseArgs(process.argv.slice(2));
-  const compositionId = COMPOSITION_IDS[template];
-  const introVoiceKeyword = INTRO_VOICE_KEYWORDS[template];
+  const { chapters, limit, force, tts, template, book, sidechain, presetFile, phraseIds, recipeFile } = parseArgs(process.argv.slice(2));
+
+  // --recipeFile (a custom, GUI-authored CompositionRecipe) takes over
+  // composition/intro-voice/manifest-tag selection entirely; --template's 3
+  // built-ins are otherwise completely unaffected - same static
+  // Reel/Reel-T2/Reel-T3 compositions, same manifest keys/filenames as
+  // always. See docs/COMPOSITION_DESIGNER.md.
+  let customRecipe: CompositionRecipe | null = null;
+  let compositionId: string = COMPOSITION_IDS[template];
+  let introVoiceKeyword: "sinhala" | "english" = INTRO_VOICE_KEYWORDS[template];
+  let effectiveTemplate: string = template;
+  if (recipeFile) {
+    customRecipe = compositionRecipeSchema.parse(JSON.parse(readFileSync(recipeFile, "utf-8")));
+    compositionId = "Reel-Custom";
+    introVoiceKeyword = customRecipe.intro.introVoiceKeyword;
+    effectiveTemplate = customRecipe.id;
+  }
+
   const bookTag = book ? sanitizeTag(book) : null;
 
   // Checked once up front (not per-batch) so a missing ffmpeg doesn't fail
@@ -185,7 +209,7 @@ async function main() {
   const toRender: { batch: ReelBatch; index: number; rotationSeed: number }[] = [];
   let skipped = 0;
   for (let i = 0; i < batches.length; i++) {
-    if (!effectiveForce && isRendered(manifest, manifestKey(batches[i], template))) {
+    if (!effectiveForce && isRendered(manifest, manifestKey(batches[i], effectiveTemplate))) {
       skipped++;
       continue;
     }
@@ -250,13 +274,13 @@ async function main() {
 
   for (const { batch, index } of toRender) {
     const plan = audioPlan.get(batch.id)!;
-    const outputPath = join(config.outputDir, outputFilename(batch, template, bookTag));
+    const outputPath = join(config.outputDir, outputFilename(batch, effectiveTemplate, bookTag));
     // Only worth ducking if there's actually a music track playing - with no
     // musicFile, sidechain would just be a wasted second render pass.
     const duckThisBatch = sidechainEnabled && plan.musicFile != null;
     const renderTarget = duckThisBatch ? `${outputPath}.dialogue.mp4` : outputPath;
 
-    const inputProps: ReelProps = {
+    const baseProps: ReelProps = {
       phrases: batch.phrases,
       config,
       // Music is left out of the Remotion mix entirely when ducking - the
@@ -270,6 +294,10 @@ async function main() {
       ttsPhraseFiles: plan.ttsPhraseFiles,
       ttsRevealFiles: plan.ttsRevealFiles,
     };
+    // The dynamic Reel-Custom composition needs `recipe` in inputProps
+    // itself (that's what makes a recipe render-time data instead of
+    // bundle-time fixed) - the 3 built-ins' static compositions don't take it.
+    const inputProps: ReelProps | ReelPropsWithRecipe = customRecipe ? { ...baseProps, recipe: customRecipe } : baseProps;
 
     console.log(`[${index + 1}/${batches.length}] Rendering ${outputPath} - "${batch.phrases[0].phrase}" ...`);
 
@@ -298,7 +326,7 @@ async function main() {
 
     const entry: ManifestEntry = {
       batchId: batch.id,
-      template,
+      template: effectiveTemplate,
       chapterOrder: batch.chapterOrder,
       chapterTitle: batch.chapterTitle,
       phraseIds: batch.phrases.map((p) => p.id),
@@ -315,7 +343,7 @@ async function main() {
       renderedAt: new Date().toISOString(),
       suggestedCaption: buildCaption(batch, config.ctaUrl),
     };
-    manifest[manifestKey(batch, template)] = entry;
+    manifest[manifestKey(batch, effectiveTemplate)] = entry;
     saveManifest(config.manifestPath, manifest);
 
     rendered++;

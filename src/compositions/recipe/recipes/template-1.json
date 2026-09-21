@@ -5,7 +5,8 @@
   "intro": {
     "kind": "intro",
     "theme": "light",
-    "text": { "source": "config.introText" }
+    "text": { "source": "config.introText" },
+    "introVoiceKeyword": "sinhala"
   },
   "perPhraseBeats": [{ "kind": "phrase" }, { "kind": "countdown" }, { "kind": "reveal" }],
   "outro": {

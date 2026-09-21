@@ -64,4 +64,18 @@ db.exec(`
     created_at TEXT NOT NULL,
     published_at TEXT
   );
+
+  -- Custom (non-built-in) composition recipes - see server/recipes.ts and
+  -- src/compositions/recipe/schema.ts's CompositionRecipe. The 3 built-in
+  -- recipes (template-{1,2,3}.json) are NOT rows here - they're code, read
+  -- straight from src/compositions/recipe/recipes/, same reasoning as
+  -- templates: this table is only ever the user-authored, editable ones.
+  CREATE TABLE IF NOT EXISTS recipes (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    recipe_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
 `);

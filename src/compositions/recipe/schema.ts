@@ -26,11 +26,12 @@ const introTextSchema = z.union([
   z.object({ source: z.literal("literal"), value: z.string() }),
 ]);
 
-/** IntroScene as-is: on-screen prompt text + voice-over, single entry animation. Zero per-composition variation beyond theme/text today. */
+/** IntroScene as-is: on-screen prompt text + voice-over, single entry animation. `introVoiceKeyword` picks which intro voice-over set (assets/voice/) matches the on-screen question's language/direction - see audio/voice.ts's pickIntroVoice. */
 const introBeatSchema = z.object({
   kind: z.literal("intro"),
   theme: themeSchema,
   text: introTextSchema,
+  introVoiceKeyword: z.enum(["sinhala", "english"]),
 });
 
 /** PhraseScene as-is - no per-composition variation exists today; kept as its own kind (not folded into a generic "text beat") because it owns the numbered-badge + pronunciation layout other beats don't share. */

@@ -5,7 +5,8 @@
   "intro": {
     "kind": "intro",
     "theme": "dark",
-    "text": { "source": "literal", "value": "මේක ඉංග්‍රීසියෙන් කියන්නෙ කොහොමද?" }
+    "text": { "source": "literal", "value": "මේක ඉංග්‍රීසියෙන් කියන්නෙ කොහොමද?" },
+    "introVoiceKeyword": "english"
   },
   "perPhraseBeats": [
     {
