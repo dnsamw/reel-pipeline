@@ -324,18 +324,21 @@ app.post("/api/render/start", (req, res) => {
       args.push(`--book=${book}`);
     }
 
-    let resolvedTemplate = template != null ? String(template) : null;
     const templateRecord = templateId ? getTemplate(String(templateId)) : null;
     if (templateId && !templateRecord) return res.status(404).json({ error: `Unknown templateId "${templateId}"` });
 
-    // recipeId picks the composition/style itself (the GUI's Recipe picker,
-    // replacing the old raw "1|2|3" Composition dropdown) - a built-in
-    // ("1"/"2"/"3") is just an alias for the matching --template (same
-    // static composition, same manifest/filename behavior as always); a
-    // genuinely custom recipe renders through the dynamic Reel-Custom
-    // composition instead, via --recipeFile (see renderBatch.ts).
-    const recipeRecord = recipeId != null ? getRecipe(String(recipeId)) : null;
-    if (recipeId != null && !recipeRecord) return res.status(404).json({ error: `Unknown recipeId "${recipeId}"` });
+    // Which recipe/composition to actually render with, in priority order:
+    // an explicit recipeId (the GUI's Recipe picker) > an explicit template
+    // number (legacy/CLI-style) > the chosen color template's own recipeId
+    // (a template "remembers" which recipe it was designed for, same as it
+    // always auto-selected a composition number before this existed). A
+    // built-in id renders exactly like the old raw --template flag (same
+    // static composition, same manifest/filename behavior); a genuinely
+    // custom recipe renders through the dynamic Reel-Custom composition
+    // instead, via --recipeFile (see renderBatch.ts).
+    const effectiveRecipeId = recipeId != null ? String(recipeId) : template != null ? String(template) : templateRecord?.recipeId ?? null;
+    const recipeRecord = effectiveRecipeId != null ? getRecipe(effectiveRecipeId) : null;
+    if (effectiveRecipeId != null && !recipeRecord) return res.status(404).json({ error: `Unknown recipe "${effectiveRecipeId}"` });
 
     // Settings' global overrides are always the baseline; a chosen template's
     // overrides win over those (same precedence as templates vs explicit
@@ -349,12 +352,8 @@ app.post("/api/render/start", (req, res) => {
     if (recipeRecord && !recipeRecord.builtin) {
       const recipePath = writeRecipeFile(recipeRecord, join(tmpdir(), "studypal-reels-recipes"));
       args.push(`--recipeFile=${recipePath}`);
-    } else {
-      resolvedTemplate = resolvedTemplate ?? recipeRecord?.id ?? templateRecord?.templateNumber ?? null;
-      if (resolvedTemplate != null) {
-        if (!["1", "2", "3"].includes(resolvedTemplate)) return res.status(400).json({ error: "template must be 1, 2, or 3" });
-        args.push(`--template=${resolvedTemplate}`);
-      }
+    } else if (recipeRecord) {
+      args.push(`--template=${recipeRecord.id}`);
     }
 
     res.json(startRender(args));
@@ -401,15 +400,15 @@ app.get("/api/settings", (_req, res) => {
 
 app.put("/api/settings", (req, res) => {
   try {
-    const { config, defaultSidechain, defaultTemplateNumber } = req.body ?? {};
-    if (defaultTemplateNumber != null && !["1", "2", "3"].includes(defaultTemplateNumber)) {
-      return res.status(400).json({ error: "defaultTemplateNumber must be 1, 2, or 3" });
+    const { config, defaultSidechain, defaultRecipeId } = req.body ?? {};
+    if (defaultRecipeId != null && !getRecipe(String(defaultRecipeId))) {
+      return res.status(400).json({ error: `Unknown recipe "${defaultRecipeId}"` });
     }
     res.json(
       saveSettings({
         config: config ?? {},
         defaultSidechain: Boolean(defaultSidechain),
-        defaultTemplateNumber: defaultTemplateNumber ?? "1",
+        defaultRecipeId: defaultRecipeId ?? "1",
       }),
     );
   } catch (err) {

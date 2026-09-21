@@ -16,8 +16,8 @@ const TEMPLATES_DIR = join(process.cwd(), "templates");
 export interface TemplateInput {
   name: string;
   description?: string;
-  /** Which composition this preset is meant for - see renderBatch.ts's Template type. */
-  templateNumber: "1" | "2" | "3";
+  /** Which recipe (built-in id "1"/"2"/"3", or a custom recipe's id) this preset is meant for/auto-selects when applied - see server/recipes.ts. */
+  recipeId: string;
   /** Overrides merged onto defaultConfig at render time via --presetFile - see renderBatch.ts. */
   config: Partial<ReelConfig>;
 }
@@ -47,7 +47,7 @@ function rowToRecord(row: TemplateRow): TemplateRecord {
     id: row.id,
     name: row.name,
     description: row.description,
-    templateNumber: row.template_number as TemplateRecord["templateNumber"],
+    recipeId: row.template_number,
     config: JSON.parse(row.config_json),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -78,7 +78,7 @@ export function saveTemplate(input: TemplateInput, id?: string): TemplateRecord 
     id: recordId,
     name: input.name,
     description: input.description ?? "",
-    templateNumber: input.templateNumber,
+    recipeId: input.recipeId,
     config: input.config,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
@@ -94,7 +94,7 @@ export function saveTemplate(input: TemplateInput, id?: string): TemplateRecord 
     id: record.id,
     name: record.name,
     description: record.description,
-    templateNumber: record.templateNumber,
+    templateNumber: record.recipeId,
     configJson: JSON.stringify(record.config),
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,

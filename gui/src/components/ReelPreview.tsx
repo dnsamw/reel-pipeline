@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import { Player } from "@remotion/player";
-import { makeCompositionFromRecipe } from "../../../src/compositions/recipe/CompositionFromRecipe";
-import { builtInRecipes } from "../../../src/compositions/recipe/recipes";
+import { CompositionFromRecipeDynamic, type ReelPropsWithRecipe } from "../../../src/compositions/recipe/CompositionFromRecipe";
 import { buildTimelineFromRecipe, totalDurationFromRecipe } from "../../../src/compositions/recipe/timeline";
 import { registerFonts } from "../../../src/theme/fonts";
 import type { Phrase } from "../../../src/data/phrase";
-import type { ReelConfig } from "../types";
+import type { CompositionRecipe, ReelConfig } from "../types";
 
 // Two phrases are enough to see a full guess/reveal cycle plus the
 // intro/outro without needing real DB data - this preview is about colors,
@@ -39,20 +38,24 @@ const SAMPLE_PHRASES: Phrase[] = [
   },
 ];
 
-// Stable component references, computed once at module load (not per-render)
-// so the Player doesn't see a "new" component type on every unrelated
-// config change and reset playback - see makeCompositionFromRecipe's own
-// note on why it's a factory rather than a fixed export.
-const COMPONENTS = {
-  "1": makeCompositionFromRecipe(builtInRecipes["1"]).component,
-  "2": makeCompositionFromRecipe(builtInRecipes["2"]).component,
-  "3": makeCompositionFromRecipe(builtInRecipes["3"]).component,
-} as const;
-
 let fontsReady: Promise<unknown> | null = null;
 
-/** ReelConfig here is gui/src/types.ts's decoupled copy, structurally identical to src/config/config.ts's - see that file's own comment on why it's duplicated rather than imported. */
-export function ReelPreview({ templateNumber, config }: { templateNumber: "1" | "2" | "3"; config: ReelConfig }) {
+/**
+ * Takes a full `recipe` object (not just a built-in id) so it can preview
+ * an in-progress, unsaved edit (the Recipe Editor) just as well as a saved
+ * built-in/custom one (the Template Editor). Uses CompositionFromRecipeDynamic
+ * directly - a stable component reference that reads `recipe` from props -
+ * so editing a recipe's fields updates the preview live without remounting
+ * the Player (only `key={recipe.id}` forces a remount, for switching to a
+ * genuinely different recipe/composition).
+ *
+ * `config` here doubles as both `src/config/config.ts`'s ReelConfig (what
+ * the recipe-driven components actually expect) and this file's
+ * structurally-identical local copy - not worrying about exact timing per
+ * the brief, so this just reuses the real timeline math for a duration
+ * that's close enough to scrub through intro/phrase/countdown/reveal/outro.
+ */
+export function ReelPreview({ recipe, config }: { recipe: CompositionRecipe; config: ReelConfig }) {
   const [fontsLoaded, setFontsLoaded] = useState(false);
 
   useEffect(() => {
@@ -68,17 +71,12 @@ export function ReelPreview({ templateNumber, config }: { templateNumber: "1" | 
     );
   }
 
-  const Component = COMPONENTS[templateNumber];
-  // Config here doubles as both `src/config/config.ts`'s ReelConfig (what
-  // the recipe-driven components actually expect) and this file's
-  // structurally-identical local copy - not worrying about exact timing per
-  // the brief, so this just reuses the real timeline math for a duration
-  // that's close enough to scrub through intro/phrase/countdown/reveal/outro.
-  const timeline = buildTimelineFromRecipe(builtInRecipes[templateNumber], SAMPLE_PHRASES.length, config);
+  const timeline = buildTimelineFromRecipe(recipe, SAMPLE_PHRASES.length, config);
   const transitionFrames = Math.round(config.transitionSeconds * config.fps);
   const durationInFrames = Math.max(1, totalDurationFromRecipe(timeline, transitionFrames));
 
-  const inputProps = {
+  const inputProps: ReelPropsWithRecipe = {
+    recipe,
     phrases: SAMPLE_PHRASES,
     config,
     musicFile: null,
@@ -92,8 +90,8 @@ export function ReelPreview({ templateNumber, config }: { templateNumber: "1" | 
 
   return (
     <Player
-      key={templateNumber}
-      component={Component}
+      key={recipe.id}
+      component={CompositionFromRecipeDynamic}
       inputProps={inputProps}
       durationInFrames={durationInFrames}
       fps={config.fps}

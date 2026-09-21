@@ -194,14 +194,31 @@ default (below) was based on.
 ## What this doesn't do yet
 
 The default has been flipped and the old files retired to `backup/legacy-composition-renderer`.
-Not yet built, roughly in order of value:
 
-1. The GUI's "Composition" dropdown (currently a hardcoded `1|2|3`) could become "pick a recipe,"
-   with a recipe editable the same way template color presets already are (`server/templates.ts`'s
-   SQLite + git-export pattern) - a form, not a canvas, with a live preview reusing `ReelPreview.tsx`.
-2. A new beat kind (a genuinely new visual layout) still requires writing a new scene component in
+**Done**: the GUI's "Composition" dropdown across Batch Render, Queue Render, Settings, and the
+Template Editor is now a `RecipePicker` (`gui/src/components/RecipePicker.tsx`) - it replaces the
+old raw `1|2|3` select everywhere, picking from the 3 built-ins plus any custom recipe. A **Recipes**
+page (`gui/src/pages/Recipes.tsx` + `RecipeEditor.tsx`) manages custom ones the same way template
+color presets already work (`server/recipes.ts`'s SQLite + git-export `recipes/*.json` pattern,
+mirroring `server/templates.ts`) - a form (beat list: kind, theme, direction; reorder/add/remove),
+not a canvas, with a live preview reusing `ReelPreview.tsx` (generalized to take a full `recipe`
+object instead of just a built-in number, so it can preview an in-progress unsaved edit too). A
+custom recipe is **actually renderable**, not just editable - `POST /api/render/start` resolves a
+`recipeId` to either a built-in (behaves exactly like the old `template` field) or a custom recipe
+(writes a temp file, uses `renderBatch.ts`'s `--recipeFile` flag - see the "Full production-pipeline
+verification" section above for how that flag itself was proven safe). Verified end-to-end for real:
+created a custom recipe through the actual GUI form, saved it, triggered a real render with it via
+the API (bypassing only the click-through, which was separately screenshot-verified), got a correct
+`.mp4` back, then cleaned up the test artifacts (deleted recipe, output file, manifest entry).
+
+Still not built:
+
+1. A new beat kind (a genuinely new visual layout) still requires writing a new scene component in
    code and adding one match arm to `CompositionFromRecipe.tsx` - by design, see
    [What this doesn't cover](#what-this-doesnt-cover-and-wont-without-more-work).
+2. The beat editor's "Direction" control only covers `guessReveal` beats (the only kind with a
+   field choice today); `phrase`/`countdown`/`reveal` beats have nothing to configure yet since
+   nothing about them varies - see [Coverage](#coverage-does-it-actually-cover-the-3-existing-templates).
 
 **Resolved**: Template 3's intro text staying a fixed literal (`template-3.json`'s
 `text: {source: "literal", ...}`) rather than reading `config.introText` was flagged above as

@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { ReelConfigNumberFields, ReelConfigPaletteFields } from "../components/ReelConfigFields";
-import type { FacebookStatus, Palette, ReelConfig, ReelTheme, Settings as SettingsRecord } from "../types";
+import { RecipePicker } from "../components/RecipePicker";
+import type { FacebookStatus, Palette, RecipeRecord, ReelConfig, ReelTheme, Settings as SettingsRecord } from "../types";
 
 type ConfigOverrides = Partial<ReelConfig>;
 
@@ -11,7 +12,8 @@ export function Settings() {
 
   const [config, setConfig] = useState<ConfigOverrides>({});
   const [defaultSidechain, setDefaultSidechain] = useState(false);
-  const [defaultTemplateNumber, setDefaultTemplateNumber] = useState<"1" | "2" | "3">("1");
+  const [defaultRecipeId, setDefaultRecipeId] = useState<string>("1");
+  const [recipes, setRecipes] = useState<RecipeRecord[]>([]);
   const [themeEnabled, setThemeEnabled] = useState(false);
   const [defaultTheme, setDefaultTheme] = useState<ReelTheme | null>(null);
 
@@ -29,11 +31,12 @@ export function Settings() {
 
   useEffect(() => {
     api.defaultTheme().then(setDefaultTheme).catch(() => {});
+    api.recipes().then(setRecipes).catch(() => {});
     Promise.all([api.settings()])
       .then(([s]) => {
         setConfig(s.config);
         setDefaultSidechain(s.defaultSidechain);
-        setDefaultTemplateNumber(s.defaultTemplateNumber);
+        setDefaultRecipeId(s.defaultRecipeId);
         setThemeEnabled(s.config.theme != null);
         setLoaded(true);
       })
@@ -80,7 +83,7 @@ export function Settings() {
       const payload: SettingsRecord = {
         config: { ...config, theme: themeEnabled ? config.theme ?? defaultTheme ?? null : null },
         defaultSidechain,
-        defaultTemplateNumber,
+        defaultRecipeId,
       };
       await api.saveSettings(payload);
       setStatus("Settings saved - applied to every render from now on.");
@@ -141,11 +144,7 @@ export function Settings() {
             <div className="grid">
               <div className="field">
                 <label>Composition</label>
-                <select value={defaultTemplateNumber} onChange={(e) => setDefaultTemplateNumber(e.target.value as "1" | "2" | "3")}>
-                  <option value="1">1 - Classic</option>
-                  <option value="2">2 - Side-by-side</option>
-                  <option value="3">3 - Reversed (dark)</option>
-                </select>
+                <RecipePicker recipes={recipes} value={defaultRecipeId} onChange={setDefaultRecipeId} />
               </div>
               <div className="field checkbox">
                 <input

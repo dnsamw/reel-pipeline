@@ -1,7 +1,7 @@
 {
   "id": "3",
   "name": "Reversed (dark)",
-  "description": "Shows the Sinhala meaning first and asks the viewer to guess the English phrase - matches ReelTemplate3.tsx / buildTimelineT2.",
+  "description": "Shows the Sinhala meaning first and asks the viewer to guess the English phrase.",
   "intro": {
     "kind": "intro",
     "theme": "dark",

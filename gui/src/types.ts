@@ -59,8 +59,59 @@ export interface TemplateRecord {
   id: string;
   name: string;
   description: string;
-  templateNumber: "1" | "2" | "3";
+  /** Which recipe (built-in id "1"/"2"/"3", or a custom recipe's id) this preset is meant for/auto-selects when applied. */
+  recipeId: string;
   config: Partial<ReelConfig>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Mirrors src/compositions/recipe/schema.ts's CompositionRecipe field-for-field -
+// which scenes a "Composition"/recipe choice sequences. See docs/COMPOSITION_DESIGNER.md.
+export type ThemeVariant = "light" | "dark";
+export type GuessRevealField = "phrase" | "translationSi";
+
+export interface IntroBeat {
+  kind: "intro";
+  theme: ThemeVariant;
+  text: { source: "config.introText" } | { source: "literal"; value: string };
+  introVoiceKeyword: "sinhala" | "english";
+}
+export interface PhraseBeat {
+  kind: "phrase";
+}
+export interface CountdownBeat {
+  kind: "countdown";
+}
+export interface RevealBeat {
+  kind: "reveal";
+}
+export interface GuessRevealBeat {
+  kind: "guessReveal";
+  theme: ThemeVariant;
+  prompt: GuessRevealField;
+  answer: GuessRevealField;
+}
+export interface OutroBeat {
+  kind: "outro";
+  theme: ThemeVariant;
+}
+export type PerPhraseBeat = PhraseBeat | CountdownBeat | RevealBeat | GuessRevealBeat;
+export const PER_PHRASE_BEAT_KINDS = ["phrase", "countdown", "reveal", "guessReveal"] as const;
+
+export interface CompositionRecipe {
+  id: string;
+  name: string;
+  description: string;
+  intro: IntroBeat;
+  perPhraseBeats: PerPhraseBeat[];
+  outro: OutroBeat;
+  transition: { at: "beforeOutro"; type: "fade" };
+}
+
+export interface RecipeRecord extends CompositionRecipe {
+  /** True for the 3 code-defined recipes - read-only in the GUI, can't be edited/deleted. */
+  builtin: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -135,8 +186,8 @@ export interface Settings {
   config: Partial<ReelConfig>;
   /** Initial value for the "Duck music under dialogue/sfx" checkbox on Batch Render / Queue Render. */
   defaultSidechain: boolean;
-  /** Initial value for the "Composition" dropdown on Batch Render / Queue Render. */
-  defaultTemplateNumber: "1" | "2" | "3";
+  /** Initial value for the "Composition" picker on Batch Render / Queue Render - a built-in id ("1"/"2"/"3") or a custom recipe's id. */
+  defaultRecipeId: string;
 }
 
 export interface FacebookPageInfo {

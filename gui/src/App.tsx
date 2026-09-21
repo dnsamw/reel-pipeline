@@ -4,6 +4,8 @@ import { StartRender } from "./pages/StartRender";
 import { ReviewQueue } from "./pages/ReviewQueue";
 import { Templates } from "./pages/Templates";
 import { TemplateEditor } from "./pages/TemplateEditor";
+import { Recipes } from "./pages/Recipes";
+import { RecipeEditor } from "./pages/RecipeEditor";
 import { VideoSpecPage } from "./pages/VideoSpecPage";
 import { Settings } from "./pages/Settings";
 
@@ -19,6 +21,7 @@ export function App() {
           <NavLink to="/review">Queue Render</NavLink>
           <NavLink to="/render">Batch Render</NavLink>
           <NavLink to="/templates">Templates</NavLink>
+          <NavLink to="/recipes">Recipes</NavLink>
           <NavLink to="/video-spec">Video Spec</NavLink>
           <NavLink to="/settings">Settings</NavLink>
         </nav>
@@ -31,6 +34,9 @@ export function App() {
           <Route path="/templates" element={<Templates />} />
           <Route path="/templates/new" element={<TemplateEditor />} />
           <Route path="/templates/:id" element={<TemplateEditor />} />
+          <Route path="/recipes" element={<Recipes />} />
+          <Route path="/recipes/new" element={<RecipeEditor />} />
+          <Route path="/recipes/:id" element={<RecipeEditor />} />
           <Route path="/video-spec" element={<VideoSpecPage />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>

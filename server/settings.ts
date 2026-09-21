@@ -10,8 +10,8 @@ export interface Settings {
   config: Partial<ReelConfig>;
   /** Initial value for the "Duck music under dialogue/sfx" checkbox on Batch Render / Queue Render - not a ReelConfig field, so it can't live in `config`. */
   defaultSidechain: boolean;
-  /** Initial value for the "Composition" dropdown on Batch Render / Queue Render. */
-  defaultTemplateNumber: "1" | "2" | "3";
+  /** Initial value for the "Composition" picker on Batch Render / Queue Render - a built-in id ("1"/"2"/"3") or a custom recipe's id, see server/recipes.ts. */
+  defaultRecipeId: string;
 }
 
 interface SettingsRow {
@@ -22,13 +22,13 @@ interface SettingsRow {
   updated_at: string;
 }
 
-const EMPTY: Settings = { config: {}, defaultSidechain: false, defaultTemplateNumber: "1" };
+const EMPTY: Settings = { config: {}, defaultSidechain: false, defaultRecipeId: "1" };
 
 function rowToSettings(row: SettingsRow): Settings {
   return {
     config: JSON.parse(row.config_json),
     defaultSidechain: row.default_sidechain === 1,
-    defaultTemplateNumber: row.default_template_number as Settings["defaultTemplateNumber"],
+    defaultRecipeId: row.default_template_number,
   };
 }
 
@@ -48,7 +48,7 @@ export function saveSettings(input: Settings): Settings {
     id: SETTINGS_ID,
     configJson: JSON.stringify(input.config),
     defaultSidechain: input.defaultSidechain ? 1 : 0,
-    defaultTemplateNumber: input.defaultTemplateNumber,
+    defaultTemplateNumber: input.defaultRecipeId,
     updatedAt: new Date().toISOString(),
   });
   return getSettings();

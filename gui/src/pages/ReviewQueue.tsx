@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { TemplatePicker } from "../components/TemplatePicker";
+import { RecipePicker } from "../components/RecipePicker";
 import { PhraseEditFields, toPhraseEdit, type PhraseEdit } from "../components/PhraseEditFields";
 import { RenderQueuePanel, type RenderQueueEntry } from "../components/RenderQueuePanel";
-import type { Book, Chapter, QueueItem, ReelConfig, ReelTheme, TemplateRecord } from "../types";
+import type { Book, Chapter, QueueItem, RecipeRecord, ReelConfig, ReelTheme, TemplateRecord } from "../types";
 
 export function ReviewQueue() {
   const [books, setBooks] = useState<Book[]>([]);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [templates, setTemplates] = useState<TemplateRecord[]>([]);
+  const [recipes, setRecipes] = useState<RecipeRecord[]>([]);
   const [defaults, setDefaults] = useState<ReelConfig | null>(null);
   const [defaultTheme, setDefaultTheme] = useState<ReelTheme | null>(null);
 
@@ -16,7 +18,7 @@ export function ReviewQueue() {
   const [minOrder, setMinOrder] = useState<number | "">("");
   const [maxOrder, setMaxOrder] = useState<number | "">("");
   const [templateId, setTemplateId] = useState<string>("");
-  const [template, setTemplate] = useState<"1" | "2" | "3">("1");
+  const [recipeId, setRecipeId] = useState<string>("1");
   const [tts, setTts] = useState<"default" | "true" | "false">("default");
   const [sidechain, setSidechain] = useState(false);
 
@@ -28,10 +30,11 @@ export function ReviewQueue() {
   const [renderQueue, setRenderQueue] = useState<RenderQueueEntry[]>([]);
 
   useEffect(() => {
-    Promise.all([api.books(), api.templates(), api.defaults(), api.defaultTheme()])
-      .then(([b, t, d, th]) => {
+    Promise.all([api.books(), api.templates(), api.recipes(), api.defaults(), api.defaultTheme()])
+      .then(([b, t, r, d, th]) => {
         setBooks(b);
         setTemplates(t);
+        setRecipes(r);
         setDefaults(d);
         setDefaultTheme(th);
       })
@@ -40,7 +43,7 @@ export function ReviewQueue() {
       .settings()
       .then((s) => {
         setSidechain(s.defaultSidechain);
-        setTemplate(s.defaultTemplateNumber);
+        setRecipeId(s.defaultRecipeId);
       })
       .catch(() => {});
   }, []);
@@ -58,11 +61,11 @@ export function ReviewQueue() {
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, [book]);
 
-  // Same reasoning as Batch Render's Composition dropdown - a preset's
+  // Same reasoning as Batch Render's Composition picker - a preset's
   // colors only apply to the composition it was made for.
   useEffect(() => {
     const selected = templates.find((t) => t.id === templateId);
-    if (selected) setTemplate(selected.templateNumber);
+    if (selected) setRecipeId(selected.recipeId);
   }, [templateId, templates]);
 
   const selectedTemplate = templates.find((t) => t.id === templateId);
@@ -71,7 +74,7 @@ export function ReviewQueue() {
   function reloadQueue(andExpandFirstUnrendered = false) {
     if (!defaults || minOrder === "" || maxOrder === "") return;
     api
-      .queue({ book: book || null, min: minOrder, max: maxOrder, phrasesPerReel, template })
+      .queue({ book: book || null, min: minOrder, max: maxOrder, phrasesPerReel, template: recipeId })
       .then((items) => {
         setQueue(items);
         if (andExpandFirstUnrendered) {
@@ -84,7 +87,7 @@ export function ReviewQueue() {
 
   useEffect(() => {
     reloadQueue(true);
-  }, [book, minOrder, maxOrder, phrasesPerReel, template, defaults]);
+  }, [book, minOrder, maxOrder, phrasesPerReel, recipeId, defaults]);
 
   function addToRenderQueue(item: QueueItem) {
     setRenderQueue((cur) =>
@@ -221,11 +224,7 @@ export function ReviewQueue() {
               </div>
               <div className="field">
                 <label>Composition</label>
-                <select value={template} onChange={(e) => setTemplate(e.target.value as "1" | "2" | "3")}>
-                  <option value="1">1 - Classic</option>
-                  <option value="2">2 - Side-by-side</option>
-                  <option value="3">3 - Reversed (dark)</option>
-                </select>
+                <RecipePicker recipes={recipes} value={recipeId} onChange={setRecipeId} />
               </div>
               <div className="field">
                 <label>Narration (TTS)</label>
@@ -246,7 +245,7 @@ export function ReviewQueue() {
             entries={renderQueue}
             onChange={updateRenderQueueEntry}
             onRemove={removeFromRenderQueue}
-            style={{ templateId: templateId || undefined, template, tts, sidechain }}
+            style={{ templateId: templateId || undefined, recipeId, tts, sidechain }}
             onItemRendered={() => reloadQueue(false)}
           />
         </div>
