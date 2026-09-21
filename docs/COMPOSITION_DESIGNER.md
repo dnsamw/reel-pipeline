@@ -213,11 +213,12 @@ the API (bypassing only the click-through, which was separately screenshot-verif
 
 Still not built:
 
-1. A new beat kind (a genuinely new visual layout) still requires writing a new scene component in
-   code and adding one match arm to `CompositionFromRecipe.tsx` - by design, see
-   [What this doesn't cover](#what-this-doesnt-cover-and-wont-without-more-work) and, for a concrete
-   (not yet built) sketch of what would remove that limitation,
-   [A concrete design for the true visual designer](#a-concrete-design-for-the-true-visual-designer-not-built).
+1. ~~A new beat kind... requires writing a new scene component in code~~ **Partially resolved** on
+   `feature/layer-designer`: the `custom` beat kind (a stack of positioned text/shape/image layers,
+   interpreted generically by `LayerRenderer.tsx`) covers many new visual layouts as pure data now -
+   see [A concrete design for the true visual designer](#a-concrete-design-for-the-true-visual-designer).
+   What's still missing is a genuinely new *primitive* beyond text/image/shape (e.g. video-clip
+   support) and the drag/resize canvas to author layers with a mouse instead of typed % numbers.
 2. The beat editor's "Direction" control only covers `guessReveal` beats (the only kind with a
    field choice today); `phrase`/`countdown`/`reveal` beats have nothing to configure yet since
    nothing about them varies - see [Coverage](#coverage-does-it-actually-cover-the-3-existing-templates).
@@ -231,16 +232,17 @@ wrong-direction copy on screen by default, since the two questions aren't interc
 ask for different things. The GUI's Template Editor "Intro text" field now shows a hint when
 Composition 3 is selected, explaining it doesn't apply there, instead of silently doing nothing.
 
-## A concrete design for the true visual designer (not built)
+## A concrete design for the true visual designer
 
-[What this doesn't cover](#what-this-doesnt-cover-and-wont-without-more-work) called a real
-drag/resize designer "a much more elaborate data model... a separate, considerably larger project."
-Not *impossible* - the pattern is well-trodden (After Effects/Lottie-style layer graphs, Figma's
-scene model) - just a genuinely different system from the beat-recipe schema above, which only
-recombines existing *components*. A true designer needs each beat's *contents* to become data too.
+**Status: partially built, on `feature/layer-designer`.** [What this doesn't cover](#what-this-doesnt-cover-and-wont-without-more-work)
+called a real drag/resize designer "a much more elaborate data model... a separate, considerably
+larger project." Not *impossible* - the pattern is well-trodden (After Effects/Lottie-style layer
+graphs, Figma's scene model) - just a genuinely different system from the beat-recipe schema above,
+which only recombines existing *components*. A true designer needs each beat's *contents* to become
+data too.
 
-**Draft schema**: `src/compositions/recipe/layers/schema.ts` (unwired - not imported by anything,
-exists to make this concrete and to type-check on its own). Sketch:
+**Schema**: `src/compositions/recipe/layers/schema.ts`. Sketch (now real, wired in - see
+"What's actually built" below):
 
 - A `custom` beat kind (`layers: Layer[]`), sitting alongside the existing 6 in `beatSchema`'s union
   rather than replacing them - existing compositions keep the hand-written, already-proven-
@@ -265,25 +267,40 @@ exists to make this concrete and to type-check on its own). Sketch:
 - `CountdownScene`'s ring fill is frame-driven, not a static prop - represented as a shape layer's
   optional `progress: {source: "countdownProgress"}` binding rather than a new layer kind.
 
-**What a real build-out looks like, in phases** (this sketch is phase 0 - nothing below it is built):
+**The build-out plan, in phases:**
 
-1. **Generic renderer, Studio-only.** A `LayerRenderer.tsx` that walks a `Layer[]` and maps each one
-   to `interpolate()`/`spring()`-driven styles, the same way the 6 existing scenes already do by
-   hand. Prove it by hand-writing one `custom` beat JSON (like `template-{1,2,3}.json` were
-   hand-derived), registering it as a one-off Studio composition, and eyeballing/still-comparing it
-   - no GUI editor yet. Roughly the same size as the original beat-recipe schema work above.
-2. **Migrate the chrome/contrast escape hatches for real** - wire `sceneFrameChrome` and
-   `oppositeThemeToken` so a `custom` beat can actually reproduce an existing built-in's chrome
-   exactly (currently just sketched as schema shapes above, not implemented).
-3. **The canvas editor.** The actually large chunk: drag/resize/rotate handles on a scaled-down
-   1080x1920 canvas, a property panel per selected layer, snapping/alignment - a new editing surface
-   in `RecipeEditor.tsx`, not an extension of its current list-based form. This is most of the total
-   effort.
-4. **Wire `custom` into the real union** - add it to `beatSchema`/`perPhraseBeatSchema` in
-   `../schema.ts`, `CompositionFromRecipe.tsx`'s dispatch, `renderBatch.ts` - mechanical, the same
-   shape as adding any new beat kind.
+1. ~~**Generic renderer, Studio-only.**~~ **Done.** `LayerRenderer.tsx` walks a `Layer[]` and maps
+   each one to `interpolate()`/`spring()`-driven styles, the same way the 6 existing scenes already
+   do by hand. Proven with a hand-written `custom` beat (`recipe/layers/poc.ts`) as a standalone
+   Studio composition (`LayerDesignerPOC`) - frame-by-frame still checks at 6 points across its
+   timeline confirmed the progress binding, fade/slide/scaleSpring animations, and rotation all
+   behave correctly.
+2. ~~**Migrate the chrome/contrast escape hatches for real.**~~ **Done**, as part of step 1 -
+   `sceneFrameChrome` and `oppositeThemeToken` are real, working bindings in `LayerRenderer.tsx`
+   itself (not just schema shapes), exercised by the same POC beat.
+3. **The canvas editor.** Still not built. `LayerEditor.tsx` (see below) is a **form**, not a
+   drag/resize canvas - every field (position/size as % numbers, rotation, anchor, etc.) is a
+   number input or select, not a mouse interaction on a scaled preview. This remains the largest
+   piece of unbuilt work: drag/resize/rotate handles, a selection/property-panel model, snapping.
+4. ~~**Wire `custom` into the real union.**~~ **Done.** `custom` is a real member of
+   `beatSchema`/`perPhraseBeatSchema` in `../schema.ts`, with matching support in `timeline.ts`
+   (duration comes from the beat's own `durationInFrames`, not `config`, unlike every other
+   per-phrase beat kind) and `CompositionFromRecipe.tsx`'s dispatch. Verified through the real
+   production path: a recipe mixing a `phrase` beat and a `custom` beat, rendered via the actual
+   `Reel-Custom` composition (not a side-channel), correct output. The 3 built-in compositions are
+   unaffected - `remotion compositions` lists identical ids/durations before and after.
 
-Phase 1 alone is buildable next with the same rigor as everything else in this doc (byte-level
-verification before trusting it). Phases 3-4 are a multi-week UI project, not an incremental add to
-`feature/recipe-picker` - worth doing if a real visual designer becomes a priority, but a deliberate,
-separate scope decision rather than something to fall into.
+**What's actually built, end to end:** a recipe's `perPhraseBeats` can include a `custom` beat today,
+saved/loaded/rendered through the exact same paths as any other beat kind (`server/recipes.ts`'s
+real `compositionRecipeSchema.parse`, `renderBatch.ts`, `ReelPreview.tsx`). `RecipeEditor.tsx`'s beat
+kind picker has a "Custom (layers)" option; picking it shows `LayerEditor.tsx` - add/reorder/remove
+layers, edit every field the schema supports (text source including phrase-field binding, color
+including theme/opposite-theme tokens, shape/fill/stroke/corner-radius, enter/exit animation).
+Verified via Playwright against the real dev server (build a recipe with a custom beat, zero
+console/page errors, save through the actual `POST /api/recipes`) - not just that it type-checks.
+
+**What's still missing** is specifically the *drag/resize canvas* (phase 3) - positioning today is
+typed percentages, not a mouse. That's the piece worth treating as a deliberate, separate scope
+decision if pursued (a new interaction model in `RecipeEditor.tsx`, not an extension of its current
+form), not something to fall into. Everything below the canvas - the schema, the renderer, the real
+wiring, a usable (if form-based) GUI editor - is done, on `feature/layer-designer`.
