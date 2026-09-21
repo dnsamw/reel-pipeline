@@ -1,5 +1,6 @@
 import { AbsoluteFill } from "remotion";
-import { colors, darkColors, fontFamily } from "../../theme/tokens";
+import { fontFamily } from "../../theme/tokens";
+import { usePalette } from "../../theme/ThemeContext";
 
 // Same path data as ubuntu-node/src/components/brand/Logo.tsx and
 // ubuntu-node/src/lib/pdf-theme.ts's logoIconPath - kept in sync manually
@@ -15,16 +16,21 @@ const logoViewBox = "3 28 95 46";
  * theme="light" for the same contrast effect in reverse.
  */
 export function OutroScene({ ctaUrl, theme = "dark" }: { ctaUrl: string; theme?: "light" | "dark" }) {
+  // Both palettes are needed regardless of `theme` - the contrast effect
+  // deliberately borrows from the *other* palette (e.g. "light" mode uses
+  // the dark palette's primary as an accent) rather than just inverting one.
+  const light = usePalette("light");
+  const dark = usePalette("dark");
   const isDark = theme === "dark";
-  const bg = isDark ? colors.primary : colors.background;
-  const accent = isDark ? colors.brand2 : darkColors.primary;
+  const bg = isDark ? light.primary : light.background;
+  const accent = isDark ? light.brand2 : dark.primary;
   const accentOpacity = isDark ? [0.45, 0.35] : [0.12, 0.08];
   const logoTileBg = isDark ? "rgba(255,255,255,0.12)" : "rgba(88,35,139,0.08)";
-  const logoFill = isDark ? colors.background : colors.primary;
-  const headingColor = isDark ? colors.background : colors.foreground;
-  const subColor = isDark ? "rgba(255,255,255,0.85)" : colors.mutedForeground;
-  const pillBg = colors.gold;
-  const pillTextColor = colors.goldInk;
+  const logoFill = isDark ? light.background : light.primary;
+  const headingColor = isDark ? light.background : light.foreground;
+  const subColor = isDark ? "rgba(255,255,255,0.85)" : light.mutedForeground;
+  const pillBg = light.gold;
+  const pillTextColor = light.goldInk;
 
   return (
     <AbsoluteFill style={{ backgroundColor: bg, overflow: "hidden" }}>

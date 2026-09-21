@@ -1,7 +1,8 @@
-// Read-only client pointed at the same local StudyPal Postgres DB
-// (C:\DEV\ubuntu-node). This schema is intentionally trimmed to just the
-// models the reel pipeline reads - it is not used to migrate the DB, only
-// to query it, so it doesn't need to track every table in the real app.
+// Client pointed at the same local StudyPal Postgres DB (C:\DEV\ubuntu-node).
+// This schema is intentionally trimmed to just the models the reel pipeline
+// touches - it is not used to migrate the DB (never run `prisma migrate`
+// against it), only to query and, for phrase content corrections via the
+// GUI's Queue Render page, update existing rows - see docs/ARCHITECTURE.md.
 generator client {
   provider = "prisma-client-js"
 }

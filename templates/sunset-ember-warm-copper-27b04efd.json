@@ -1,0 +1,32 @@
+{
+  "id": "sunset-ember-warm-copper-27b04efd",
+  "name": "Sunset Ember & Warm Copper",
+  "description": "Warm, inviting, and striking - a creative, bold, and modern feel.",
+  "templateNumber": "3",
+  "config": {
+    "theme": {
+      "light": {
+        "primary": "#c75353",
+        "brand2": "#d18364",
+        "gold": "#FFB347",
+        "goldInk": "#FFE5B4",
+        "foreground": "#12100E",
+        "mutedForeground": "#949393",
+        "border": "#dbdbdb",
+        "background": "#FFFFFF"
+      },
+      "dark": {
+        "primary": "#FF6B6B",
+        "brand2": "#FFA07A",
+        "gold": "#FFB347",
+        "goldInk": "#FFE5B4",
+        "foreground": "#FFFFFF",
+        "mutedForeground": "#A0A0A0",
+        "border": "#2A2421",
+        "background": "#12100E"
+      }
+    }
+  },
+  "createdAt": "2026-09-20T10:53:41.333Z",
+  "updatedAt": "2026-09-20T10:53:41.333Z"
+}

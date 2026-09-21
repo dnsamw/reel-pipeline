@@ -1,5 +1,6 @@
 import { Html5Audio, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import { colors, primaryTint, darkColors, darkPrimaryTint, fontFamily } from "../../theme/tokens";
+import { fontFamily } from "../../theme/tokens";
+import { usePalette } from "../../theme/ThemeContext";
 import { SceneFrame } from "./SceneFrame";
 
 export function IntroScene({
@@ -18,8 +19,8 @@ export function IntroScene({
   const enter = spring({ frame, fps, config: { damping: 200 } });
   const scale = interpolate(enter, [0, 1], [0.85, 1]);
   const opacity = interpolate(enter, [0, 1], [0, 1]);
-  const c = theme === "dark" ? darkColors : colors;
-  const pTint = theme === "dark" ? darkPrimaryTint : primaryTint;
+  const c = usePalette(theme);
+  const pTint = c.primaryTint;
 
   return (
     <SceneFrame theme={theme}>

@@ -1,10 +1,10 @@
 import { interpolate } from "remotion";
 
 /**
- * Pure frame-math shared by GuessRevealSceneT2/T3 - both templates need the
- * exact same "prompt pins up + countdown fades in, then countdown fades out
- * + answer fades in" choreography, just with different content/theme, so
- * this is factored out rather than duplicated.
+ * Pure frame-math for GuessRevealScene.tsx's "prompt pins up + countdown
+ * fades in, then countdown fades out + answer fades in" choreography -
+ * factored out of that component since it's pure timing, no content/theme
+ * dependency.
  */
 export interface GuessRevealPhaseInput {
   frame: number;

@@ -1,0 +1,32 @@
+{
+  "id": "kids-teenage-eeffc3de",
+  "name": "Kids / Teenage",
+  "description": "Bright, energetic, playful, and high-contrast pop colors.",
+  "templateNumber": "3",
+  "config": {
+    "theme": {
+      "light": {
+        "primary": "#0083c7",
+        "brand2": "#d14d00",
+        "gold": "#FFD300",
+        "goldInk": "#FFE866",
+        "foreground": "#11161B",
+        "mutedForeground": "#949698",
+        "border": "#dbdcdd",
+        "background": "#FFFFFF"
+      },
+      "dark": {
+        "primary": "#00A8FF",
+        "brand2": "#FF5E00",
+        "gold": "#FFD300",
+        "goldInk": "#FFE866",
+        "foreground": "#FFFFFF",
+        "mutedForeground": "#9DA3A6",
+        "border": "#22272B",
+        "background": "#11161B"
+      }
+    }
+  },
+  "createdAt": "2026-09-20T10:53:41.344Z",
+  "updatedAt": "2026-09-20T10:53:41.344Z"
+}

@@ -1,22 +1,56 @@
 import { Html5Audio, Sequence, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import { colors, primaryTint, fontFamily } from "../../theme/tokens";
+import { fontFamily } from "../../theme/tokens";
+import { usePalette } from "../../theme/ThemeContext";
 import type { Phrase } from "../../data/phrase";
 import { SceneFrame } from "./SceneFrame";
 import { computeGuessRevealPhases } from "./guessRevealPhases";
 
+export type GuessRevealField = "phrase" | "translationSi";
+
 /**
- * Template 2's per-phrase unit: one continuously-mounted scene (not three
- * separate cut Sequences like Template 1) so the phrase can visually persist
- * and pin up while the countdown runs in place below it, then swap to the
- * Sinhala reveal in the same spot - phrase and meaning end up on screen
- * together.
+ * Generic replacement for the old GuessRevealSceneT2/T3 (two near-duplicate
+ * files, preserved on the backup/legacy-composition-renderer branch) -
+ * parameterized by which Phrase field plays "prompt" vs "answer" instead of
+ * having that choice hardcoded per file. Verified byte-identical against
+ * both for the two combos they implemented before being retired - see
+ * docs/COMPOSITION_DESIGNER.md.
+ *
+ * Every visual difference between the old T2/T3 files turned out to be
+ * derivable from field identity, not from "which composition" - each field
+ * has a fixed "identity" (phrase: sans/foreground/larger, with an optional
+ * pronunciation secondary line; translationSi: sinhala/primary/smaller, no
+ * secondary), and the answer block's spacing (top offset, card padding/
+ * margin/font size) is tighter when the answer field is "phrase" purely
+ * because that field's optional pronunciation line adds an extra line above
+ * the card - not an arbitrary per-composition tweak. See FIELD_STYLE/
+ * ANSWER_LAYOUT below for the exact numbers this was built from.
  */
-export function GuessRevealSceneT2({
+const FIELD_STYLE: Record<
+  GuessRevealField,
+  { font: "sans" | "sinhala"; color: "foreground" | "primary"; promptSize: number; answerSize: number; secondarySize: { prompt: number; answer: number } | null }
+> = {
+  phrase: { font: "sans", color: "foreground", promptSize: 72, answerSize: 54, secondarySize: { prompt: 36, answer: 30 } },
+  translationSi: { font: "sinhala", color: "primary", promptSize: 60, answerSize: 48, secondarySize: null },
+};
+
+const ANSWER_LAYOUT: Record<GuessRevealField, { top: number; cardPadding: string; cardMarginTop: number; explanationSize: number; explanationSiSize: number }> = {
+  translationSi: { top: 1020, cardPadding: "26px 30px", cardMarginTop: 0, explanationSize: 26, explanationSiSize: 24 },
+  phrase: { top: 990, cardPadding: "24px 28px", cardMarginTop: 8, explanationSize: 24, explanationSiSize: 22 },
+};
+
+function fieldValue(field: GuessRevealField, phrase: Phrase): string | null {
+  return field === "phrase" ? phrase.phrase : phrase.translationSi;
+}
+
+export function GuessRevealScene({
   phrase,
   index,
   total,
   promptFrames,
   countdownFrames,
+  theme = "light",
+  promptField,
+  answerField,
   tickFile,
   tickVolume,
   revealSoundFile,
@@ -31,6 +65,9 @@ export function GuessRevealSceneT2({
   total: number;
   promptFrames: number;
   countdownFrames: number;
+  theme?: "light" | "dark";
+  promptField: GuessRevealField;
+  answerField: GuessRevealField;
   tickFile: string | null;
   tickVolume: number;
   revealSoundFile: string | null;
@@ -42,6 +79,8 @@ export function GuessRevealSceneT2({
 }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const colors = usePalette(theme);
+  const primaryTint = colors.primaryTint;
   const { promptTranslateY, promptScale, ringOpacity, ringProgress, countdownNumber, answerOpacity } =
     computeGuessRevealPhases({ frame, fps, promptFrames, countdownFrames });
 
@@ -50,8 +89,14 @@ export function GuessRevealSceneT2({
   const dashoffset = circumference * (1 - ringProgress);
   const revealStart = promptFrames + countdownFrames;
 
+  const promptStyle = FIELD_STYLE[promptField];
+  const answerStyle = FIELD_STYLE[answerField];
+  const answerLayout = ANSWER_LAYOUT[answerField];
+  const promptText = fieldValue(promptField, phrase);
+  const answerText = fieldValue(answerField, phrase);
+
   return (
-    <SceneFrame progress={{ current: index, total }}>
+    <SceneFrame theme={theme} progress={{ current: index, total }}>
       {promptTtsFile && <Html5Audio src={staticFile(`tts/${promptTtsFile}`)} volume={promptTtsVolume} />}
       {tickFile && (
         <Sequence from={promptFrames} durationInFrames={countdownFrames}>
@@ -103,22 +148,22 @@ export function GuessRevealSceneT2({
           </div>
           <p
             style={{
-              fontFamily: fontFamily.sans,
+              fontFamily: fontFamily[promptStyle.font],
               fontWeight: 700,
-              fontSize: 72,
-              lineHeight: 1.2,
+              fontSize: promptStyle.promptSize,
+              lineHeight: promptStyle.font === "sans" ? 1.2 : 1.3,
               textAlign: "center",
-              color: colors.foreground,
+              color: colors[promptStyle.color],
               margin: 0,
             }}
           >
-            {phrase.phrase}
+            {promptText}
           </p>
-          {phrase.pronunciationSi && (
+          {promptStyle.secondarySize && phrase.pronunciationSi && (
             <p
               style={{
                 fontFamily: fontFamily.sinhala,
-                fontSize: 36,
+                fontSize: promptStyle.secondarySize.prompt,
                 color: colors.mutedForeground,
                 textAlign: "center",
                 margin: 0,
@@ -154,15 +199,7 @@ export function GuessRevealSceneT2({
               strokeDashoffset={dashoffset}
               transform="rotate(-90 130 130)"
             />
-            <text
-              x={130}
-              y={150}
-              textAnchor="middle"
-              fontFamily={fontFamily.sans}
-              fontWeight={700}
-              fontSize={80}
-              fill={colors.primary}
-            >
+            <text x={130} y={150} textAnchor="middle" fontFamily={fontFamily.sans} fontWeight={700} fontSize={80} fill={colors.primary}>
               {countdownNumber}
             </text>
           </svg>
@@ -171,7 +208,7 @@ export function GuessRevealSceneT2({
         <div
           style={{
             position: "absolute",
-            top: 1020,
+            top: answerLayout.top,
             left: 0,
             right: 0,
             opacity: answerOpacity,
@@ -179,43 +216,57 @@ export function GuessRevealSceneT2({
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            gap: 20,
+            gap: answerField === "phrase" ? 16 : 20,
           }}
         >
-          {phrase.translationSi && (
+          {answerText && (
             <p
               style={{
-                fontFamily: fontFamily.sinhala,
+                fontFamily: fontFamily[answerStyle.font],
                 fontWeight: 700,
-                fontSize: 48,
-                lineHeight: 1.3,
+                fontSize: answerStyle.answerSize,
+                lineHeight: answerStyle.font === "sans" ? 1.2 : 1.3,
                 textAlign: "center",
-                color: colors.primary,
+                color: colors[answerStyle.color],
                 margin: 0,
               }}
             >
-              {phrase.translationSi}
+              {answerText}
+            </p>
+          )}
+          {answerStyle.secondarySize && phrase.pronunciationSi && (
+            <p
+              style={{
+                fontFamily: fontFamily.sinhala,
+                fontSize: answerStyle.secondarySize.answer,
+                color: colors.mutedForeground,
+                textAlign: "center",
+                margin: 0,
+              }}
+            >
+              ({phrase.pronunciationSi})
             </p>
           )}
           <div
             style={{
               backgroundColor: primaryTint,
               borderRadius: 24,
-              padding: "26px 30px",
+              padding: answerLayout.cardPadding,
               display: "flex",
               flexDirection: "column",
-              gap: 14,
+              gap: answerField === "phrase" ? 12 : 14,
               width: "100%",
+              marginTop: answerLayout.cardMarginTop || undefined,
             }}
           >
-            <p style={{ fontFamily: fontFamily.sans, fontSize: 26, lineHeight: 1.4, color: colors.foreground, margin: 0 }}>
+            <p style={{ fontFamily: fontFamily.sans, fontSize: answerLayout.explanationSize, lineHeight: 1.4, color: colors.foreground, margin: 0 }}>
               {phrase.explanation}
             </p>
             {phrase.explanationSi && (
               <p
                 style={{
                   fontFamily: fontFamily.sinhala,
-                  fontSize: 24,
+                  fontSize: answerLayout.explanationSiSize,
                   lineHeight: 1.45,
                   color: colors.foreground,
                   margin: 0,

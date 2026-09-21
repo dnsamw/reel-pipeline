@@ -1,0 +1,32 @@
+{
+  "id": "cyberpunk-ab95d718",
+  "name": "Cyberpunk",
+  "description": "Neon-drenched, high-tech, and intense.",
+  "templateNumber": "3",
+  "config": {
+    "theme": {
+      "light": {
+        "primary": "#00bfc7",
+        "brand2": "#d10068",
+        "gold": "#CCFF00",
+        "goldInk": "#E6FF66",
+        "foreground": "#080C14",
+        "mutedForeground": "#909295",
+        "border": "#dadbdc",
+        "background": "#FFFFFF"
+      },
+      "dark": {
+        "primary": "#00F5FF",
+        "brand2": "#FF007F",
+        "gold": "#CCFF00",
+        "goldInk": "#E6FF66",
+        "foreground": "#FFFFFF",
+        "mutedForeground": "#7A889B",
+        "border": "#1C2538",
+        "background": "#080C14"
+      }
+    }
+  },
+  "createdAt": "2026-09-20T10:53:41.340Z",
+  "updatedAt": "2026-09-20T10:53:41.340Z"
+}

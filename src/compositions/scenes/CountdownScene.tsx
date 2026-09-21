@@ -1,5 +1,6 @@
 import { Html5Audio, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import { colors, fontFamily } from "../../theme/tokens";
+import { fontFamily } from "../../theme/tokens";
+import { usePalette } from "../../theme/ThemeContext";
 import { SceneFrame } from "./SceneFrame";
 
 /**
@@ -24,6 +25,7 @@ export function CountdownScene({
 }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const colors = usePalette("light");
   const progress = interpolate(frame, [0, durationInFrames], [0, 1], { extrapolateRight: "clamp" });
 
   const steps = Math.max(1, Math.round(durationInFrames / fps));
