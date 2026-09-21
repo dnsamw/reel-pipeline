@@ -1,11 +1,12 @@
 {
   "id": "2",
   "name": "Side-by-side",
-  "description": "Phrase stays on screen, shrinking as the countdown runs in place beneath it, then the meaning reveals alongside it - matches ReelTemplate2.tsx / buildTimelineT2.",
+  "description": "Phrase stays on screen, shrinking as the countdown runs in place beneath it, then the meaning reveals alongside it.",
   "intro": {
     "kind": "intro",
     "theme": "light",
-    "text": { "source": "config.introText" }
+    "text": { "source": "config.introText" },
+    "introVoiceKeyword": "sinhala"
   },
   "perPhraseBeats": [
     {

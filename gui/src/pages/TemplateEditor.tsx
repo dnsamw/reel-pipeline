@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import { ReelPreview } from "../components/ReelPreview";
+import { RecipePicker } from "../components/RecipePicker";
 import { ReelConfigNumberFields, ReelConfigPaletteFields } from "../components/ReelConfigFields";
-import type { Palette, ReelConfig, ReelTheme, TemplateRecord } from "../types";
+import type { Palette, RecipeRecord, ReelConfig, ReelTheme, TemplateRecord } from "../types";
 
 type ConfigOverrides = Partial<ReelConfig>;
 
@@ -14,7 +15,8 @@ export function TemplateEditor() {
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [templateNumber, setTemplateNumber] = useState<"1" | "2" | "3">("1");
+  const [recipeId, setRecipeId] = useState<string>("1");
+  const [recipes, setRecipes] = useState<RecipeRecord[]>([]);
   const [config, setConfig] = useState<ConfigOverrides>({});
   const [themeEnabled, setThemeEnabled] = useState(false);
   const [defaultTheme, setDefaultTheme] = useState<ReelTheme | null>(null);
@@ -28,6 +30,7 @@ export function TemplateEditor() {
 
   useEffect(() => {
     api.defaultTheme().then(setDefaultTheme).catch(() => {});
+    api.recipes().then(setRecipes).catch((err) => setError(err instanceof Error ? err.message : String(err)));
     // Fetched unconditionally (not just for `isNew`) - the live preview needs
     // every ReelConfig field populated with a concrete value, but an existing
     // template's saved `config` may only contain the fields it overrides.
@@ -41,7 +44,7 @@ export function TemplateEditor() {
       .then((t) => {
         setName(t.name);
         setDescription(t.description);
-        setTemplateNumber(t.templateNumber);
+        setRecipeId(t.recipeId);
         setConfig(t.config);
         setThemeEnabled(t.config.theme != null);
         setSavedId(t.id);
@@ -73,7 +76,7 @@ export function TemplateEditor() {
       const payload = {
         name,
         description,
-        templateNumber,
+        recipeId,
         config: { ...config, theme: themeEnabled ? config.theme ?? defaultTheme ?? null : null },
       };
       const record: TemplateRecord = savedId ? await api.updateTemplate(savedId, payload) : await api.createTemplate(payload);
@@ -105,6 +108,7 @@ export function TemplateEditor() {
 
   const lightPalette = config.theme?.light ?? defaultTheme?.light;
   const darkPalette = config.theme?.dark ?? defaultTheme?.dark;
+  const selectedRecipe = recipes.find((r) => r.id === recipeId) ?? null;
 
   // Merges defaults under the current overrides so every field has a
   // concrete value (buildTimeline/etc. can't tolerate undefined), without
@@ -130,11 +134,7 @@ export function TemplateEditor() {
             </div>
             <div className="field">
               <label>Composition</label>
-              <select value={templateNumber} onChange={(e) => setTemplateNumber(e.target.value as "1" | "2" | "3")}>
-                <option value="1">1 - Classic</option>
-                <option value="2">2 - Side-by-side</option>
-                <option value="3">3 - Reversed (dark)</option>
-              </select>
+              <RecipePicker recipes={recipes} value={recipeId} onChange={setRecipeId} />
             </div>
             <div className="field" style={{ gridColumn: "1 / -1" }}>
               <label>Description</label>
@@ -158,10 +158,10 @@ export function TemplateEditor() {
             <div className="field" style={{ gridColumn: "1 / -1" }}>
               <label>Intro text</label>
               <input type="text" value={(config.introText as string) ?? ""} onChange={(e) => setField("introText", e.target.value)} />
-              {templateNumber === "3" && (
+              {selectedRecipe?.intro.text.source === "literal" && (
                 <span className="hint">
-                  Composition 3's intro asks the reverse question ("how do you say this in English?") and
-                  isn't affected by this field - see template-3.json's own fixed intro text.
+                  "{selectedRecipe.name}"'s intro uses its own fixed text (edit it on the Recipes page) and
+                  isn't affected by this field.
                 </span>
               )}
             </div>
@@ -179,7 +179,7 @@ export function TemplateEditor() {
               <h2 style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: "0.04em" }}>Light scenes</h2>
               <ReelConfigPaletteFields variant="light" palette={lightPalette} onChange={(k, v) => setPaletteField("light", k, v)} />
               <h2 style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: 18 }}>
-                Dark scenes (Template 3)
+                Dark scenes (dark-theme beats)
               </h2>
               <ReelConfigPaletteFields variant="dark" palette={darkPalette} onChange={(k, v) => setPaletteField("dark", k, v)} />
             </>
@@ -204,8 +204,8 @@ export function TemplateEditor() {
             Shows the colors above on the selected composition, with sample text. Durations are approximate -
             this is for checking colors, not final timing.
           </p>
-          {previewConfig ? (
-            <ReelPreview templateNumber={templateNumber} config={previewConfig} />
+          {previewConfig && selectedRecipe ? (
+            <ReelPreview recipe={selectedRecipe} config={previewConfig} />
           ) : (
             <div className="preview-frame preview-loading">
               <span className="hint">Loading...</span>

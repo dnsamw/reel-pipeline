@@ -102,12 +102,14 @@ Finished videos land in `output/`, alongside `manifest.json` (what's been render
 a suggested social caption for each). Re-running the same command later only renders what's new — add
 `--force` to redo everything anyway.
 
-### GUI (batch monitor, start-render form, template library, settings, Facebook publishing)
+### GUI (batch monitor, start-render form, template + recipe libraries, settings, Facebook publishing)
 
 A local React + Express control panel wraps the CLI above — same `render:batch` underneath, just with a form
 instead of flags, a live view of `manifest.json`/running renders (with inline playback), a library of saved
-config/color presets ("templates" in the GUI sense, not to be confused with the three visual Templates 1/2/3),
-a Settings page for GUI-wide defaults, and one-click publishing of a rendered reel to a connected Facebook Page.
+config/color presets ("templates" in the GUI sense), a library of composition **recipes** (which scenes a
+"Composition" choice sequences — the 3 built-ins plus any you create, see
+[docs/COMPOSITION_DESIGNER.md](docs/COMPOSITION_DESIGNER.md)), a Settings page for GUI-wide defaults, and
+one-click publishing of a rendered reel to a connected Facebook Page.
 
 ```bash
 npm run gui   # starts the API server (:4300) and the Vite dev server (:5183) together
@@ -125,6 +127,13 @@ Two ways to render from the GUI:
   the left, then batch-render together (or one at a time) once you're happy with the text. Corrections save
   straight to the database either way, so they also fix the main StudyPal app's content, not just this tool's
   renders.
+
+**Recipes page** — which scenes a "Composition" choice actually sequences (intro → a repeating per-phrase
+unit → outro), as data instead of one hand-written React component per composition. The 3 built-ins
+(Classic/Side-by-side/Reversed) are read-only; create a custom one by picking beats (phrase/countdown/reveal/
+guess-and-reveal, in any order/count) with a live preview, same save/edit/push-to-git flow as template color
+presets. A custom recipe is fully renderable, not just previewable — pick it anywhere a "Composition" is
+chosen. See [docs/COMPOSITION_DESIGNER.md](docs/COMPOSITION_DESIGNER.md) for the full design.
 
 **Settings page** — GUI-wide defaults (durations/volumes/TTS/colors/copy, plus the default composition and
 whether music-ducking is on by default) that every render starts from, whether it goes through the CLI flags
@@ -150,6 +159,7 @@ setup steps and how the Page token is stored.
 | `--sidechain=true\|false` | Duck background music under dialogue/sfx via ffmpeg's real `sidechaincompress` filter (default `false`). Costs a second render pass per batch (~10-20% more total time, measured — not a flat 2x, since frame-painting isn't the dominant render cost here). Requires `ffmpeg` on `PATH`; if it's missing, the whole run warns once and falls back to the normal single-pass mix instead of failing |
 | `--presetFile=path.json` | Merge a JSON `ReelConfig` (partial) into `defaultConfig` as this run's baseline, before the flags above apply — how the GUI's template library applies a saved preset. Rarely hand-written; see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#gui-batch-monitor--template-library) |
 | `--phraseIds=id1,id2,id3` | Render (or re-render) exactly these phrases as one reel, in this order — ignores `--chapters`/`--book`/`--limit` and always renders regardless of manifest state. How the GUI's Queue Render page targets one specific reel from its Render Queue; rarely hand-written |
+| `--recipeFile=path.json` | Render through a custom (non-built-in) composition recipe instead of `--template`'s 3 built-ins — the file is a full recipe (`src/compositions/recipe/schema.ts`). Takes precedence over `--template`; the recipe's own id becomes the manifest-key/filename tag. How the GUI's Recipes page renders a custom recipe; rarely hand-written — see [docs/COMPOSITION_DESIGNER.md](docs/COMPOSITION_DESIGNER.md) |
 
 Add more background music any time by dropping `.mp3`/`.wav`/`.m4a`/`.ogg` files into `assets/music/` — new
 tracks are automatically included in the rotation for the next generation, no config change needed.
@@ -168,15 +178,17 @@ src/
   theme/           Brand colors/fonts (ported from the main StudyPal app) + ThemeContext for per-template overrides
   config/          All tunable durations/volumes/text/theme/TTS rate, as a Zod schema
   audio/           Music/sfx/voice/TTS selection + ffmpeg availability check (Node-only)
-  compositions/    The Remotion video templates + shared scene components
+  compositions/    Composition recipes (recipe/) + beat-kind scene components - see docs/COMPOSITION_DESIGNER.md
   render/          The batch runner (renderBatch.ts), manifest tracking, and sidechain ducking post-process
-server/            Express API for the GUI - template library (SQLite + git export), global settings, Facebook
-                   OAuth + publishing, render orchestration, chapter/book lookups
+server/            Express API for the GUI - template + recipe libraries (SQLite + git export), global
+                   settings, Facebook OAuth + publishing, render orchestration, chapter/book lookups
 gui/               React + Vite control panel (batch monitor w/ playback+publish, Batch Render form, Queue
-                   Render, template library, settings, video-clip spec reference)
+                   Render, template + recipe libraries, settings, video-clip spec reference)
 templates/         Git-tracked JSON export of every saved template preset (one file per template) - see server/templates.ts
-data/              SQLite db for the GUI's own state - template library, global settings, connected Facebook
-                   Page token, publish history (gitignored - templates/*.json is the only part with a git export)
+recipes/           Git-tracked JSON export of every saved custom recipe (one file per recipe) - see server/recipes.ts
+data/              SQLite db for the GUI's own state - template + recipe libraries, global settings, connected
+                   Facebook Page token, publish history (gitignored - templates/*.json and recipes/*.json are
+                   the only parts with a git export)
 assets/            fonts, music, sfx, voice-over, and generated TTS audio
 output/            Rendered videos + manifest.json (gitignored)
 ```

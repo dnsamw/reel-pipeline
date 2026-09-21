@@ -8,6 +8,7 @@ import { getPhrases, listBooks, listChapters, updatePhrase, disconnect } from ".
 import { batchPhrases } from "../src/data/batch";
 import { loadManifest, isRendered } from "../src/render/manifest";
 import { listTemplates, getTemplate, saveTemplate, deleteTemplate, pushTemplatesToGit } from "./templates";
+import { listRecipes, getRecipe, saveRecipe, deleteRecipe, writeRecipeFile, pushRecipesToGit } from "./recipes";
 import { getSettings, saveSettings, resolveDefaultConfig, writeConfigPresetFile } from "./settings";
 import {
   createOAuthState,
@@ -228,11 +229,68 @@ app.post("/api/templates/:id/push", async (req, res) => {
   }
 });
 
+// --- Composition recipes (which scenes a "Composition" choice actually sequences - see
+// src/compositions/recipe/schema.ts). The 3 built-ins are read-only (listRecipes/getRecipe
+// include them, saveRecipe/deleteRecipe refuse to touch their ids). ---
+
+app.get("/api/recipes", (_req, res) => {
+  try {
+    res.json(listRecipes());
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+app.get("/api/recipes/:id", (req, res) => {
+  try {
+    const record = getRecipe(req.params.id);
+    if (!record) return res.status(404).json({ error: `No recipe "${req.params.id}"` });
+    res.json(record);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+app.post("/api/recipes", (req, res) => {
+  try {
+    res.json(saveRecipe(req.body));
+  } catch (err) {
+    res.status(400).json({ error: String(err) });
+  }
+});
+
+app.put("/api/recipes/:id", (req, res) => {
+  try {
+    res.json(saveRecipe(req.body, req.params.id));
+  } catch (err) {
+    res.status(400).json({ error: String(err) });
+  }
+});
+
+app.delete("/api/recipes/:id", (req, res) => {
+  try {
+    deleteRecipe(req.params.id);
+    res.status(204).end();
+  } catch (err) {
+    res.status(400).json({ error: String(err) });
+  }
+});
+
+app.post("/api/recipes/:id/push", async (req, res) => {
+  try {
+    const message =
+      typeof req.body?.message === "string" && req.body.message.trim() ? req.body.message : `Update recipe: ${req.params.id}`;
+    res.json(await pushRecipesToGit(message));
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
 // --- Batch render orchestration (wraps `npm run render:batch`, doesn't replace it) ---
 
 app.post("/api/render/start", (req, res) => {
   try {
-    const { chapters, limit, force, tts, template, book, sidechain, templateId, phraseIds } = req.body ?? {};
+    const { chapters, limit, force, tts, template, book, sidechain, templateId, phraseIds, recipeId } = req.body ?? {};
     const args: string[] = [];
 
     // phraseIds targets one exact reel (the Queue Render page's Render Queue
@@ -266,9 +324,21 @@ app.post("/api/render/start", (req, res) => {
       args.push(`--book=${book}`);
     }
 
-    let resolvedTemplate = template != null ? String(template) : null;
     const templateRecord = templateId ? getTemplate(String(templateId)) : null;
     if (templateId && !templateRecord) return res.status(404).json({ error: `Unknown templateId "${templateId}"` });
+
+    // Which recipe/composition to actually render with, in priority order:
+    // an explicit recipeId (the GUI's Recipe picker) > an explicit template
+    // number (legacy/CLI-style) > the chosen color template's own recipeId
+    // (a template "remembers" which recipe it was designed for, same as it
+    // always auto-selected a composition number before this existed). A
+    // built-in id renders exactly like the old raw --template flag (same
+    // static composition, same manifest/filename behavior); a genuinely
+    // custom recipe renders through the dynamic Reel-Custom composition
+    // instead, via --recipeFile (see renderBatch.ts).
+    const effectiveRecipeId = recipeId != null ? String(recipeId) : template != null ? String(template) : templateRecord?.recipeId ?? null;
+    const recipeRecord = effectiveRecipeId != null ? getRecipe(effectiveRecipeId) : null;
+    if (effectiveRecipeId != null && !recipeRecord) return res.status(404).json({ error: `Unknown recipe "${effectiveRecipeId}"` });
 
     // Settings' global overrides are always the baseline; a chosen template's
     // overrides win over those (same precedence as templates vs explicit
@@ -278,10 +348,12 @@ app.post("/api/render/start", (req, res) => {
       const presetPath = writeConfigPresetFile(mergedConfig, join(tmpdir(), "studypal-reels-presets"));
       args.push(`--presetFile=${presetPath}`);
     }
-    resolvedTemplate = resolvedTemplate ?? templateRecord?.templateNumber ?? null;
-    if (resolvedTemplate != null) {
-      if (!["1", "2", "3"].includes(resolvedTemplate)) return res.status(400).json({ error: "template must be 1, 2, or 3" });
-      args.push(`--template=${resolvedTemplate}`);
+
+    if (recipeRecord && !recipeRecord.builtin) {
+      const recipePath = writeRecipeFile(recipeRecord, join(tmpdir(), "studypal-reels-recipes"));
+      args.push(`--recipeFile=${recipePath}`);
+    } else if (recipeRecord) {
+      args.push(`--template=${recipeRecord.id}`);
     }
 
     res.json(startRender(args));
@@ -328,15 +400,15 @@ app.get("/api/settings", (_req, res) => {
 
 app.put("/api/settings", (req, res) => {
   try {
-    const { config, defaultSidechain, defaultTemplateNumber } = req.body ?? {};
-    if (defaultTemplateNumber != null && !["1", "2", "3"].includes(defaultTemplateNumber)) {
-      return res.status(400).json({ error: "defaultTemplateNumber must be 1, 2, or 3" });
+    const { config, defaultSidechain, defaultRecipeId } = req.body ?? {};
+    if (defaultRecipeId != null && !getRecipe(String(defaultRecipeId))) {
+      return res.status(400).json({ error: `Unknown recipe "${defaultRecipeId}"` });
     }
     res.json(
       saveSettings({
         config: config ?? {},
         defaultSidechain: Boolean(defaultSidechain),
-        defaultTemplateNumber: defaultTemplateNumber ?? "1",
+        defaultRecipeId: defaultRecipeId ?? "1",
       }),
     );
   } catch (err) {

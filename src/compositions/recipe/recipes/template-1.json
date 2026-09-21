@@ -1,11 +1,12 @@
 {
   "id": "1",
   "name": "Classic",
-  "description": "Phrase, countdown, and reveal are separate screens - matches Reel.tsx / buildTimeline.",
+  "description": "Phrase, countdown, and reveal are separate screens.",
   "intro": {
     "kind": "intro",
     "theme": "light",
-    "text": { "source": "config.introText" }
+    "text": { "source": "config.introText" },
+    "introVoiceKeyword": "sinhala"
   },
   "perPhraseBeats": [{ "kind": "phrase" }, { "kind": "countdown" }, { "kind": "reveal" }],
   "outro": {

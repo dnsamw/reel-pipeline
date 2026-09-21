@@ -41,7 +41,7 @@ export function RenderQueuePanel({
   entries: RenderQueueEntry[];
   onChange: (batchId: string, update: Partial<RenderQueueEntry>) => void;
   onRemove: (batchId: string) => void;
-  style: { templateId?: string; template: "1" | "2" | "3"; tts: "default" | "true" | "false"; sidechain: boolean };
+  style: { templateId?: string; recipeId: string; tts: "default" | "true" | "false"; sidechain: boolean };
   onItemRendered: () => void;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -54,7 +54,7 @@ export function RenderQueuePanel({
       const started = await api.startRender({
         phraseIds: entry.phrases.map((p) => p.id),
         templateId: style.templateId,
-        template: style.template,
+        recipeId: style.recipeId,
         tts: style.tts === "default" ? undefined : style.tts === "true",
         sidechain: style.sidechain || undefined,
       });

@@ -1,11 +1,13 @@
 import type {
   Book,
   Chapter,
+  CompositionRecipe,
   FacebookStatus,
   Manifest,
   Phrase,
   Publication,
   QueueItem,
+  RecipeRecord,
   ReelConfig,
   ReelTheme,
   RenderRun,
@@ -43,7 +45,7 @@ export const api = {
   manifest: () => request<Manifest>("/manifest"),
   videoSpec: () => request<VideoSpec>("/video-spec"),
 
-  queue: (params: { book?: string | null; min?: number | null; max?: number | null; phrasesPerReel?: number; template?: "1" | "2" | "3" }) => {
+  queue: (params: { book?: string | null; min?: number | null; max?: number | null; phrasesPerReel?: number; template?: string }) => {
     const q = new URLSearchParams();
     if (params.book) q.set("book", params.book);
     if (params.min != null) q.set("min", String(params.min));
@@ -68,16 +70,30 @@ export const api = {
       body: JSON.stringify({ message }),
     }),
 
+  recipes: () => request<RecipeRecord[]>("/recipes"),
+  recipe: (id: string) => request<RecipeRecord>(`/recipes/${encodeURIComponent(id)}`),
+  createRecipe: (input: Omit<CompositionRecipe, "id">) => request<RecipeRecord>("/recipes", { method: "POST", body: JSON.stringify(input) }),
+  updateRecipe: (id: string, input: Omit<CompositionRecipe, "id">) =>
+    request<RecipeRecord>(`/recipes/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(input) }),
+  deleteRecipe: (id: string) => request<void>(`/recipes/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  pushRecipes: (id: string, message: string) =>
+    request<{ pushed: boolean; output: string }>(`/recipes/${encodeURIComponent(id)}/push`, {
+      method: "POST",
+      body: JSON.stringify({ message }),
+    }),
+
   startRender: (body: {
     chapters?: string;
     limit?: number;
     force?: boolean;
     tts?: boolean;
-    template?: "1" | "2" | "3";
+    template?: string;
     book?: string;
     sidechain?: boolean;
     templateId?: string;
     phraseIds?: string[];
+    /** Which recipe/composition to render with - a built-in id ("1"/"2"/"3") behaves exactly like `template`; a custom recipe's id renders through the dynamic composition (server/recipes.ts). Replaces raw `template` as the GUI's own choice - see RecipePicker. */
+    recipeId?: string;
   }) => request<RenderRun>("/render/start", { method: "POST", body: JSON.stringify(body) }),
   listRuns: () => request<RenderRun[]>("/render"),
   getRun: (id: string) => request<RenderRun>(`/render/${encodeURIComponent(id)}`),

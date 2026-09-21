@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { ThemePreviewPair } from "../components/ThemeThumbnail";
-import type { ReelTheme, TemplateRecord } from "../types";
+import type { RecipeRecord, ReelTheme, TemplateRecord } from "../types";
 
 export function Templates() {
   const [templates, setTemplates] = useState<TemplateRecord[]>([]);
+  const [recipes, setRecipes] = useState<RecipeRecord[]>([]);
   const [defaultTheme, setDefaultTheme] = useState<ReelTheme | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -16,6 +17,7 @@ export function Templates() {
   useEffect(reload, []);
   useEffect(() => {
     api.defaultTheme().then(setDefaultTheme).catch(() => {});
+    api.recipes().then(setRecipes).catch(() => {});
   }, []);
 
   async function onDelete(id: string) {
@@ -44,7 +46,8 @@ export function Templates() {
               {(t.config.theme ?? defaultTheme) && <ThemePreviewPair theme={t.config.theme ?? defaultTheme!} />}
               <div className="template-list-info">
                 <div>
-                  <strong>{t.name}</strong> <span className="hint">(Composition {t.templateNumber})</span>
+                  <strong>{t.name}</strong>{" "}
+                  <span className="hint">({recipes.find((r) => r.id === t.recipeId)?.name ?? t.recipeId})</span>
                 </div>
                 <div className="meta">{t.description || "No description"} · updated {new Date(t.updatedAt).toLocaleString()}</div>
               </div>

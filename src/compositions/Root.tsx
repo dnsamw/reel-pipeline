@@ -1,7 +1,7 @@
 import { Composition, registerRoot } from "remotion";
 import { registerFonts } from "../theme/fonts";
-import { sampleBatches } from "./reelProps";
-import { makeCompositionFromRecipe } from "./recipe/CompositionFromRecipe";
+import { reelDefaultProps, sampleBatches } from "./reelProps";
+import { makeCompositionFromRecipe, CompositionFromRecipeDynamic, calculateMetadataForRecipeDynamic, reelPropsWithRecipeSchema } from "./recipe/CompositionFromRecipe";
 import { builtInRecipes } from "./recipe/recipes";
 
 // Fires once when the bundle loads; loadFont/loadCustomFont each call
@@ -36,6 +36,27 @@ function RemotionRoot() {
           />
         );
       })}
+
+      {/* The one dynamic composition custom (non-built-in) recipes render
+          through - `recipe` comes in as a real prop at render time instead
+          of being fixed at bundle time, which is what makes a GUI-authored
+          recipe actually renderable without a bundle rebuild. See
+          server/recipes.ts / renderBatch.ts's --recipeFile and
+          docs/COMPOSITION_DESIGNER.md. defaultProps.recipe is just a
+          starting point for Studio browsing - any recipe can be passed in
+          via inputProps at render time. */}
+      <Composition
+        id="Reel-Custom"
+        component={CompositionFromRecipeDynamic}
+        schema={reelPropsWithRecipeSchema}
+        calculateMetadata={calculateMetadataForRecipeDynamic}
+        durationInFrames={300}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{ ...reelDefaultProps, recipe: builtInRecipes["1"] }}
+      />
+
       <SampleReels />
     </>
   );
