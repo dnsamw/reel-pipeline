@@ -133,9 +133,10 @@ unit → outro), as data instead of one hand-written React component per composi
 (Classic/Side-by-side/Reversed) are read-only; create a custom one by picking beats (phrase/countdown/reveal/
 guess-and-reveal, in any order/count) with a live preview, same save/edit/push-to-git flow as template color
 presets. One beat kind, **Custom**, goes further — instead of one of the fixed scene layouts, it's a stack of
-positioned text/shape/image layers (position, size, color, animation) you edit as typed fields, no code
-needed for a new visual arrangement of that beat's content. A custom recipe is fully renderable, not just
-previewable — pick it anywhere a "Composition" is chosen. See
+positioned text/shape/image layers (position, size, color, animation) you arrange by dragging/resizing/
+rotating on a canvas (plus a form for text/color/animation fields), no code needed for a new visual
+arrangement of that beat's content. A custom recipe is fully renderable, not just previewable — pick it
+anywhere a "Composition" is chosen. See
 [docs/COMPOSITION_DESIGNER.md](docs/COMPOSITION_DESIGNER.md) for the full design.
 
 **Settings page** — GUI-wide defaults (durations/volumes/TTS/colors/copy, plus the default composition and

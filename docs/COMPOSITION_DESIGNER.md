@@ -213,12 +213,13 @@ the API (bypassing only the click-through, which was separately screenshot-verif
 
 Still not built:
 
-1. ~~A new beat kind... requires writing a new scene component in code~~ **Partially resolved** on
+1. ~~A new beat kind... requires writing a new scene component in code~~ **Mostly resolved** on
    `feature/layer-designer`: the `custom` beat kind (a stack of positioned text/shape/image layers,
-   interpreted generically by `LayerRenderer.tsx`) covers many new visual layouts as pure data now -
-   see [A concrete design for the true visual designer](#a-concrete-design-for-the-true-visual-designer).
+   interpreted generically by `LayerRenderer.tsx`, authored via a drag/resize/rotate canvas in the
+   GUI) covers many new visual layouts as pure data now - see
+   [A concrete design for the true visual designer](#a-concrete-design-for-the-true-visual-designer).
    What's still missing is a genuinely new *primitive* beyond text/image/shape (e.g. video-clip
-   support) and the drag/resize canvas to author layers with a mouse instead of typed % numbers.
+   support).
 2. The beat editor's "Direction" control only covers `guessReveal` beats (the only kind with a
    field choice today); `phrase`/`countdown`/`reveal` beats have nothing to configure yet since
    nothing about them varies - see [Coverage](#coverage-does-it-actually-cover-the-3-existing-templates).
@@ -234,7 +235,7 @@ Composition 3 is selected, explaining it doesn't apply there, instead of silentl
 
 ## A concrete design for the true visual designer
 
-**Status: partially built, on `feature/layer-designer`.** [What this doesn't cover](#what-this-doesnt-cover-and-wont-without-more-work)
+**Status: built, on `feature/layer-designer` (not yet merged).** [What this doesn't cover](#what-this-doesnt-cover-and-wont-without-more-work)
 called a real drag/resize designer "a much more elaborate data model... a separate, considerably
 larger project." Not *impossible* - the pattern is well-trodden (After Effects/Lottie-style layer
 graphs, Figma's scene model) - just a genuinely different system from the beat-recipe schema above,
@@ -278,10 +279,11 @@ data too.
 2. ~~**Migrate the chrome/contrast escape hatches for real.**~~ **Done**, as part of step 1 -
    `sceneFrameChrome` and `oppositeThemeToken` are real, working bindings in `LayerRenderer.tsx`
    itself (not just schema shapes), exercised by the same POC beat.
-3. **The canvas editor.** Still not built. `LayerEditor.tsx` (see below) is a **form**, not a
-   drag/resize canvas - every field (position/size as % numbers, rotation, anchor, etc.) is a
-   number input or select, not a mouse interaction on a scaled preview. This remains the largest
-   piece of unbuilt work: drag/resize/rotate handles, a selection/property-panel model, snapping.
+3. ~~**The canvas editor.**~~ **Done.** `LayerCanvas.tsx` renders a scaled-down 1080x1920 box where
+   each layer is a draggable div - a corner handle resizes, a top handle rotates - sharing the same
+   `Layer[]` state as `LayerEditor.tsx`'s form (below it, for the fields a mouse isn't a better
+   input for: text source, font, color, animation curves), so dragging and typing stay in sync. No
+   snapping/alignment guides yet - plain free-form drag.
 4. ~~**Wire `custom` into the real union.**~~ **Done.** `custom` is a real member of
    `beatSchema`/`perPhraseBeatSchema` in `../schema.ts`, with matching support in `timeline.ts`
    (duration comes from the beat's own `durationInFrames`, not `config`, unlike every other
@@ -293,14 +295,15 @@ data too.
 **What's actually built, end to end:** a recipe's `perPhraseBeats` can include a `custom` beat today,
 saved/loaded/rendered through the exact same paths as any other beat kind (`server/recipes.ts`'s
 real `compositionRecipeSchema.parse`, `renderBatch.ts`, `ReelPreview.tsx`). `RecipeEditor.tsx`'s beat
-kind picker has a "Custom (layers)" option; picking it shows `LayerEditor.tsx` - add/reorder/remove
-layers, edit every field the schema supports (text source including phrase-field binding, color
-including theme/opposite-theme tokens, shape/fill/stroke/corner-radius, enter/exit animation).
-Verified via Playwright against the real dev server (build a recipe with a custom beat, zero
-console/page errors, save through the actual `POST /api/recipes`) - not just that it type-checks.
+kind picker has a "Custom (layers)" option; picking it shows `LayerCanvas.tsx` (drag/resize/rotate)
+plus `LayerEditor.tsx`'s form below it for everything else the schema supports (text source including
+phrase-field binding, color including theme/opposite-theme tokens, shape/fill/stroke/corner-radius,
+enter/exit animation) - clicking a layer on the canvas or in the form selects it in both. Verified via
+Playwright against the real dev server: dragging/resizing/rotating a layer and reading the values back
+from the form confirmed each interaction updates real state, and saving a custom-beat recipe through
+the actual `POST /api/recipes` (real Zod validation) worked with zero console/page errors.
 
-**What's still missing** is specifically the *drag/resize canvas* (phase 3) - positioning today is
-typed percentages, not a mouse. That's the piece worth treating as a deliberate, separate scope
-decision if pursued (a new interaction model in `RecipeEditor.tsx`, not an extension of its current
-form), not something to fall into. Everything below the canvas - the schema, the renderer, the real
-wiring, a usable (if form-based) GUI editor - is done, on `feature/layer-designer`.
+**What's still missing:** snapping/alignment guides on the canvas, and (unrelated to the canvas) a
+genuinely new visual *primitive* beyond text/image/shape - e.g. video-clip support, still requires
+code. The original 4-phase plan (renderer, chrome/contrast bindings, canvas, real schema wiring) is
+otherwise complete, on `feature/layer-designer`.
