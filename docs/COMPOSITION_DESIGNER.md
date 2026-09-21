@@ -6,10 +6,11 @@ prop-passing boilerplate) even when it would reuse scenes that already exist. Th
 toward not needing that: a schema for describing a composition as **data**, checked against all
 three existing templates to see how much of them it actually covers.
 
-**Status: schema, validated recipes, and a working generic renderer, on
-`feature/composition-designer-schema`.** `Reel.tsx`/`ReelTemplate2.tsx`/`ReelTemplate3.tsx` are
-still unchanged and still what `renderBatch.ts`/the GUI actually use - the recipe-driven renderer
-is registered as three additional, side-by-side Studio compositions (`Reel-Recipe-1/2/3`) purely for
+**Status: schema, validated recipes, and a working generic renderer - including a genuinely generic
+`guessReveal` beat, not just two hardcoded variants - on `feature/composition-designer-schema`.**
+`Reel.tsx`/`ReelTemplate2.tsx`/`ReelTemplate3.tsx` (and `GuessRevealSceneT2`/`T3`) are still
+unchanged and still what `renderBatch.ts`/the GUI actually use - the recipe-driven renderer is
+registered as three additional, side-by-side Studio compositions (`Reel-Recipe-1/2/3`) purely for
 comparison, not wired into the production render path. See
 [Verified: byte-identical output](#verified-byte-identical-output) and
 [What this doesn't do yet](#what-this-doesnt-do-yet).
@@ -103,22 +104,43 @@ new file under `recipes/` and registering it in `Root.tsx` the same way the thre
   guessing beat. **Renderable today**, no further code needed.
 - A "Template 1 pacing but Template 3's outro theme" hybrid: `perPhraseBeats: [phrase, countdown,
   reveal]` with `outro.theme: "dark"` overridden. **Renderable today.**
-- A "Template 1 pacing but Template 3's dark `guessReveal` theme and reversed prompt/answer" hybrid
-  - **not actually renderable yet**, see the `pickGuessRevealComponent` gap below.
+- A "dark theme but English-first `guessReveal` prompt" hybrid, matching neither Template 2 nor
+  Template 3 - **also renderable today**, and actually built and eyeballed as a one-off Studio
+  composition to prove it (`theme: "dark"`, `prompt: "phrase"`, `answer: "translationSi"`): renders
+  cleanly, correct contrast, no overlap - see [`guessReveal` is now fully generic](#guessreveal-is-now-fully-generic).
+
+### `guessReveal` is now fully generic
+
+Originally, `prompt`/`answer` only genuinely drove TTS routing (`ttsFor()` in
+`CompositionFromRecipe.tsx`) - the *visual* content (whether a pronunciation line shows, which side
+gets the explanation card, font sizes/spacing) was hardcoded per file in `GuessRevealSceneT2.tsx`/
+`GuessRevealSceneT3.tsx`, so the renderer could only pick between those two whole components by
+`theme`, and a combo neither one implemented (e.g. dark + English-first) wouldn't render as
+requested.
+
+**Closed**: `src/compositions/scenes/GuessRevealScene.tsx` is a new, generic component
+parameterized by `promptField`/`answerField`/`theme`, used only by `CompositionFromRecipe.tsx` -
+`GuessRevealSceneT2.tsx`/`GuessRevealSceneT3.tsx` are untouched and still exactly what
+`ReelTemplate2.tsx`/`ReelTemplate3.tsx` use directly. Every visual difference between the old two
+files turned out to be derivable from field identity, not from "which composition": each field has
+a fixed identity (`phrase`: sans font, `foreground` color, larger size, an optional pronunciation
+secondary line; `translationSi`: sinhala font, `primary` color, smaller size, no secondary), and the
+answer block's spacing (vertical position, explanation-card padding/margin/font size) is
+consistently tighter when the answer field is `phrase` - not an arbitrary per-composition tweak, but
+because that field's optional pronunciation line adds an extra line above the card. Re-verified with
+the same still-frame technique: **still 15/15 byte-identical** against `Reel-T2`/`Reel-T3` across
+all 5 phases, plus the dark+English-first combo rendered and inspected by eye (no code path existed
+to compare it against, since it never worked before).
+
+One honest, harmless divergence found while doing this: the original files guard nullable fields
+inconsistently (`GuessRevealSceneT2` guards its `translationSi`-as-answer heading with `phrase.translationSi && (...)`;
+`GuessRevealSceneT3` doesn't guard its `phrase`-as-answer heading at all). `GuessRevealScene.tsx`
+guards both uniformly, which only matters for an empty-string `phrase` - never true in practice
+(required field, empty in neither the schema nor real content) - and is what every still-frame
+comparison above was checked against.
 
 ### What this doesn't cover, and won't without more work
 
-- **`guessReveal`'s `theme`/`prompt`/`answer` aren't fully independent yet.** `prompt`/`answer` genuinely
-  drive which TTS file/volume gets used (`ttsFor()` in `CompositionFromRecipe.tsx` - verified,
-  generic, no gap there). But the *visual* secondary content - whether a pronunciation line shows,
-  which side gets the explanation card - is still hardcoded per file in `GuessRevealSceneT2.tsx`/
-  `GuessRevealSceneT3.tsx`. The renderer currently picks between those two whole components by
-  `theme` (`pickGuessRevealComponent`), so only the two combos that already match an existing
-  component's shape (light+phrase-prompt, dark+translation-prompt) actually render correctly - a
-  recipe requesting, say, `theme: "dark"` with `prompt: "phrase"` would silently render with T3's
-  layout regardless. Fixing this for real means merging `GuessRevealSceneT2`/`T3` into one
-  component parameterized by `promptField`/`answerField` (deriving the right secondary content from
-  that), with a visual regression check against the current two shapes before trusting it.
 - **A genuinely new visual layout** (different fonts/positions/colors/animation curves, a new kind
   of progress indicator, a split-screen composition, etc.) still means writing a new beat-kind
   component in code. This schema recombines existing scene *kinds*; it doesn't describe pixel
@@ -139,17 +161,19 @@ what this branch builds.
 
 Not yet built, and the natural next steps, roughly in order of value:
 
-1. **Fix the `guessReveal` component-selection gap** above, if arbitrary theme/prompt/answer combos
-   for that beat kind matter - otherwise the recipe format already slightly overclaims for that one
-   beat kind (its `prompt`/`answer` fields only fully apply to the two combos that already exist).
-2. **Wire a chosen recipe into `renderBatch.ts`/the GUI** - today `Root.tsx`'s `Reel-Recipe-*`
+1. **Wire a chosen recipe into `renderBatch.ts`/the GUI** - today `Root.tsx`'s `Reel-Recipe-*`
    compositions exist only for Studio comparison; `render:batch --template=N` still resolves to the
-   hand-written `Reel`/`ReelTemplate2`/`ReelTemplate3` regardless. Once trusted, the GUI's
-   "Composition" dropdown (currently a hardcoded `1|2|3`) could become "pick a recipe," with a
+   hand-written `Reel`/`ReelTemplate2`/`ReelTemplate3` regardless. This is a bigger step than
+   anything done so far - it changes what real production videos are, and the verification so far
+   has been Remotion stills only (no full render / audio mix / mp4 diff yet). Once trusted, the
+   GUI's "Composition" dropdown (currently a hardcoded `1|2|3`) could become "pick a recipe," with a
    recipe editable the same way template color presets already are (`server/templates.ts`'s SQLite +
    git-export pattern) - a form, not a canvas, with a live preview reusing `ReelPreview.tsx`.
-3. **Known real gap surfaced by this exercise, independent of the designer work**: Template 3's
+2. **Known real gap surfaced by this exercise, independent of the designer work**: Template 3's
    intro text is a hardcoded constant that ignores `config.introText`/a saved template's override -
    the recipe models this correctly (`text: {source: "literal", ...}` vs `{source: "config.introText"}`,
    and `CompositionFromRecipe.tsx` already honors it), but the actual `ReelTemplate3.tsx` still has
-   this inconsistency until step 2 replaces it.
+   this inconsistency until step 1 replaces it.
+3. A new beat kind (a genuinely new visual layout) still requires writing a new scene component in
+   code and adding one match arm to `CompositionFromRecipe.tsx` - by design, see
+   [What this doesn't cover](#what-this-doesnt-cover-and-wont-without-more-work).

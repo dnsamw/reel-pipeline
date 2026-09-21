@@ -7,8 +7,7 @@ import { PhraseScene } from "../scenes/PhraseScene";
 import { CountdownScene } from "../scenes/CountdownScene";
 import { RevealScene } from "../scenes/RevealScene";
 import { OutroScene } from "../scenes/OutroScene";
-import { GuessRevealSceneT2 } from "../scenes/GuessRevealSceneT2";
-import { GuessRevealSceneT3 } from "../scenes/GuessRevealSceneT3";
+import { GuessRevealScene } from "../scenes/GuessRevealScene";
 import { ThemeProvider } from "../../theme/ThemeContext";
 import type { ReelConfig } from "../../config/config";
 import { reelPropsSchema, reelDefaultProps, type ReelProps } from "../Reel";
@@ -22,31 +21,12 @@ function resolveIntroText(recipe: CompositionRecipe, config: ReelConfig): string
 /**
  * Maps a guessReveal beat's abstract `prompt`/`answer: "phrase"|"translationSi"`
  * onto the concrete TTS file array + volume config field that field actually
- * corresponds to - this part IS fully generic today (both built-in recipes'
- * prompt/answer choices round-trip correctly through it). What's NOT generic
- * yet is the secondary content (pronunciation line, which side gets the
- * explanation card) baked into GuessRevealSceneT2/T3's own JSX - see
- * `pickGuessRevealComponent` below and docs/COMPOSITION_DESIGNER.md.
+ * corresponds to.
  */
 function ttsFor(field: "phrase" | "translationSi", ttsPhraseFiles: (string | null)[], ttsRevealFiles: (string | null)[], config: ReelConfig, phraseIndex: number) {
   return field === "phrase"
     ? { file: ttsPhraseFiles[phraseIndex] ?? null, volume: config.phraseVoiceVolume }
     : { file: ttsRevealFiles[phraseIndex] ?? null, volume: config.revealVoiceVolume };
-}
-
-/**
- * Picks which of the two existing hand-written guessReveal components to
- * mount for a given theme. This is the one honest gap in "recipes are fully
- * data-driven": GuessRevealSceneT2/T3 don't yet accept `promptField`/
- * `answerField` as props (their secondary content - pronunciation line,
- * which side shows the explanation card - is hardcoded per file), so a
- * recipe combo that doesn't match either component's existing shape (e.g.
- * dark theme with an English prompt) isn't actually renderable yet. Both
- * built-in recipes (template-2.json, template-3.json) only ever request the
- * combo their matching component already implements, so this holds for them.
- */
-function pickGuessRevealComponent(theme: "light" | "dark") {
-  return theme === "dark" ? GuessRevealSceneT3 : GuessRevealSceneT2;
 }
 
 export const calculateMetadataForRecipe =
@@ -137,16 +117,18 @@ export function makeCompositionFromRecipe(recipe: CompositionRecipe) {
                 />
               );
             } else if (item.type === "guessReveal") {
-              const GuessReveal = pickGuessRevealComponent(item.theme);
               const promptTts = ttsFor(item.prompt, ttsPhraseFiles, ttsRevealFiles, config, item.phraseIndex);
               const answerTts = ttsFor(item.answer, ttsPhraseFiles, ttsRevealFiles, config, item.phraseIndex);
               content = (
-                <GuessReveal
+                <GuessRevealScene
                   phrase={phrases[item.phraseIndex]}
                   index={item.phraseIndex}
                   total={phrases.length}
                   promptFrames={item.promptFrames}
                   countdownFrames={item.countdownFrames}
+                  theme={item.theme}
+                  promptField={item.prompt}
+                  answerField={item.answer}
                   tickFile={tickFile}
                   tickVolume={config.tickVolume}
                   revealSoundFile={revealSoundFile}
