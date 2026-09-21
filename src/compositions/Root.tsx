@@ -3,6 +3,8 @@ import { registerFonts } from "../theme/fonts";
 import { Reel, calculateReelMetadata, reelDefaultProps, reelPropsSchema, sampleBatches } from "./Reel";
 import { ReelTemplate2, calculateReelTemplate2Metadata, reelTemplate2DefaultProps, reelTemplate2PropsSchema } from "./ReelTemplate2";
 import { ReelTemplate3, calculateReelTemplate3Metadata, reelTemplate3DefaultProps, reelTemplate3PropsSchema } from "./ReelTemplate3";
+import { makeCompositionFromRecipe } from "./recipe/CompositionFromRecipe";
+import { builtInRecipes } from "./recipe/recipes";
 
 // Fires once when the bundle loads; loadFont/loadCustomFont each call
 // Remotion's delayRender/continueRender internally, so this blocks any
@@ -51,6 +53,30 @@ function RemotionRoot() {
         defaultProps={reelTemplate3DefaultProps}
       />
       <SampleReelsT3 />
+
+      {/* Experimental (feature/composition-designer-schema): the same three
+          templates above, re-rendered through the generic recipe interpreter
+          instead of their own hand-written .tsx - see
+          docs/COMPOSITION_DESIGNER.md. Side-by-side with "Reel"/"Reel-T2"/
+          "Reel-T3" in Studio's sidebar for visual comparison; not used by
+          renderBatch.ts or the GUI. */}
+      {(["1", "2", "3"] as const).map((id) => {
+        const { component, calculateMetadata, propsSchema, defaultProps } = makeCompositionFromRecipe(builtInRecipes[id]);
+        return (
+          <Composition
+            key={id}
+            id={`Reel-Recipe-${id}`}
+            component={component}
+            schema={propsSchema}
+            calculateMetadata={calculateMetadata}
+            durationInFrames={300}
+            fps={30}
+            width={1080}
+            height={1920}
+            defaultProps={defaultProps}
+          />
+        );
+      })}
     </>
   );
 }

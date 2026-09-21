@@ -6,10 +6,13 @@ prop-passing boilerplate) even when it would reuse scenes that already exist. Th
 toward not needing that: a schema for describing a composition as **data**, checked against all
 three existing templates to see how much of them it actually covers.
 
-**Status: schema + validated recipes only, on `feature/composition-designer-schema`.** Nothing here
-is wired into rendering yet - `Reel.tsx`/`ReelTemplate2.tsx`/`ReelTemplate3.tsx` are unchanged and
-still what actually renders. See [What this doesn't do yet](#what-this-doesnt-do-yet) for the real
-next step.
+**Status: schema, validated recipes, and a working generic renderer, on
+`feature/composition-designer-schema`.** `Reel.tsx`/`ReelTemplate2.tsx`/`ReelTemplate3.tsx` are
+still unchanged and still what `renderBatch.ts`/the GUI actually use - the recipe-driven renderer
+is registered as three additional, side-by-side Studio compositions (`Reel-Recipe-1/2/3`) purely for
+comparison, not wired into the production render path. See
+[Verified: byte-identical output](#verified-byte-identical-output) and
+[What this doesn't do yet](#what-this-doesnt-do-yet).
 
 ## The finding this is built on
 
@@ -71,22 +74,51 @@ straight from the real `Reel*.tsx`/`buildTimeline*` source and validated by pars
 Every field that actually differs between the three real files shows up as a field in the recipe;
 nothing needed approximating or dropping to fit.
 
-### What this already buys you, even before Phase 1.5 is built
+## Verified: byte-identical output
 
-Because the recipe can freely recombine the *existing* six beat kinds, some compositions that
-don't exist today become a JSON edit away once a generic renderer exists (see below) - no new
-`.tsx`, no new `<Composition>` registration:
+`src/compositions/recipe/CompositionFromRecipe.tsx` (`makeCompositionFromRecipe`) interprets a
+recipe at render time - one `buildTimelineFromRecipe()` (parallel to `timings.ts`'s
+`buildTimeline`/`buildTimelineT2`) plus a single `if/else` dispatching each beat to the *same* scene
+components `Reel*.tsx` already use. `Root.tsx` registers it three times, once per built-in recipe,
+as `Reel-Recipe-1`/`Reel-Recipe-2`/`Reel-Recipe-3` - visible in Studio right alongside `Reel`/
+`Reel-T2`/`Reel-T3`.
+
+Checked with `npx remotion still`, comparing each original composition against its recipe-driven
+counterpart at the same frame, same default sample data:
+
+- `calculateMetadata` reports the identical duration for all six (1470 frames / 49.00s with the
+  default sample batch).
+- Stills at 5 frames spanning every phase (intro, phrase/prompt, countdown, reveal, outro) for all
+  3 template pairs - **18/18 comparisons produced byte-for-byte identical PNGs** (`cmp -s`).
+
+So the recipe interpreter reproduces all three existing templates exactly, not just approximately.
+
+### What this already buys you
+
+Because the recipe can freely recombine the *existing* six beat kinds, some compositions that don't
+exist today are a JSON file away - no new `.tsx`, no new `<Composition>` registration - by adding a
+new file under `recipes/` and registering it in `Root.tsx` the same way the three built-ins are:
 
 - Drop the countdown entirely: `perPhraseBeats: [phrase, reveal]` - straight phrase→answer, no
-  guessing beat.
-- Two guess-reveal beats back to back per phrase (prompt in English, then again in Sinhala) instead
-  of one.
-- A "Template 1 pacing but Template 3's dark theme and reversed prompt/answer" hybrid - today that
-  would need a fourth hand-written file; with the recipe it's `perPhraseBeats: [guessReveal]` with
-  `theme: "dark"`, `prompt: "translationSi"`.
+  guessing beat. **Renderable today**, no further code needed.
+- A "Template 1 pacing but Template 3's outro theme" hybrid: `perPhraseBeats: [phrase, countdown,
+  reveal]` with `outro.theme: "dark"` overridden. **Renderable today.**
+- A "Template 1 pacing but Template 3's dark `guessReveal` theme and reversed prompt/answer" hybrid
+  - **not actually renderable yet**, see the `pickGuessRevealComponent` gap below.
 
-### What this doesn't cover, and won't without a much bigger project
+### What this doesn't cover, and won't without more work
 
+- **`guessReveal`'s `theme`/`prompt`/`answer` aren't fully independent yet.** `prompt`/`answer` genuinely
+  drive which TTS file/volume gets used (`ttsFor()` in `CompositionFromRecipe.tsx` - verified,
+  generic, no gap there). But the *visual* secondary content - whether a pronunciation line shows,
+  which side gets the explanation card - is still hardcoded per file in `GuessRevealSceneT2.tsx`/
+  `GuessRevealSceneT3.tsx`. The renderer currently picks between those two whole components by
+  `theme` (`pickGuessRevealComponent`), so only the two combos that already match an existing
+  component's shape (light+phrase-prompt, dark+translation-prompt) actually render correctly - a
+  recipe requesting, say, `theme: "dark"` with `prompt: "phrase"` would silently render with T3's
+  layout regardless. Fixing this for real means merging `GuessRevealSceneT2`/`T3` into one
+  component parameterized by `promptField`/`answerField` (deriving the right secondary content from
+  that), with a visual regression check against the current two shapes before trusting it.
 - **A genuinely new visual layout** (different fonts/positions/colors/animation curves, a new kind
   of progress indicator, a split-screen composition, etc.) still means writing a new beat-kind
   component in code. This schema recombines existing scene *kinds*; it doesn't describe pixel
@@ -105,19 +137,19 @@ what this branch builds.
 
 ## What this doesn't do yet
 
-This branch stops at "schema + validated recipes for the 3 existing templates" - on purpose, to
-check the idea holds up before investing further. Not yet built, and the natural next step:
+Not yet built, and the natural next steps, roughly in order of value:
 
-1. **A generic renderer** - one `CompositionFromRecipe.tsx` + a `buildTimelineFromRecipe()` (parallel
-   to today's `buildTimeline`/`buildTimelineT2`) that reads a `CompositionRecipe` and dispatches to
-   the right existing scene component per beat, replacing the hand-written `if/else` chains in all
-   three `Reel*.tsx` files with one interpreter. `Root.tsx` would register recipes (built-in and,
-   eventually, GUI-authored) instead of three hardcoded `<Composition>` blocks.
-2. Once that exists, the GUI's "Composition" dropdown (currently a hardcoded `1|2|3`) becomes "pick
-   a recipe," and a recipe becomes editable the same way template color presets already are
-   (`server/templates.ts`'s SQLite + git-export pattern) - a form, not a canvas, with a live preview
-   reusing `ReelPreview.tsx`.
+1. **Fix the `guessReveal` component-selection gap** above, if arbitrary theme/prompt/answer combos
+   for that beat kind matter - otherwise the recipe format already slightly overclaims for that one
+   beat kind (its `prompt`/`answer` fields only fully apply to the two combos that already exist).
+2. **Wire a chosen recipe into `renderBatch.ts`/the GUI** - today `Root.tsx`'s `Reel-Recipe-*`
+   compositions exist only for Studio comparison; `render:batch --template=N` still resolves to the
+   hand-written `Reel`/`ReelTemplate2`/`ReelTemplate3` regardless. Once trusted, the GUI's
+   "Composition" dropdown (currently a hardcoded `1|2|3`) could become "pick a recipe," with a
+   recipe editable the same way template color presets already are (`server/templates.ts`'s SQLite +
+   git-export pattern) - a form, not a canvas, with a live preview reusing `ReelPreview.tsx`.
 3. **Known real gap surfaced by this exercise, independent of the designer work**: Template 3's
    intro text is a hardcoded constant that ignores `config.introText`/a saved template's override -
-   the recipe models this correctly (`text: {source: "literal", ...}` vs `{source: "config.introText"}`),
-   but until Phase 1.5 lands, the actual `ReelTemplate3.tsx` still has this inconsistency.
+   the recipe models this correctly (`text: {source: "literal", ...}` vs `{source: "config.introText"}`,
+   and `CompositionFromRecipe.tsx` already honors it), but the actual `ReelTemplate3.tsx` still has
+   this inconsistency until step 2 replaces it.
