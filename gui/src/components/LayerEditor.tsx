@@ -1,14 +1,18 @@
+import { useState } from "react";
+import { LayerCanvas } from "./LayerCanvas";
 import type { Anchor, AnimationSpec, AnimationStep, ColorRef, CustomBeat, Layer, LayerBox, Palette, PhraseTextField, TextRef, ThemeVariant } from "../types";
 
 /**
- * Form-based editor for a `custom` beat's Layer[] - the GUI side of
+ * Editor for a `custom` beat's Layer[] - the GUI side of
  * docs/COMPOSITION_DESIGNER.md's "concrete design for the true visual
- * designer". Deliberately NOT a drag/resize canvas (that's still-open Phase
- * 3 of that doc's build-out plan) - positions/sizes are typed as % numbers
- * instead. Every layer field this renders maps 1:1 onto
- * src/compositions/recipe/layers/schema.ts, so what's typed here is exactly
- * what LayerRenderer.tsx interprets - see ReelPreview.tsx for how a saved
- * edit becomes a live preview through the real renderer.
+ * designer": a drag/resize/rotate canvas (LayerCanvas.tsx) for
+ * position/size/rotation, plus a form below it for everything a mouse isn't
+ * a better input for (text source, font, color, animation curves). Both
+ * edit the same Layer[] state, so dragging on the canvas and typing in the
+ * form stay in sync. Every field maps 1:1 onto
+ * src/compositions/recipe/layers/schema.ts, so what's edited here is
+ * exactly what LayerRenderer.tsx interprets - see ReelPreview.tsx for how a
+ * saved edit becomes a live preview through the real renderer.
  */
 
 const ANCHORS: Anchor[] = ["top-left", "top-center", "top-right", "center-left", "center", "center-right", "bottom-left", "bottom-center", "bottom-right"];
@@ -143,7 +147,25 @@ function AnimationStepFields({ label, step, onChange }: { label: string; step: A
   );
 }
 
-function LayerCard({ layer, index, total, onChange, onMove, onRemove }: { layer: Layer; index: number; total: number; onChange: (l: Layer) => void; onMove: (delta: -1 | 1) => void; onRemove: () => void }) {
+function LayerCard({
+  layer,
+  index,
+  total,
+  selected,
+  onSelect,
+  onChange,
+  onMove,
+  onRemove,
+}: {
+  layer: Layer;
+  index: number;
+  total: number;
+  selected: boolean;
+  onSelect: () => void;
+  onChange: (l: Layer) => void;
+  onMove: (delta: -1 | 1) => void;
+  onRemove: () => void;
+}) {
   const { box, animation } = layer;
 
   function updateBox(patch: Partial<LayerBox>) {
@@ -151,8 +173,8 @@ function LayerCard({ layer, index, total, onChange, onMove, onRemove }: { layer:
   }
 
   return (
-    <div className="queue-phrase-card">
-      <div className="hint" style={{ marginBottom: 6 }}>
+    <div className="queue-phrase-card" style={selected ? { outline: "2px solid var(--primary)" } : undefined}>
+      <div className="hint" style={{ marginBottom: 6, cursor: "pointer" }} onClick={onSelect}>
         Layer {index + 1} of {total} - {layer.id}
       </div>
       <div className="grid">
@@ -327,6 +349,8 @@ function LayerCard({ layer, index, total, onChange, onMove, onRemove }: { layer:
 }
 
 export function LayerEditor({ beat, onChange, fps }: { beat: CustomBeat; onChange: (beat: CustomBeat) => void; fps: number }) {
+  const [selectedId, setSelectedId] = useState<string | null>(beat.layers[0]?.id ?? null);
+
   function updateLayer(index: number, layer: Layer) {
     onChange({ ...beat, layers: beat.layers.map((l, i) => (i === index ? layer : l)) });
   }
@@ -366,19 +390,30 @@ export function LayerEditor({ beat, onChange, fps }: { beat: CustomBeat; onChang
         <p className="hint">
           A custom beat's content is a stack of positioned layers (% of the 1080x1920 canvas), not a fixed layout - see docs/COMPOSITION_DESIGNER.md.
         </p>
+        <LayerCanvas beat={beat} selectedId={selectedId} onSelect={setSelectedId} onChange={onChange} />
         {beat.layers.map((layer, i) => (
           <LayerCard
             key={layer.id}
             layer={layer}
             index={i}
             total={beat.layers.length}
+            selected={layer.id === selectedId}
+            onSelect={() => setSelectedId(layer.id)}
             onChange={(l) => updateLayer(i, l)}
             onMove={(delta) => moveLayer(i, delta)}
             onRemove={() => removeLayer(i)}
           />
         ))}
         <div className="button-row" style={{ marginTop: 0 }}>
-          <button type="button" className="secondary" onClick={() => onChange({ ...beat, layers: [...beat.layers, defaultLayer()] })}>
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => {
+              const layer = defaultLayer();
+              onChange({ ...beat, layers: [...beat.layers, layer] });
+              setSelectedId(layer.id);
+            }}
+          >
             + Add layer
           </button>
         </div>
