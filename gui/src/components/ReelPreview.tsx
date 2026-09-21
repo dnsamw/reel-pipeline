@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { Player } from "@remotion/player";
-import { Reel } from "../../../src/compositions/Reel";
-import { ReelTemplate2 } from "../../../src/compositions/ReelTemplate2";
-import { ReelTemplate3 } from "../../../src/compositions/ReelTemplate3";
-import { buildTimeline, buildTimelineT2, totalDuration } from "../../../src/compositions/timings";
+import { makeCompositionFromRecipe } from "../../../src/compositions/recipe/CompositionFromRecipe";
+import { builtInRecipes } from "../../../src/compositions/recipe/recipes";
+import { buildTimelineFromRecipe, totalDurationFromRecipe } from "../../../src/compositions/recipe/timeline";
 import { registerFonts } from "../../../src/theme/fonts";
 import type { Phrase } from "../../../src/data/phrase";
 import type { ReelConfig } from "../types";
@@ -40,7 +39,15 @@ const SAMPLE_PHRASES: Phrase[] = [
   },
 ];
 
-const COMPONENTS = { "1": Reel, "2": ReelTemplate2, "3": ReelTemplate3 } as const;
+// Stable component references, computed once at module load (not per-render)
+// so the Player doesn't see a "new" component type on every unrelated
+// config change and reset playback - see makeCompositionFromRecipe's own
+// note on why it's a factory rather than a fixed export.
+const COMPONENTS = {
+  "1": makeCompositionFromRecipe(builtInRecipes["1"]).component,
+  "2": makeCompositionFromRecipe(builtInRecipes["2"]).component,
+  "3": makeCompositionFromRecipe(builtInRecipes["3"]).component,
+} as const;
 
 let fontsReady: Promise<unknown> | null = null;
 
@@ -63,13 +70,13 @@ export function ReelPreview({ templateNumber, config }: { templateNumber: "1" | 
 
   const Component = COMPONENTS[templateNumber];
   // Config here doubles as both `src/config/config.ts`'s ReelConfig (what
-  // Reel/ReelTemplate2/ReelTemplate3 actually expect) and this file's
+  // the recipe-driven components actually expect) and this file's
   // structurally-identical local copy - not worrying about exact timing per
   // the brief, so this just reuses the real timeline math for a duration
   // that's close enough to scrub through intro/phrase/countdown/reveal/outro.
-  const timeline = templateNumber === "1" ? buildTimeline(SAMPLE_PHRASES.length, config) : buildTimelineT2(SAMPLE_PHRASES.length, config);
+  const timeline = buildTimelineFromRecipe(builtInRecipes[templateNumber], SAMPLE_PHRASES.length, config);
   const transitionFrames = Math.round(config.transitionSeconds * config.fps);
-  const durationInFrames = Math.max(1, totalDuration(timeline, transitionFrames));
+  const durationInFrames = Math.max(1, totalDurationFromRecipe(timeline, transitionFrames));
 
   const inputProps = {
     phrases: SAMPLE_PHRASES,
