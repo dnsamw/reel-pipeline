@@ -55,7 +55,22 @@ let fontsReady: Promise<unknown> | null = null;
  * the brief, so this just reuses the real timeline math for a duration
  * that's close enough to scrub through intro/phrase/countdown/reveal/outro.
  */
-export function ReelPreview({ recipe, config }: { recipe: CompositionRecipe; config: ReelConfig }) {
+export function ReelPreview({
+  recipe,
+  config,
+  focusBeatIndex = null,
+}: {
+  recipe: CompositionRecipe;
+  config: ReelConfig;
+  /**
+   * Index into `recipe.perPhraseBeats` to scope playback to (the first
+   * phrase's occurrence of that beat) instead of the whole recipe - lets
+   * RecipeEditor.tsx's "Preview this beat" button seek/loop just the beat
+   * being edited, since scrubbing through intro/other beats/outro to find
+   * it every time makes it hard to focus on the one thing changing.
+   */
+  focusBeatIndex?: number | null;
+}) {
   const [fontsLoaded, setFontsLoaded] = useState(false);
 
   useEffect(() => {
@@ -75,6 +90,19 @@ export function ReelPreview({ recipe, config }: { recipe: CompositionRecipe; con
   const transitionFrames = Math.round(config.transitionSeconds * config.fps);
   const durationInFrames = Math.max(1, totalDurationFromRecipe(timeline, transitionFrames));
 
+  let focusRange: { inFrame: number; outFrame: number } | null = null;
+  if (focusBeatIndex != null) {
+    // perPhraseBeats maps 1:1 onto timeline items per phrase (each beat kind
+    // produces exactly one timeline item) - so the Nth non-intro/outro item
+    // for phraseIndex 0 is the beat at perPhraseBeats[N].
+    const phrase0Items = timeline.filter((item) => item.type !== "intro" && item.type !== "outro" && "phraseIndex" in item && item.phraseIndex === 0);
+    const target = phrase0Items[focusBeatIndex];
+    if (target) {
+      const start = timeline.slice(0, timeline.indexOf(target)).reduce((sum, it) => sum + it.durationInFrames, 0);
+      focusRange = { inFrame: start, outFrame: Math.min(durationInFrames - 1, start + target.durationInFrames - 1) };
+    }
+  }
+
   const inputProps: ReelPropsWithRecipe = {
     recipe,
     phrases: SAMPLE_PHRASES,
@@ -90,7 +118,7 @@ export function ReelPreview({ recipe, config }: { recipe: CompositionRecipe; con
 
   return (
     <Player
-      key={recipe.id}
+      key={`${recipe.id}-${focusBeatIndex ?? "full"}`}
       component={CompositionFromRecipeDynamic}
       inputProps={inputProps}
       durationInFrames={durationInFrames}
@@ -101,6 +129,9 @@ export function ReelPreview({ recipe, config }: { recipe: CompositionRecipe; con
       className="preview-frame"
       controls
       loop
+      inFrame={focusRange?.inFrame ?? null}
+      outFrame={focusRange?.outFrame ?? null}
+      initialFrame={focusRange?.inFrame ?? 0}
       clickToPlay
       doubleClickToFullscreen={false}
     />

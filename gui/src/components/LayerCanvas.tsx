@@ -83,7 +83,7 @@ export function LayerCanvas({ beat, selectedId, onSelect, onChange }: { beat: Cu
   }
 
   return (
-    <div>
+    <div style={{ maxWidth: 280, margin: "0 auto" }}>
       <div
         ref={canvasRef}
         onPointerMove={onPointerMove}

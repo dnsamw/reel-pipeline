@@ -1,7 +1,8 @@
 import express from "express";
 import cors from "cors";
-import { join, relative } from "node:path";
+import { join, relative, extname, basename } from "node:path";
 import { tmpdir } from "node:os";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { defaultConfig } from "../src/config/config";
 import { colors as lightPalette, darkColors as darkPalette } from "../src/theme/tokens";
 import { getPhrases, listBooks, listChapters, updatePhrase, disconnect } from "../src/data/getPhrases";
@@ -281,6 +282,32 @@ app.post("/api/recipes/:id/push", async (req, res) => {
     const message =
       typeof req.body?.message === "string" && req.body.message.trim() ? req.body.message : `Update recipe: ${req.params.id}`;
     res.json(await pushRecipesToGit(message));
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// Uploads an image for a `custom` beat's image layer (LayerEditor.tsx) -
+// saved under assets/images/ (Config.setPublicDir("assets") in
+// remotion.config.ts, so staticFile("images/<file>") resolves it the same
+// way at render time as at edit time). Raw body, not multipart - the GUI
+// sends the File object directly as the request body - so this route gets
+// its own express.raw() instead of relying on the global express.json().
+const ALLOWED_IMAGE_EXT = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"];
+app.post("/api/assets/images", express.raw({ type: () => true, limit: "15mb" }), (req, res) => {
+  try {
+    const rawName = typeof req.query.filename === "string" ? req.query.filename : "upload";
+    const ext = extname(rawName).toLowerCase();
+    if (!ALLOWED_IMAGE_EXT.includes(ext)) {
+      return res.status(400).json({ error: `Unsupported image type "${ext || "(none)"}" - use ${ALLOWED_IMAGE_EXT.join(", ")}` });
+    }
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: "Empty upload" });
+    const safeBase = basename(rawName, ext).replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 60) || "image";
+    const filename = `${Date.now()}-${safeBase}${ext}`;
+    const dir = join(process.cwd(), "assets", "images");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, filename), req.body);
+    res.json({ path: `images/${filename}` });
   } catch (err) {
     res.status(500).json({ error: String(err) });
   }

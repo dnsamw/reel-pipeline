@@ -153,7 +153,7 @@ export interface ShapeLayer {
   kind: "shape";
   id: string;
   box: LayerBox;
-  shape: "rect" | "circle" | "ring";
+  shape: "rect" | "circle" | "ring" | "triangle" | "star" | "line";
   fill?: ColorRef;
   stroke?: ColorRef;
   strokeWidthPx?: number;

@@ -303,6 +303,17 @@ Playwright against the real dev server: dragging/resizing/rotating a layer and r
 from the form confirmed each interaction updates real state, and saving a custom-beat recipe through
 the actual `POST /api/recipes` (real Zod validation) worked with zero console/page errors.
 
+**UX polish, based on hands-on feedback after the above landed:** shape layers gained `triangle`,
+`star`, and `line` (on top of `rect`/`circle`/`ring`); image layers can be populated by uploading a
+file (`POST /api/assets/images`, saved to `assets/images/` - gitignored like `assets/music/` - and
+served via `staticFile()` the same way at edit time and render time) instead of typing an asset path
+by hand; a multi-layer beat's field form collapses every layer but the selected one to a one-line
+summary instead of stacking full forms (the vertical-scroll complaint); the canvas caps at 280px wide
+instead of filling the column; Intro/Outro are collapsed by default (a "Show" toggle) since editing a
+custom beat rarely touches them; and each per-phrase beat has a "Preview this beat" button that seeks
+the live preview `Player` to that beat's own frame range (`inFrame`/`outFrame`) and loops just that,
+instead of scrubbing the whole recipe to find it.
+
 **What's still missing:** snapping/alignment guides on the canvas, and (unrelated to the canvas) a
 genuinely new visual *primitive* beyond text/image/shape - e.g. video-clip support, still requires
 code. The original 4-phase plan (renderer, chrome/contrast bindings, canvas, real schema wiring) is

@@ -99,6 +99,21 @@ export const api = {
   getRun: (id: string) => request<RenderRun>(`/render/${encodeURIComponent(id)}`),
   cancelRun: (id: string) => request<{ cancelled: boolean }>(`/render/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
 
+  // Not through request() - this sends the raw File as the body, not JSON
+  // (matching server/index.ts's express.raw() route, not express.json()).
+  uploadImage: async (file: File) => {
+    const res = await fetch(`/api/assets/images?filename=${encodeURIComponent(file.name)}`, {
+      method: "POST",
+      headers: { "Content-Type": file.type || "application/octet-stream" },
+      body: file,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error ?? `${res.status} ${res.statusText}`);
+    }
+    return res.json() as Promise<{ path: string }>;
+  },
+
   settings: () => request<Settings>("/settings"),
   saveSettings: (input: Settings) => request<Settings>("/settings", { method: "PUT", body: JSON.stringify(input) }),
 

@@ -203,7 +203,8 @@ output/            Rendered videos + manifest.json (gitignored)
   its own dependencies, not deployed anywhere, run locally.
 - `assets/music/` and `audio-samples/` are gitignored (large binary files) — source your own tracks and drop
   them in `assets/music/` after cloning. `assets/voice/` and `assets/sfx/` (small, already-sourced clips) are
-  committed.
+  committed. `assets/images/` (custom recipe image layers, uploaded via the Recipes page) is gitignored the
+  same way as `assets/music/`.
 - `.env` (DB credentials, Azure key, Facebook app credentials) is gitignored — never commit real credentials.
 - The connected Facebook Page's access token lives in `data/gui.db` (gitignored, same trust boundary as
   `.env`) — the GUI frontend is only ever shown the Page's name/id, never the token itself.

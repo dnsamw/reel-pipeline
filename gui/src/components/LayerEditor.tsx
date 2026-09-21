@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { api } from "../api";
 import { LayerCanvas } from "./LayerCanvas";
-import type { Anchor, AnimationSpec, AnimationStep, ColorRef, CustomBeat, Layer, LayerBox, Palette, PhraseTextField, TextRef, ThemeVariant } from "../types";
+import type { Anchor, AnimationSpec, AnimationStep, ColorRef, CustomBeat, Layer, LayerBox, Palette, PhraseTextField, ShapeLayer, TextRef, ThemeVariant } from "../types";
 
 /**
  * Editor for a `custom` beat's Layer[] - the GUI side of
@@ -147,6 +148,12 @@ function AnimationStepFields({ label, step, onChange }: { label: string; step: A
   );
 }
 
+function layerSummary(layer: Layer): string {
+  if (layer.kind === "text") return layer.text.source === "literal" ? layer.text.value || "(empty text)" : layer.text.source === "phraseField" ? `{${layer.text.field}}` : "{introText}";
+  if (layer.kind === "shape") return layer.shape;
+  return layer.src.source === "sceneFrameChrome" ? "scene chrome" : layer.src.path || "(no image chosen)";
+}
+
 function LayerCard({
   layer,
   index,
@@ -167,15 +174,56 @@ function LayerCard({
   onRemove: () => void;
 }) {
   const { box, animation } = layer;
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   function updateBox(patch: Partial<LayerBox>) {
     onChange({ ...layer, box: { ...box, ...patch } } as Layer);
   }
 
+  async function onPickImageFile(file: File) {
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const { path } = await api.uploadImage(file);
+      onChange({ ...layer, src: { source: "asset", path } } as Layer);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  // Collapsed to a single summary row unless selected - a beat with several
+  // layers used to need paragraphs of scrolling to reach the Nth one; only
+  // the selected layer's full field grid renders now.
+  if (!selected) {
+    return (
+      <div className="queue-phrase-card" style={{ padding: "8px 14px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <span className="hint" style={{ cursor: "pointer", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} onClick={onSelect}>
+            {index + 1}. {layer.kind} - {layerSummary(layer)}
+          </span>
+          <div className="button-row" style={{ margin: 0 }}>
+            <button type="button" className="secondary" disabled={index === 0} onClick={() => onMove(-1)}>
+              ↑
+            </button>
+            <button type="button" className="secondary" disabled={index === total - 1} onClick={() => onMove(1)}>
+              ↓
+            </button>
+            <button type="button" className="danger" disabled={total <= 1} onClick={onRemove}>
+              Remove
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="queue-phrase-card" style={selected ? { outline: "2px solid var(--primary)" } : undefined}>
+    <div className="queue-phrase-card" style={{ outline: "2px solid var(--primary)" }}>
       <div className="hint" style={{ marginBottom: 6, cursor: "pointer" }} onClick={onSelect}>
-        Layer {index + 1} of {total} - {layer.id}
+        Layer {index + 1} of {total} - click to collapse
       </div>
       <div className="grid">
         <div className="field">
@@ -276,10 +324,13 @@ function LayerCard({
           <>
             <div className="field">
               <label>Shape</label>
-              <select value={layer.shape} onChange={(e) => onChange({ ...layer, shape: e.target.value as "rect" | "circle" | "ring" })}>
+              <select value={layer.shape} onChange={(e) => onChange({ ...layer, shape: e.target.value as ShapeLayer["shape"] })}>
                 <option value="rect">Rectangle</option>
                 <option value="circle">Circle</option>
                 <option value="ring">Ring (progress)</option>
+                <option value="triangle">Triangle</option>
+                <option value="star">Star</option>
+                <option value="line">Line</option>
               </select>
             </div>
             <ColorRefField
@@ -311,18 +362,31 @@ function LayerCard({
         {layer.kind === "image" && (
           <div className="field">
             <label>Source</label>
-            <div style={{ display: "flex", gap: 6 }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
               <select
                 value={layer.src.source}
                 onChange={(e) => onChange({ ...layer, src: e.target.value === "asset" ? { source: "asset", path: "" } : { source: "sceneFrameChrome" } })}
               >
                 <option value="sceneFrameChrome">Scene background chrome</option>
-                <option value="asset">Asset file</option>
+                <option value="asset">Uploaded image</option>
               </select>
               {layer.src.source === "asset" && (
-                <input type="text" placeholder="e.g. images/foo.png" value={layer.src.path} onChange={(e) => onChange({ ...layer, src: { source: "asset", path: e.target.value } })} />
+                <>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) onPickImageFile(file);
+                      e.target.value = "";
+                    }}
+                  />
+                  {uploading && <span className="hint">Uploading...</span>}
+                  {layer.src.path && !uploading && <span className="hint">{layer.src.path}</span>}
+                </>
               )}
             </div>
+            {uploadError && <div className="error-banner">{uploadError}</div>}
           </div>
         )}
 
@@ -398,7 +462,7 @@ export function LayerEditor({ beat, onChange, fps }: { beat: CustomBeat; onChang
             index={i}
             total={beat.layers.length}
             selected={layer.id === selectedId}
-            onSelect={() => setSelectedId(layer.id)}
+            onSelect={() => setSelectedId((cur) => (cur === layer.id ? null : layer.id))}
             onChange={(l) => updateLayer(i, l)}
             onMove={(delta) => moveLayer(i, delta)}
             onRemove={() => removeLayer(i)}

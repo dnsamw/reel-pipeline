@@ -56,6 +56,11 @@ export function RecipeEditor() {
   const [intro, setIntro] = useState<IntroBeat>(DEFAULT_INTRO);
   const [perPhraseBeats, setPerPhraseBeats] = useState<PerPhraseBeat[]>([defaultBeat("phrase")]);
   const [outro, setOutro] = useState<OutroBeat>(DEFAULT_OUTRO);
+  // Collapsed by default - while working on per-phrase beat layouts, intro/outro
+  // are usually untouched and just add scrolling; expand only when needed.
+  const [introOpen, setIntroOpen] = useState(false);
+  const [outroOpen, setOutroOpen] = useState(false);
+  const [previewBeatIndex, setPreviewBeatIndex] = useState<number | null>(null);
 
   const [builtin, setBuiltin] = useState(false);
   const [defaults, setDefaults] = useState<ReelConfig | null>(null);
@@ -99,17 +104,19 @@ export function RecipeEditor() {
   }
 
   function moveBeat(index: number, delta: -1 | 1) {
+    const target = index + delta;
+    if (target < 0 || target >= perPhraseBeats.length) return;
     setPerPhraseBeats((cur) => {
       const next = [...cur];
-      const target = index + delta;
-      if (target < 0 || target >= next.length) return cur;
       [next[index], next[target]] = [next[target], next[index]];
       return next;
     });
+    setPreviewBeatIndex((cur) => (cur === index ? target : cur === target ? index : cur));
   }
 
   function removeBeat(index: number) {
     setPerPhraseBeats((cur) => (cur.length <= 1 ? cur : cur.filter((_, i) => i !== index)));
+    setPreviewBeatIndex((cur) => (cur == null ? cur : cur === index ? null : cur > index ? cur - 1 : cur));
   }
 
   async function onSave(e: React.FormEvent) {
@@ -192,50 +199,57 @@ export function RecipeEditor() {
             </div>
 
             <div className="card">
-              <h2>Intro</h2>
-              <div className="grid">
-                <div className="field">
-                  <label>Theme</label>
-                  <select value={intro.theme} onChange={(e) => setIntro((cur) => ({ ...cur, theme: e.target.value as ThemeVariant }))}>
-                    <option value="light">Light</option>
-                    <option value="dark">Dark</option>
-                  </select>
-                </div>
-                <div className="field">
-                  <label>Narration voice set</label>
-                  <select
-                    value={intro.introVoiceKeyword}
-                    onChange={(e) => setIntro((cur) => ({ ...cur, introVoiceKeyword: e.target.value as "sinhala" | "english" }))}
-                  >
-                    <option value="sinhala">Sinhala ("what does this mean?")</option>
-                    <option value="english">English ("how do you say this?")</option>
-                  </select>
-                </div>
-                <div className="field checkbox">
-                  <input
-                    id="intro-literal"
-                    type="checkbox"
-                    checked={intro.text.source === "literal"}
-                    onChange={(e) =>
-                      setIntro((cur) => ({
-                        ...cur,
-                        text: e.target.checked ? { source: "literal", value: cur.text.source === "literal" ? cur.text.value : "" } : { source: "config.introText" },
-                      }))
-                    }
-                  />
-                  <label htmlFor="intro-literal">Use fixed text instead of the global default (Settings' Intro text)</label>
-                </div>
-                {intro.text.source === "literal" && (
-                  <div className="field" style={{ gridColumn: "1 / -1" }}>
-                    <label>Fixed intro text</label>
-                    <input
-                      type="text"
-                      value={intro.text.value}
-                      onChange={(e) => setIntro((cur) => ({ ...cur, text: { source: "literal", value: e.target.value } }))}
-                    />
-                  </div>
-                )}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: introOpen ? 12 : 0 }}>
+                <h2 style={{ margin: 0 }}>Intro</h2>
+                <button type="button" className="secondary" onClick={() => setIntroOpen((o) => !o)}>
+                  {introOpen ? "Hide" : "Show"}
+                </button>
               </div>
+              {introOpen && (
+                <div className="grid">
+                  <div className="field">
+                    <label>Theme</label>
+                    <select value={intro.theme} onChange={(e) => setIntro((cur) => ({ ...cur, theme: e.target.value as ThemeVariant }))}>
+                      <option value="light">Light</option>
+                      <option value="dark">Dark</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label>Narration voice set</label>
+                    <select
+                      value={intro.introVoiceKeyword}
+                      onChange={(e) => setIntro((cur) => ({ ...cur, introVoiceKeyword: e.target.value as "sinhala" | "english" }))}
+                    >
+                      <option value="sinhala">Sinhala ("what does this mean?")</option>
+                      <option value="english">English ("how do you say this?")</option>
+                    </select>
+                  </div>
+                  <div className="field checkbox">
+                    <input
+                      id="intro-literal"
+                      type="checkbox"
+                      checked={intro.text.source === "literal"}
+                      onChange={(e) =>
+                        setIntro((cur) => ({
+                          ...cur,
+                          text: e.target.checked ? { source: "literal", value: cur.text.source === "literal" ? cur.text.value : "" } : { source: "config.introText" },
+                        }))
+                      }
+                    />
+                    <label htmlFor="intro-literal">Use fixed text instead of the global default (Settings' Intro text)</label>
+                  </div>
+                  {intro.text.source === "literal" && (
+                    <div className="field" style={{ gridColumn: "1 / -1" }}>
+                      <label>Fixed intro text</label>
+                      <input
+                        type="text"
+                        value={intro.text.value}
+                        onChange={(e) => setIntro((cur) => ({ ...cur, text: { source: "literal", value: e.target.value } }))}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="card">
@@ -244,7 +258,7 @@ export function RecipeEditor() {
                 Repeats once for every phrase in a reel, in this order, between the intro and outro.
               </p>
               {perPhraseBeats.map((beat, i) => (
-                <div className="queue-phrase-card" key={i}>
+                <div className="queue-phrase-card" key={i} style={previewBeatIndex === i ? { outline: "2px solid var(--primary)" } : undefined}>
                   <div className="hint" style={{ marginBottom: 6 }}>
                     Beat {i + 1} of {perPhraseBeats.length}
                   </div>
@@ -287,6 +301,13 @@ export function RecipeEditor() {
                   </div>
                   {beat.kind === "custom" && <LayerEditor beat={beat} onChange={(next) => updateBeat(i, next)} fps={defaults?.fps ?? 30} />}
                   <div className="button-row">
+                    <button
+                      type="button"
+                      className={previewBeatIndex === i ? "" : "secondary"}
+                      onClick={() => setPreviewBeatIndex((cur) => (cur === i ? null : i))}
+                    >
+                      {previewBeatIndex === i ? "Previewing this beat" : "Preview this beat"}
+                    </button>
                     <button type="button" className="secondary" disabled={i === 0} onClick={() => moveBeat(i, -1)}>
                       ↑ Move up
                     </button>
@@ -307,14 +328,21 @@ export function RecipeEditor() {
             </div>
 
             <div className="card">
-              <h2>Outro</h2>
-              <div className="field">
-                <label>Theme</label>
-                <select value={outro.theme} onChange={(e) => setOutro({ theme: e.target.value as ThemeVariant, kind: "outro" })}>
-                  <option value="light">Light</option>
-                  <option value="dark">Dark</option>
-                </select>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: outroOpen ? 12 : 0 }}>
+                <h2 style={{ margin: 0 }}>Outro</h2>
+                <button type="button" className="secondary" onClick={() => setOutroOpen((o) => !o)}>
+                  {outroOpen ? "Hide" : "Show"}
+                </button>
               </div>
+              {outroOpen && (
+                <div className="field">
+                  <label>Theme</label>
+                  <select value={outro.theme} onChange={(e) => setOutro({ theme: e.target.value as ThemeVariant, kind: "outro" })}>
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                  </select>
+                </div>
+              )}
             </div>
 
             <div className="button-row">
@@ -333,10 +361,12 @@ export function RecipeEditor() {
           <div className="card preview-card">
             <h2>Live preview</h2>
             <p className="hint" style={{ marginTop: 0 }}>
-              Uses the current defaults' colors/timing with sample text. Durations are approximate.
+              {previewBeatIndex != null
+                ? "Looping just the beat marked above - click its \"Previewing this beat\" button to go back to the full recipe."
+                : "Uses the current defaults' colors/timing with sample text. Durations are approximate."}
             </p>
             {defaults ? (
-              <ReelPreview recipe={previewRecipe} config={defaults} />
+              <ReelPreview recipe={previewRecipe} config={defaults} focusBeatIndex={previewBeatIndex} />
             ) : (
               <div className="preview-frame preview-loading">
                 <span className="hint">Loading...</span>

@@ -11,6 +11,9 @@ assets/music/*
 !assets/music/.gitkeep
 assets/tts/*
 !assets/tts/.gitkeep
+# User-uploaded image layer assets (LayerEditor.tsx's image layer upload, server/index.ts's /api/assets/images) - not meant for git.
+assets/images/*
+!assets/images/.gitkeep
 src/compositions/sample-data.json
 # Original upload staging copy - real copies now live under assets/
 audio-samples/

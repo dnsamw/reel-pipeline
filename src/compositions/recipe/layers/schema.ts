@@ -120,7 +120,7 @@ const shapeLayerSchema = z.object({
   kind: z.literal("shape"),
   id: z.string(),
   box: layerBoxSchema,
-  shape: z.enum(["rect", "circle", "ring"]),
+  shape: z.enum(["rect", "circle", "ring", "triangle", "star", "line"]),
   fill: colorRefSchema.optional(),
   stroke: colorRefSchema.optional(),
   strokeWidthPx: z.number().optional(),

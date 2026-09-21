@@ -1,4 +1,4 @@
-import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Img, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { fontFamily } from "../../../theme/tokens";
 import { usePalette, type ResolvedPalette } from "../../../theme/ThemeContext";
 import type { ReelConfig } from "../../../config/config";
@@ -6,14 +6,27 @@ import type { Phrase } from "../../../data/phrase";
 import type { ColorRef, CustomBeat, Layer, TextRef } from "./schema";
 
 /**
- * Phase 1 of docs/COMPOSITION_DESIGNER.md's "concrete design for the true
- * visual designer": a generic interpreter for the DRAFT `CustomBeat`/`Layer`
- * schema (./schema.ts) - proves a beat's visual content can be pure data,
- * not a hand-written scene component. Registered standalone as Root.tsx's
- * "LayerDesignerPOC" composition; not wired into the production beat system
- * (beatSchema/CompositionFromRecipe.tsx) yet - see the doc for the phased
- * plan this is phase 1 of.
+ * A generic interpreter for the `CustomBeat`/`Layer` schema (./schema.ts) -
+ * a beat's visual content as pure data instead of a hand-written scene
+ * component. Wired into the real beat system via CompositionFromRecipe.tsx's
+ * dispatch (the `custom` kind in ../schema.ts's beatSchema); also still
+ * registered standalone as Root.tsx's "LayerDesignerPOC" composition for
+ * isolated testing. See docs/COMPOSITION_DESIGNER.md for the full design.
  */
+
+/** A regular star polygon inscribed in a 100x100 box, for the "star" shape - a fixed 5-point star, not a configurable spike count (not asked for, and one more number field per shape wasn't worth it yet). */
+function starPoints(cx: number, cy: number, outerR: number, innerR: number, spikes = 5): string {
+  const pts: string[] = [];
+  const step = Math.PI / spikes;
+  let rot = -Math.PI / 2;
+  for (let i = 0; i < spikes; i++) {
+    pts.push(`${cx + Math.cos(rot) * outerR},${cy + Math.sin(rot) * outerR}`);
+    rot += step;
+    pts.push(`${cx + Math.cos(rot) * innerR},${cy + Math.sin(rot) * innerR}`);
+    rot += step;
+  }
+  return pts.join(" ");
+}
 
 const anchorOffset: Record<Layer["box"]["anchor"], [number, number]> = {
   "top-left": [0, 0],
@@ -152,6 +165,24 @@ function LayerView({
         </div>
       );
     }
+    if (layer.shape === "triangle" || layer.shape === "star") {
+      const points = layer.shape === "triangle" ? "50,2 98,98 2,98" : starPoints(50, 50, 48, 20);
+      return (
+        <div style={style}>
+          <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <polygon
+              points={points}
+              fill={fill ?? "none"}
+              stroke={layer.stroke ? resolveColor(layer.stroke, c, opposite) : undefined}
+              strokeWidth={layer.strokeWidthPx ?? 0}
+            />
+          </svg>
+        </div>
+      );
+    }
+    if (layer.shape === "line") {
+      return <div style={{ ...style, height: layer.strokeWidthPx ?? 4, backgroundColor: fill ?? resolveColor(layer.stroke, c, opposite) ?? c.foreground }} />;
+    }
     return (
       <div
         style={{
@@ -176,7 +207,8 @@ function LayerView({
       </>
     );
   }
-  return null; // asset images: not exercised by the POC beat, would use remotion's <Img src={staticFile(...)} />
+  if (!layer.src.path) return null;
+  return <Img src={staticFile(layer.src.path)} style={{ ...style, objectFit: "cover" }} />;
 }
 
 export function LayerRenderer({ beat, phrase = null, config }: { beat: CustomBeat; phrase?: Phrase | null; config: ReelConfig }) {
