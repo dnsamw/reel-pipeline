@@ -15,6 +15,7 @@ you.
 - [Sidechain ducking (--sidechain=true)](#sidechain-ducking---sidechaintrue)
 - [How a template is put together](#how-a-template-is-put-together)
 - [Building a new template](#building-a-new-template)
+- [docs/COMPOSITION_DESIGNER.md](COMPOSITION_DESIGNER.md) *(experimental, branch `feature/composition-designer-schema`)*
 - [Theming (per-template color overrides)](#theming-per-template-color-overrides)
 - [Switching to a new book (e.g. Volume 2)](#switching-to-a-new-book-eg-volume-2)
 - [GUI: batch monitor + template library](#gui-batch-monitor--template-library)
@@ -241,6 +242,12 @@ main scenes, rather than two near-duplicate files.
 ## Building a new template
 
 Say you want a Template 4. The fastest path is to copy the closest existing template and adjust:
+
+> If your new template would just **recombine existing scenes in a different order** (e.g. Template
+> 1's pacing with Template 3's theme and reversed prompt/answer) rather than needing a genuinely new
+> visual layout, see [docs/COMPOSITION_DESIGNER.md](COMPOSITION_DESIGNER.md) first (branch
+> `feature/composition-designer-schema`, not yet merged) - the steps below are for when you actually
+> need new scene code, which is still most new templates today.
 
 1. **Pick your starting point.** Copying `ReelTemplate2.tsx`/`GuessRevealSceneT2.tsx` gets you the
    "everything in one persistent canvas" style; copying `Reel.tsx`/`PhraseScene.tsx`/`CountdownScene.tsx`/
