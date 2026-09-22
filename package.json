@@ -23,6 +23,7 @@
     "@remotion/player": "4.0.523",
     "@remotion/renderer": "4.0.523",
     "@remotion/transitions": "4.0.523",
+    "@xyflow/react": "^12.11.6",
     "better-sqlite3": "^11.8.1",
     "cors": "^2.8.5",
     "express": "^4.21.2",

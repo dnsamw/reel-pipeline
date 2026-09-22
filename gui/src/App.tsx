@@ -8,6 +8,8 @@ import { Recipes } from "./pages/Recipes";
 import { RecipeEditor } from "./pages/RecipeEditor";
 import { VideoSpecPage } from "./pages/VideoSpecPage";
 import { Settings } from "./pages/Settings";
+import { SpikeGraph } from "./pages/SpikeGraph";
+import { SpikeTimeline } from "./pages/SpikeTimeline";
 
 export function App() {
   return (
@@ -24,6 +26,9 @@ export function App() {
           <NavLink to="/recipes">Recipes</NavLink>
           <NavLink to="/video-spec">Video Spec</NavLink>
           <NavLink to="/settings">Settings</NavLink>
+          {/* Temporary - evaluation spikes for the recipe editor redesign, see docs/COMPOSITION_DESIGNER.md. Remove once a direction is picked. */}
+          <NavLink to="/spike-graph">Spike: Graph</NavLink>
+          <NavLink to="/spike-timeline">Spike: Timeline</NavLink>
         </nav>
       </aside>
       <main className="app-main">
@@ -39,6 +44,8 @@ export function App() {
           <Route path="/recipes/:id" element={<RecipeEditor />} />
           <Route path="/video-spec" element={<VideoSpecPage />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/spike-graph" element={<SpikeGraph />} />
+          <Route path="/spike-timeline" element={<SpikeTimeline />} />
         </Routes>
       </main>
     </div>
