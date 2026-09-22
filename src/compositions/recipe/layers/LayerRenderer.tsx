@@ -93,13 +93,22 @@ function LayerView({
   config: ReelConfig;
   beatDurationInFrames: number;
 }) {
-  const { box, animation } = layer;
+  const { box, animation, timing } = layer;
   const [ox, oy] = anchorOffset[box.anchor];
 
-  const enter = animationProgress(frame, fps, animation.enter, animation.delayFrames);
-  const framesFromEnd = beatDurationInFrames - frame;
-  const exitStart = beatDurationInFrames - (animation.exit.type === "none" ? 0 : stepDuration(animation.exit, fps));
-  const exit = frame >= exitStart ? animationProgress(framesFromEnd, fps, animation.exit, 0) : { fraction: 0, spring: 0 };
+  // A layer's own trim within the beat - undefined `timing` means "the whole
+  // beat" (unchanged from before this field existed). Outside its window, a
+  // layer simply isn't mounted; inside it, every frame/duration below is
+  // relative to the layer's own start, not the beat's.
+  const startFrame = timing?.startFrame ?? 0;
+  const layerDurationInFrames = timing?.durationFrames ?? beatDurationInFrames - startFrame;
+  const localFrame = frame - startFrame;
+  if (localFrame < 0 || localFrame >= layerDurationInFrames) return null;
+
+  const enter = animationProgress(localFrame, fps, animation.enter, animation.delayFrames);
+  const framesFromEnd = layerDurationInFrames - localFrame;
+  const exitStart = layerDurationInFrames - (animation.exit.type === "none" ? 0 : stepDuration(animation.exit, fps));
+  const exit = localFrame >= exitStart ? animationProgress(framesFromEnd, fps, animation.exit, 0) : { fraction: 0, spring: 0 };
 
   let opacity = 1;
   let extraTransform = "";
@@ -149,7 +158,7 @@ function LayerView({
       const radius = 130;
       const circumference = 2 * Math.PI * radius;
       // No real countdown state in this POC - demo the binding by tying it to the beat's own timeline.
-      const progress = layer.progress ? interpolate(frame, [0, beatDurationInFrames], [0, 1], { extrapolateRight: "clamp" }) : 1;
+      const progress = layer.progress ? interpolate(localFrame, [0, layerDurationInFrames], [0, 1], { extrapolateRight: "clamp" }) : 1;
       return (
         <div style={style}>
           <svg width={radius * 2 + 20} height={radius * 2 + 20} viewBox={`0 0 ${radius * 2 + 20} ${radius * 2 + 20}`}>

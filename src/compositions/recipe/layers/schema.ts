@@ -95,6 +95,22 @@ const animationSchema = z.object({
 // ring, the reveal stinger) that need their own binding rather than a new
 // kind each.
 
+/**
+ * A layer's own trim within its parent beat's timeline - omitted entirely
+ * means "spans the whole beat" (the only behavior that existed before this
+ * field), so every existing/stored layer keeps working unchanged. This is
+ * what makes a multi-track timeline (gui/src/components/Timeline.tsx) real
+ * instead of cosmetic: two layers in the same beat can now occupy different
+ * windows of it instead of both always being mounted for the beat's full
+ * duration. See docs/COMPOSITION_DESIGNER.md.
+ */
+const layerTimingSchema = z
+  .object({
+    startFrame: z.number().default(0),
+    durationFrames: z.number().optional(), // omitted = "until the beat ends"
+  })
+  .optional();
+
 const textLayerSchema = z.object({
   kind: z.literal("text"),
   id: z.string(),
@@ -106,6 +122,7 @@ const textLayerSchema = z.object({
   color: colorRefSchema,
   align: z.enum(["left", "center", "right"]).default("center"),
   animation: animationSchema,
+  timing: layerTimingSchema,
 });
 
 const imageLayerSchema = z.object({
@@ -118,6 +135,7 @@ const imageLayerSchema = z.object({
     z.object({ source: z.literal("sceneFrameChrome") }),
   ]),
   animation: animationSchema,
+  timing: layerTimingSchema,
 });
 
 const shapeLayerSchema = z.object({
@@ -132,6 +150,7 @@ const shapeLayerSchema = z.object({
   /** CountdownScene's ring fill-fraction - a frame-driven value, not a static prop, so it's a binding rather than a number. */
   progress: z.object({ source: z.literal("countdownProgress") }).optional(),
   animation: animationSchema,
+  timing: layerTimingSchema,
 });
 
 const layerSchema = z.discriminatedUnion("kind", [textLayerSchema, imageLayerSchema, shapeLayerSchema]);
@@ -156,3 +175,4 @@ export type CustomBeat = z.infer<typeof customBeatSchema>;
 export type Layer = z.infer<typeof layerSchema>;
 export type ColorRef = z.infer<typeof colorRefSchema>;
 export type TextRef = z.infer<typeof textRefSchema>;
+export type LayerTiming = NonNullable<z.infer<typeof layerTimingSchema>>;
