@@ -130,18 +130,26 @@ export function DataGraph({
 
   useEffect(() => {
     if (!dataSource) return;
-    // Preserves each existing node's on-screen position across an edit
-    // (only a brand-new layer gets a fresh default position) - besides being
-    // less jarring, constantly resetting positions was part of what made
-    // fitView's continuous re-fit (see the ReactFlow props below) unstable.
+    // Merges into each existing node object (spreading it first) rather than
+    // building a brand-new one from scratch - preserves not just its
+    // on-screen position but React Flow's own internal bookkeeping on it
+    // (measured size, etc). Discarding that on every rebuild - which happens
+    // on every tick of a Knob drag, since it changes the `beat` reference -
+    // was making nodes flicker invisible (unmeasured) mid-drag; constantly
+    // resetting positions was also part of what made fitView's continuous
+    // re-fit (see the ReactFlow props below) unstable.
     setNodes((current) => {
       const existingById = new Map(current.map((n) => [n.id, n]));
-      const dataNode: Node = { id: "data", type: "dataSource", position: existingById.get("data")?.position ?? { x: 0, y: 0 }, data: { label: dataSource.label, fields: dataSource.fields } };
+      const existingData = existingById.get("data");
+      const dataNode: Node = { ...existingData, id: "data", type: "dataSource", position: existingData?.position ?? { x: 0, y: 0 }, data: { label: dataSource.label, fields: dataSource.fields } };
       if (!customBeat) return [dataNode];
-      const layerNodes: Node[] = customBeat.layers.map((layer, i) => ({
+      const layerNodes: Node[] = customBeat.layers.map((layer, i) => {
+        const existing = existingById.get(layer.id);
+        return {
+        ...existing,
         id: layer.id,
         type: "layer",
-        position: existingById.get(layer.id)?.position ?? { x: 420, y: i * 110 },
+        position: existing?.position ?? { x: 420, y: i * 110 },
         data: {
           label: layerLabel(layer, i),
           kind: layer.kind,
@@ -160,7 +168,8 @@ export function DataGraph({
             setPropertiesFor({ layerId: layer.id, ...anchorFromEvent(e, 300, 480) });
           },
         },
-      }));
+      };
+      });
       return [dataNode, ...layerNodes];
     });
     if (!customBeat) {
@@ -172,8 +181,13 @@ export function DataGraph({
         .filter((l): l is Layer & { kind: "text" } => l.kind === "text" && l.text.source === "dataField")
         .map((l) => ({ id: `${l.id}-edge`, source: "data", sourceHandle: (l.text as { field: string }).field, target: l.id, targetHandle: "text", style: { stroke: "var(--primary)" } })),
     );
+    // Deliberately keyed on customBeat?.layers rather than customBeat itself:
+    // theme/duration edits replace the beat object but leave `layers`
+    // referentially unchanged, so they shouldn't trigger a node/edge rebuild
+    // at all - this is what stops every tick of the beat-duration Knob from
+    // churning the graph.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataSource, customBeat, selectedLayerId, positionLayerId, propertiesFor]);
+  }, [dataSource, customBeat?.layers, selectedLayerId, positionLayerId, propertiesFor]);
 
   const onConnect = useCallback(
     (connection: Connection) => {

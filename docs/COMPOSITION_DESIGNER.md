@@ -587,3 +587,48 @@ properties/Position near that node and clamped fully on-screen; dragging the del
 keeps both nodes visible with a provably stable viewport transform throughout the drag; closing the
 properties panel leaves the node selected. `git diff --stat` on `src/render`/`LayerRenderer.tsx` is
 empty - this round touched only the GUI layout/interaction layer.
+
+## Finding the real cause of the disappearing nodes (the fitView fix wasn't the whole story)
+
+The user reported the "nodes disappear while dragging a Knob" bug again after the fitView fix above,
+this time from the beat-duration Knob specifically, screenshotted mid-drag with the graph canvas
+completely blank. The earlier fix (one-time `onInit` fitView) was real and necessary, but insufficient
+- it addressed one mechanism (the viewport panning/zooming itself out of the nodes) while a second,
+independent one was still live.
+
+Reproducing it needed a sharper instrument than before: node count and `.react-flow__viewport`'s
+transform (what the earlier repro checked) stayed perfectly normal throughout - the actual defect
+was each node's `visibility: hidden`, which doesn't zero out `getBoundingClientRect()` or change node
+count, so the earlier checks were blind to it. Caught it with an in-page `requestAnimationFrame` loop
+recording any frame where a `.react-flow__node` was zero-size, `display: none`, or `visibility:
+hidden` - polling *inside the page* every frame, not just at the points a Playwright script happens
+to sample between synthetic mouse moves. Against the pre-fix code this immediately caught **200
+consecutive frames of `visibility: hidden` on every node** during a single fast drag of the
+beat-duration Knob; the same instrumented drag against the three Layer-properties Knobs (size,
+weight, delay) showed none - isolating the bug to the specific case of a beat-level edit (duration,
+also theme) rather than a layer edit.
+
+**Root cause**: `DataGraph.tsx`'s node-rebuilding `useEffect` was keyed on the whole `customBeat`
+object, and on every edit it built entirely new node objects from scratch, copying over only
+`.position` from the previous ones. A beat-duration or theme edit replaces the beat object (so the
+effect re-ran) without touching `customBeat.layers` at all - work the effect didn't actually need to
+do. Worse, discarding each node's previous object wholesale - rather than updating it in place - also
+threw away React Flow's own internal bookkeeping on it (its measured width/height, set via
+`ResizeObserver` after first render). A node React Flow considers unmeasured renders with `visibility:
+hidden` until it's re-measured; rebuilding fresh, unmeasured-looking node objects many times a second
+during a fast Knob drag reproduced exactly that hidden state for a sustained run of frames.
+
+**Fix**, two parts in `DataGraph.tsx`:
+1. The effect is now keyed on `customBeat?.layers` instead of `customBeat` itself - a duration or
+   theme edit leaves the `layers` array reference untouched, so the rebuild simply doesn't run for
+   those edits anymore.
+2. When it does run (an actual layer add/remove/edit), each node is now built by spreading the
+   *existing* node object first (`{ ...existing, position, data }`) instead of constructing a bare
+   new one - preserving whatever internal fields React Flow had already attached to it, not just its
+   position.
+
+Verified with the same instrumented rAF monitor: 0 flicker frames across 8 rounds of a fast,
+unpaced beat-duration-Knob drag (previously 200), and 0 across the three Layer-properties Knobs.
+Confirmed the monitor itself wasn't just insensitive by re-running it against the pre-fix code via
+`git stash` - it reliably reproduced the 200-frame failure there, then 0 after `git stash pop`
+restored the fix. `git diff --stat` on `src/render`/`LayerRenderer.tsx` is empty.
