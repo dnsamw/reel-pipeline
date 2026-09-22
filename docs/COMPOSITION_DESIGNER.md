@@ -487,3 +487,46 @@ the field; the trash icon removes a layer node; selecting Intro shows Inspector 
 toolbar correctly absent) instead of the Graph+LayerCanvas pair; saving through the real
 `POST /api/recipes` succeeds with zero console errors. `git diff --stat` on
 `src/render`/`LayerRenderer.tsx` is empty - this round touched only the GUI layout/interaction layer.
+
+## Full-bleed workspace: floating/draggable panels instead of a laid-out page
+
+"This is way better, but we need more refinements" - the graph-centric round still left a lot of
+unused horizontal space (the page was capped at `.app-main`'s standard 1400px max-width, centered,
+like every other GUI page), the live preview was small, and Timeline/Position permanently consumed
+layout space even when not the current focus. The ask: make this one page behave like a real
+DAW/NLE workspace - one large canvas, everything else floats over it and can be dragged out of the
+way or hidden.
+
+**`FloatingPanel.tsx`** (new, generic, reusable) - a draggable, closeable panel: a titlebar (plain
+pointer-drag, same technique as everywhere else in this project) repositions it, an optional `onClose`
+adds an X. Not tied to any one panel's content.
+
+**`RecipeEditor.tsx`'s root is now `position: fixed`**, offset by a `--sidebar-width` CSS custom
+property (set by `App.tsx` on the `.app` root, toggled alongside the sidebar's own collapse state) -
+this is what lets the page ignore `.app-main`'s max-width/padding entirely without a special case
+there: fixed-position elements are placed relative to the *viewport*, not their parent, so an ancestor's
+`max-width`/`padding` simply doesn't apply. Verified this actually reaches full-bleed: a real
+`getBoundingClientRect()` check showed the graph's own box filling exactly `(viewport - sidebar) x
+(viewport - topbar)` - not close, exact.
+
+- **`DataGraph.tsx`** is now the workspace's base layer - `position: absolute; inset: 0` filling
+  the whole area, `<ReactFlow>` itself sized to match. Its former toolbar (add-layer buttons, beat
+  theme/duration) and the `LayerPropertyPanel` both moved into `FloatingPanel`s laid over the canvas
+  instead of pushing it into a smaller box.
+- **Timeline, Live preview, and Position (`LayerCanvas`)** are now `FloatingPanel`s inside the
+  workspace instead of stacked/side-by-side cards. Live preview is bigger by default (340px vs. the
+  previous 220px) and, being just a normal floating panel now, fully draggable. Position only
+  renders when a layer is actually selected ("needed only when an element is selected") and
+  re-opens itself on a newly-selected layer even if it was closed for a previous one. Small toggle
+  buttons in the topbar reopen a closed Timeline/Preview; Position's own close (X) plus re-selecting
+  a layer is how it comes back.
+- Everything not part of the floating-panel workspace (the top name/data-source/Save/Push bar) stays
+  a normal, always-visible strip - not everything needed to float, just the tool palettes.
+
+Verified via Playwright against the real dev server: the page has no vertical scroll at all
+(`document.documentElement.scrollHeight` equals the viewport height exactly) - confirming the fixed,
+full-viewport model actually took effect, not just visually; the graph's bounding box measured
+exactly `(1800-220) x (1000-60)` px against an 1800x1000 viewport with the sidebar expanded; dragging
+the Timeline panel by its titlebar moved its real screen position; closing and reopening the Live
+preview panel via the topbar toggle worked; the Position and Layer-property panels both appeared on
+selecting a layer. Zero console errors throughout.

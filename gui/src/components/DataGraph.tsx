@@ -7,6 +7,7 @@ import { contentForKind, defaultAnimation, defaultBox, newLayerId } from "../lib
 import { Knob } from "./Knob";
 import { IconToggleGroup } from "./IconToggleGroup";
 import { LayerPropertyPanel } from "./LayerPropertyPanel";
+import { FloatingPanel } from "./FloatingPanel";
 import type { CustomBeat, DataSourceDescriptor, Layer, PerPhraseBeat, ThemeVariant } from "../types";
 
 /**
@@ -166,7 +167,7 @@ export function DataGraph({
 
   if (!customBeat) {
     return (
-      <div className="card" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 200 }}>
+      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <p className="hint">Select a Custom beat on the Timeline to work on it here.</p>
       </div>
     );
@@ -175,73 +176,78 @@ export function DataGraph({
   const selectedLayer = customBeat.layers.find((l) => l.id === selectedLayerId) ?? null;
 
   return (
-    <div className="card">
-      <div className="graph-toolbar">
-        <div className="graph-toolbar-add">
-          <button type="button" className="secondary" title="Add a text layer" onClick={() => addLayer("text")}>
-            <Type size={14} /> Text
-          </button>
-          <button type="button" className="secondary" title="Add a shape layer" onClick={() => addLayer("shape")}>
-            <Square size={14} /> Shape
-          </button>
-          <button type="button" className="secondary" title="Add an image layer" onClick={() => addLayer("image")}>
-            <ImageIcon size={14} /> Image
-          </button>
-        </div>
-        <IconToggleGroup
-          value={customBeat.theme}
-          onChange={(theme: ThemeVariant) => onChangeBeat({ ...customBeat, theme })}
-          options={[
-            { value: "light", label: "Light theme", icon: <Sun size={14} /> },
-            { value: "dark", label: "Dark theme", icon: <Moon size={14} /> },
-          ]}
-        />
-        <Knob
-          label="secs"
-          value={Math.round((customBeat.durationInFrames / fps) * 10) / 10}
-          min={0.5}
-          max={20}
-          step={0.1}
-          sensitivity={0.1}
-          format={(v) => `${v.toFixed(1)}s`}
-          onChange={(v) => onChangeBeat({ ...customBeat, durationInFrames: Math.round(v * fps) })}
-        />
-      </div>
+    <div style={{ position: "absolute", inset: 0 }}>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onConnectEnd={onConnectEnd}
+        nodeTypes={nodeTypes}
+        onNodeClick={(_e, node) => {
+          if (node.type === "layer") onSelectLayer(node.id);
+        }}
+        onNodesDelete={(deleted) => {
+          for (const n of deleted) if (n.type === "layer") deleteLayer(n.id);
+        }}
+        deleteKeyCode={["Backspace", "Delete"]}
+        fitView
+      >
+        <Background />
+        <Controls showInteractive={false} />
+      </ReactFlow>
 
-      <div className="graph-body">
-        <div className="graph-canvas-wrap">
-          <div style={{ height: 360, border: "1px solid var(--border)", borderRadius: 10, background: "var(--bg)" }}>
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onConnect={onConnect}
-              onConnectEnd={onConnectEnd}
-              nodeTypes={nodeTypes}
-              onNodeClick={(_e, node) => {
-                if (node.type === "layer") onSelectLayer(node.id);
-              }}
-              onNodesDelete={(deleted) => {
-                for (const n of deleted) if (n.type === "layer") deleteLayer(n.id);
-              }}
-              deleteKeyCode={["Backspace", "Delete"]}
-              fitView
-            >
-              <Background />
-              <Controls showInteractive={false} />
-            </ReactFlow>
+      <FloatingPanel title="Custom beat" defaultX={16} defaultY={16} width={360}>
+        <div className="graph-toolbar" style={{ marginBottom: 0, paddingBottom: 0, border: "none" }}>
+          <div className="graph-toolbar-add">
+            <button type="button" className="secondary" title="Add a text layer" onClick={() => addLayer("text")}>
+              <Type size={14} /> Text
+            </button>
+            <button type="button" className="secondary" title="Add a shape layer" onClick={() => addLayer("shape")}>
+              <Square size={14} /> Shape
+            </button>
+            <button type="button" className="secondary" title="Add an image layer" onClick={() => addLayer("image")}>
+              <ImageIcon size={14} /> Image
+            </button>
           </div>
-          <p className="hint" style={{ marginTop: 6, marginBottom: 0 }}>
-            Drag a field's dot onto a layer's dot to bind it, or drop it on empty space to add a new bound layer. Select
-            a layer to edit it; Delete/Backspace removes it.
-          </p>
+          <IconToggleGroup
+            value={customBeat.theme}
+            onChange={(theme: ThemeVariant) => onChangeBeat({ ...customBeat, theme })}
+            options={[
+              { value: "light", label: "Light theme", icon: <Sun size={14} /> },
+              { value: "dark", label: "Dark theme", icon: <Moon size={14} /> },
+            ]}
+          />
+          <Knob
+            label="secs"
+            value={Math.round((customBeat.durationInFrames / fps) * 10) / 10}
+            min={0.5}
+            max={20}
+            step={0.1}
+            sensitivity={0.1}
+            format={(v) => `${v.toFixed(1)}s`}
+            onChange={(v) => onChangeBeat({ ...customBeat, durationInFrames: Math.round(v * fps) })}
+          />
         </div>
+        <p className="hint" style={{ marginTop: 8, marginBottom: 0 }}>
+          Drag a field's dot onto a layer's dot to bind it, or drop it on empty space to add a new bound layer. Select a
+          layer to edit it; Delete/Backspace removes it.
+        </p>
+      </FloatingPanel>
 
-        {selectedLayer && (
+      {selectedLayer && (
+        <FloatingPanel
+          title={`Layer: ${selectedLayer.kind}`}
+          defaultX={Math.max(16, window.innerWidth - 320)}
+          defaultY={16}
+          width={300}
+          maxHeight={window.innerHeight - 140}
+          onClose={() => onSelectLayer(null)}
+        >
           <LayerPropertyPanel layer={selectedLayer} dataFields={dataSource?.fields ?? []} fps={fps} onChange={(l) => updateLayer(selectedLayer.id, l)} onDelete={() => deleteLayer(selectedLayer.id)} />
-        )}
-      </div>
+        </FloatingPanel>
+      )}
     </div>
   );
 }

@@ -876,21 +876,7 @@ th {
   font-size: 12px;
 }
 
-.graph-body {
-  display: flex;
-  gap: 12px;
-}
-
-.graph-canvas-wrap {
-  flex: 1;
-  min-width: 0;
-}
-
 .node-property-panel {
-  flex: none;
-  width: 220px;
-  border-left: 1px solid var(--border);
-  padding-left: 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -910,15 +896,90 @@ th {
   font-weight: 600;
 }
 
-/* --- Floating live preview --- */
+/* --- Recipe editor: full-bleed workspace + floating panels (DAW/NLE convention) --- */
 
-.floating-preview {
+.recipe-editor-page {
   position: fixed;
-  top: 88px;
-  right: 16px;
-  width: 220px;
-  z-index: 40;
+  top: 0;
+  left: var(--sidebar-width, 220px);
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-soft);
+  transition: left 0.15s ease;
+}
+
+.recipe-editor-topbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.recipe-editor-workspace {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.recipe-editor-workspace-base {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+}
+
+.floating-panel {
+  position: absolute;
+  z-index: 30;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
-  max-height: calc(100vh - 104px);
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.floating-panel-titlebar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: var(--bg-soft);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.floating-panel-close {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+}
+
+.floating-panel-close:hover {
+  color: var(--danger);
+}
+
+.floating-panel-body {
+  padding: 10px;
+  overflow: auto;
+}
+
+.workspace-toggle-row {
+  display: flex;
+  gap: 6px;
 }

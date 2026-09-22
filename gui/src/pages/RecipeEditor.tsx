@@ -6,18 +6,22 @@ import { Timeline, type Selection } from "../components/Timeline";
 import { DataGraph } from "../components/DataGraph";
 import { LayerCanvas } from "../components/LayerCanvas";
 import { Inspector, defaultBeat } from "../components/Inspector";
+import { FloatingPanel } from "../components/FloatingPanel";
 import type { CompositionRecipe, DataSourceDescriptor, IntroBeat, OutroBeat, PerPhraseBeat, RecipeRecord, ReelConfig } from "../types";
 
 const DEFAULT_INTRO: IntroBeat = { kind: "intro", theme: "light", text: { source: "config.introText" }, introVoiceKeyword: "sinhala" };
 const DEFAULT_OUTRO: OutroBeat = { kind: "outro", theme: "dark" };
 
 /**
- * Canvas-style rebuild - replaces the old vertical stacked-card form with
- * one screen: a Timeline (primary navigation/sequencing, multi-track),
- * a Graph (data-binding, scoped to the selected beat), and an Inspector
- * (fields for exactly the current selection). All three read/write the same
- * `perPhraseBeats` state and a single shared `selection`, kept in sync with
- * the live preview's focus. See docs/COMPOSITION_DESIGNER.md.
+ * Full-bleed workspace, DAW/NLE-style: the Graph (or Inspector, when
+ * there's no `custom` beat to show) fills the whole area beside the
+ * sidebar; Timeline, Live preview, and Position (LayerCanvas) float over
+ * it as draggable/closeable panels instead of permanently consuming
+ * layout space - see docs/COMPOSITION_DESIGNER.md's graph-centric editing
+ * round for why. `.recipe-editor-page` is `position: fixed`, which is what
+ * lets it ignore `.app-main`'s max-width/padding without a special case
+ * there - fixed-position elements are placed relative to the viewport, not
+ * their parent.
  */
 export function RecipeEditor() {
   const { id } = useParams();
@@ -45,6 +49,15 @@ export function RecipeEditor() {
   const [saving, setSaving] = useState(false);
   const [pushing, setPushing] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(true);
+  const [timelineOpen, setTimelineOpen] = useState(true);
+  const [positionOpen, setPositionOpen] = useState(true);
+
+  // A newly-selected layer re-opens the Position panel even if it was
+  // closed for a previous one - "closed" is a per-look convenience, not a
+  // standing preference.
+  useEffect(() => {
+    if (selection.layerId) setPositionOpen(true);
+  }, [selection.layerId]);
 
   function applyRecord(r: RecipeRecord | CompositionRecipe) {
     setName("name" in r ? r.name : "");
@@ -153,49 +166,96 @@ export function RecipeEditor() {
   const activeDataSource = dataSourceList.find((d) => d.id === dataSourceId) ?? null;
   const numericBeatIndex = typeof selection.beatIndex === "number" ? selection.beatIndex : null;
   const selectedBeat = numericBeatIndex != null ? perPhraseBeats[numericBeatIndex] : null;
+  const isCustomSelected = selectedBeat?.kind === "custom";
 
   return (
-    <div>
-      <form onSubmit={onSave}>
-        <fieldset disabled={builtin} style={{ border: "none", padding: 0, margin: 0 }}>
-          <div className="card" style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Recipe name" required style={{ fontSize: 16, fontWeight: 700, flex: "1 1 220px" }} />
-            {dataSourceList.length > 1 ? (
-              <select value={dataSourceId} onChange={(e) => setDataSourceId(e.target.value)} title="Data source">
-                {dataSourceList.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.label}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <span className="hint">Data source: {activeDataSource?.label ?? dataSourceId}</span>
-            )}
-            <button type="button" className="secondary" onClick={() => setPreviewOpen((o) => !o)}>
-              {previewOpen ? "Hide preview" : "Show preview"}
+    <div className="recipe-editor-page">
+      <form onSubmit={onSave} className="recipe-editor-topbar">
+        <fieldset disabled={builtin} style={{ border: "none", padding: 0, margin: 0, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", width: "100%" }}>
+          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Recipe name" required style={{ fontSize: 16, fontWeight: 700, flex: "1 1 200px" }} />
+          {dataSourceList.length > 1 ? (
+            <select value={dataSourceId} onChange={(e) => setDataSourceId(e.target.value)} title="Data source">
+              {dataSourceList.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="hint">Data source: {activeDataSource?.label ?? dataSourceId}</span>
+          )}
+          <div className="workspace-toggle-row">
+            <button type="button" className={timelineOpen ? "" : "secondary"} onClick={() => setTimelineOpen((o) => !o)}>
+              Timeline
             </button>
-            <button type="submit" disabled={saving}>
-              {saving ? "Saving..." : "Save recipe"}
-            </button>
-            <button type="button" className="secondary" disabled={!savedId || pushing} onClick={onPush}>
-              {pushing ? "Pushing..." : "Push to GitHub"}
+            <button type="button" className={previewOpen ? "" : "secondary"} onClick={() => setPreviewOpen((o) => !o)}>
+              Preview
             </button>
           </div>
-
-          {error && <div className="error-banner">{error}</div>}
-          {status && <div className="success-banner">{status}</div>}
+          <button type="submit" disabled={saving}>
+            {saving ? "Saving..." : "Save recipe"}
+          </button>
+          <button
+            type="button"
+            className="secondary"
+            disabled={!savedId || pushing}
+            title={!savedId ? "Save at least once before pushing - the JSON export is written on save." : undefined}
+            onClick={onPush}
+          >
+            {pushing ? "Pushing..." : "Push to GitHub"}
+          </button>
           {builtin && (
-            <div className="card">
-              <p className="hint" style={{ marginTop: 0 }}>
-                This is a built-in recipe (matches Composition {id}) and can't be edited or deleted directly.
-              </p>
-              <button type="button" onClick={() => navigate(`/recipes/new?from=${id}`)}>
+            <span className="hint">
+              Built-in - can't edit directly.{" "}
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => navigate(`/recipes/new?from=${id}`)}
+                style={{ padding: "2px 8px" }}
+              >
                 Clone to customize
               </button>
+            </span>
+          )}
+        </fieldset>
+      </form>
+
+      {error && <div className="error-banner">{error}</div>}
+      {status && <div className="success-banner">{status}</div>}
+
+      <div className="recipe-editor-workspace">
+        <div className="recipe-editor-workspace-base">
+          {isCustomSelected && selectedBeat ? (
+            <DataGraph
+              dataSource={activeDataSource}
+              beat={selectedBeat}
+              selectedLayerId={selection.layerId}
+              fps={defaults?.fps ?? 30}
+              onSelectLayer={(layerId) => numericBeatIndex != null && selectLayer(numericBeatIndex, layerId)}
+              onChangeBeat={(b) => numericBeatIndex != null && updateBeat(numericBeatIndex, b)}
+            />
+          ) : (
+            <div style={{ padding: 20, maxWidth: 700 }}>
+              <Inspector
+                selection={selection}
+                intro={intro}
+                outro={outro}
+                onChangeIntro={setIntro}
+                onChangeOutro={setOutro}
+                introOpen={introOpen}
+                outroOpen={outroOpen}
+                onToggleIntroOpen={() => setIntroOpen((o) => !o)}
+                onToggleOutroOpen={() => setOutroOpen((o) => !o)}
+                perPhraseBeats={perPhraseBeats}
+                onChangeBeat={updateBeat}
+                onRemoveBeat={removeBeat}
+              />
             </div>
           )}
+        </div>
 
-          {defaults && (
+        {timelineOpen && defaults && (
+          <FloatingPanel title="Timeline" defaultX={16} defaultY={16} width={Math.min(1100, window.innerWidth - 340)} onClose={() => setTimelineOpen(false)}>
             <Timeline
               recipe={previewRecipe}
               config={defaults}
@@ -208,83 +268,53 @@ export function RecipeEditor() {
               onSelectBeat={selectBeat}
               onSelectLayer={selectLayer}
             />
-          )}
+            <div className="button-row" style={{ marginTop: 8, marginBottom: 0 }}>
+              <button type="button" className="secondary" onClick={() => setPerPhraseBeats((cur) => [...cur, defaultBeat("phrase")])}>
+                + Add beat
+              </button>
+            </div>
+          </FloatingPanel>
+        )}
 
-          <div className="button-row" style={{ marginTop: 0, marginBottom: 20 }}>
-            <button type="button" className="secondary" onClick={() => setPerPhraseBeats((cur) => [...cur, defaultBeat("phrase")])}>
-              + Add beat
-            </button>
-          </div>
-
-          {selectedBeat?.kind === "custom" ? (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-              <DataGraph
-                dataSource={activeDataSource}
-                beat={selectedBeat}
-                selectedLayerId={selection.layerId}
-                fps={defaults?.fps ?? 30}
-                onSelectLayer={(layerId) => numericBeatIndex != null && selectLayer(numericBeatIndex, layerId)}
-                onChangeBeat={(b) => numericBeatIndex != null && updateBeat(numericBeatIndex, b)}
+        {previewOpen && (
+          <FloatingPanel title="Live preview" defaultX={Math.max(16, window.innerWidth - 380) - 220} defaultY={window.innerHeight * 0.4} width={340} onClose={() => setPreviewOpen(false)}>
+            <p className="hint" style={{ marginTop: 0, fontSize: 11 }}>
+              {typeof selection.beatIndex === "number"
+                ? "Looping the selected beat."
+                : !introOpen || !outroOpen
+                  ? `Skipping ${[!introOpen && "intro", !outroOpen && "outro"].filter(Boolean).join(" and ")}.`
+                  : "Sample text/timing."}
+            </p>
+            {defaults ? (
+              <ReelPreview
+                recipe={previewRecipe}
+                config={defaults}
+                focusBeatIndex={typeof selection.beatIndex === "number" ? selection.beatIndex : null}
+                showIntro={introOpen}
+                showOutro={outroOpen}
               />
-              <div className="card">
-                <h2>Position</h2>
-                <p className="hint" style={{ marginTop: 0 }}>
-                  Drag a layer to move it, the square handle to resize, the round handle to rotate.
-                </p>
-                <LayerCanvas
-                  beat={selectedBeat}
-                  selectedId={selection.layerId}
-                  onSelect={(id) => selectLayer(numericBeatIndex!, id)}
-                  onChange={(b) => numericBeatIndex != null && updateBeat(numericBeatIndex, b)}
-                />
+            ) : (
+              <div className="preview-frame preview-loading">
+                <span className="hint">Loading...</span>
               </div>
-            </div>
-          ) : (
-            <Inspector
-              selection={selection}
-              intro={intro}
-              outro={outro}
-              onChangeIntro={setIntro}
-              onChangeOutro={setOutro}
-              introOpen={introOpen}
-              outroOpen={outroOpen}
-              onToggleIntroOpen={() => setIntroOpen((o) => !o)}
-              onToggleOutroOpen={() => setOutroOpen((o) => !o)}
-              perPhraseBeats={perPhraseBeats}
-              onChangeBeat={updateBeat}
-              onRemoveBeat={removeBeat}
-            />
-          )}
+            )}
+          </FloatingPanel>
+        )}
 
-          {!savedId && <p className="hint">Save at least once before pushing - the JSON export is written on save.</p>}
-        </fieldset>
-      </form>
-
-      {previewOpen && (
-        <div className="card preview-card floating-preview">
-          <h2 style={{ fontSize: 14 }}>Live preview</h2>
-          <p className="hint" style={{ marginTop: 0, fontSize: 11 }}>
-            {typeof selection.beatIndex === "number"
-              ? "Looping the selected beat."
-              : !introOpen || !outroOpen
-                ? `Skipping ${[!introOpen && "intro", !outroOpen && "outro"].filter(Boolean).join(" and ")}.`
-                : "Sample text/timing."}
-          </p>
-          {defaults ? (
-            <ReelPreview
-              recipe={previewRecipe}
-              config={defaults}
-              focusBeatIndex={typeof selection.beatIndex === "number" ? selection.beatIndex : null}
-              showIntro={introOpen}
-              showOutro={outroOpen}
+        {isCustomSelected && selectedBeat && positionOpen && selection.layerId && (
+          <FloatingPanel title="Position" defaultX={16} defaultY={window.innerHeight - 420} width={300} onClose={() => setPositionOpen(false)}>
+            <p className="hint" style={{ marginTop: 0 }}>
+              Drag a layer to move it, the square handle to resize, the round handle to rotate.
+            </p>
+            <LayerCanvas
+              beat={selectedBeat}
+              selectedId={selection.layerId}
+              onSelect={(id) => selectLayer(numericBeatIndex!, id)}
+              onChange={(b) => numericBeatIndex != null && updateBeat(numericBeatIndex, b)}
             />
-          ) : (
-            <div className="preview-frame preview-loading">
-              <span className="hint">Loading...</span>
-            </div>
-          )}
-        </div>
-      )}
+          </FloatingPanel>
+        )}
+      </div>
     </div>
   );
 }

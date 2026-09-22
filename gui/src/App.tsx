@@ -47,7 +47,10 @@ export function App() {
   }
 
   return (
-    <div className="app">
+    // --sidebar-width lets a full-bleed page (RecipeEditor.tsx's workspace)
+    // offset itself around the sidebar without needing to lift collapse
+    // state into a context - it just reads the same variable via CSS.
+    <div className="app" style={{ "--sidebar-width": collapsed ? "60px" : "220px" } as React.CSSProperties}>
       <aside className={`app-sidebar${collapsed ? " collapsed" : ""}`}>
         <div className="app-sidebar-header">
           {!collapsed && <span className="brand">StudyPal Reel Studio</span>}
