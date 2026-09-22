@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ReactFlow, Background, Controls, Handle, Position, addEdge, useEdgesState, useNodesState } from "@xyflow/react";
 import type { Connection, Edge, Node, NodeProps, OnConnectEnd } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Crosshair, Image as ImageIcon, Info, Moon, Settings, Square, Sun, Type } from "lucide-react";
+import { Image as ImageIcon, Info, Moon, Settings, Square, Sun, Type } from "lucide-react";
 import { contentForKind, defaultAnimation, defaultBox, newLayerId } from "../lib/layerDefaults";
 import { Knob } from "./Knob";
 import { IconToggleGroup } from "./IconToggleGroup";
 import { LayerPropertyPanel } from "./LayerPropertyPanel";
+import { LayerCanvas } from "./LayerCanvas";
 import { FloatingPanel } from "./FloatingPanel";
 import type { CustomBeat, DataSourceDescriptor, Layer, PerPhraseBeat, ThemeVariant } from "../types";
 
@@ -44,18 +45,13 @@ function LayerNodeComponent({ data }: NodeProps) {
   const bound = data.bound as string | null;
   const selected = data.selected as boolean;
   const kind = data.kind as Layer["kind"];
-  const positionActive = data.positionActive as boolean;
   const propertiesActive = data.propertiesActive as boolean;
-  const onOpenPosition = data.onOpenPosition as (e: React.MouseEvent) => void;
   const onOpenProperties = data.onOpenProperties as (e: React.MouseEvent) => void;
   const Icon = LAYER_ICON[kind];
   return (
     <div className="datagraph-node" style={{ maxWidth: 200, outline: selected ? "2px solid var(--primary)" : undefined }}>
       <div className="node-icon-btns">
-        <button type="button" className={`node-icon-btn node-icon-btn-position${positionActive ? " active" : ""}`} title="Position" onClick={onOpenPosition}>
-          <Crosshair size={11} />
-        </button>
-        <button type="button" className={`node-icon-btn node-icon-btn-properties${propertiesActive ? " active" : ""}`} title="Layer properties" onClick={onOpenProperties}>
+        <button type="button" className={`node-icon-btn node-icon-btn-properties${propertiesActive ? " active" : ""}`} title="Position & layer properties" onClick={onOpenProperties}>
           <Settings size={11} />
         </button>
       </div>
@@ -95,19 +91,15 @@ export function DataGraph({
   beat,
   selectedLayerId,
   fps,
-  positionLayerId,
   onSelectLayer,
   onChangeBeat,
-  onRequestPosition,
 }: {
   dataSource: DataSourceDescriptor | null;
   beat: PerPhraseBeat | null;
   selectedLayerId: string | null;
   fps: number;
-  positionLayerId: string | null;
   onSelectLayer: (layerId: string | null) => void;
   onChangeBeat: (beat: CustomBeat) => void;
-  onRequestPosition: (layerId: string, anchor: { x: number; y: number }) => void;
 }) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -155,17 +147,11 @@ export function DataGraph({
           kind: layer.kind,
           bound: layer.kind === "text" && layer.text.source === "dataField" ? layer.text.field : null,
           selected: layer.id === selectedLayerId,
-          positionActive: layer.id === positionLayerId,
           propertiesActive: layer.id === propertiesFor?.layerId,
-          onOpenPosition: (e: React.MouseEvent) => {
-            e.stopPropagation();
-            onSelectLayer(layer.id);
-            onRequestPosition(layer.id, anchorFromEvent(e, 300, 420));
-          },
           onOpenProperties: (e: React.MouseEvent) => {
             e.stopPropagation();
             onSelectLayer(layer.id);
-            setPropertiesFor({ layerId: layer.id, ...anchorFromEvent(e, 300, 480) });
+            setPropertiesFor((cur) => (cur?.layerId === layer.id ? null : { layerId: layer.id, ...anchorFromEvent(e, 320, 640) }));
           },
         },
       };
@@ -187,7 +173,7 @@ export function DataGraph({
     // at all - this is what stops every tick of the beat-duration Knob from
     // churning the graph.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataSource, customBeat?.layers, selectedLayerId, positionLayerId, propertiesFor]);
+  }, [dataSource, customBeat?.layers, selectedLayerId, propertiesFor]);
 
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -309,7 +295,7 @@ export function DataGraph({
           onChange={(v) => onChangeBeat({ ...customBeat, durationInFrames: Math.round(v * fps) })}
         />
         <div className="beat-tools-divider" />
-        <button type="button" className="beat-tools-info" title="Drag a field's dot onto a layer's dot to bind it, or drop it on empty space to add a new bound layer. Use the target/gear buttons on a layer node to summon its Position and Layer properties panels; Delete/Backspace removes a selected node.">
+        <button type="button" className="beat-tools-info" title="Drag a field's dot onto a layer's dot to bind it, or drop it on empty space to add a new bound layer. Use the gear button on a layer node to show/hide its Position and Layer properties panel; Delete/Backspace removes a selected node.">
           <Info size={15} />
         </button>
       </div>
@@ -320,10 +306,13 @@ export function DataGraph({
           title={`Layer: ${propertiesLayer.kind}`}
           defaultX={propertiesFor.x}
           defaultY={propertiesFor.y}
-          width={300}
+          width={320}
           maxHeight={window.innerHeight - 140}
           onClose={() => setPropertiesFor(null)}
         >
+          <div className="layer-panel-position">
+            <LayerCanvas beat={customBeat} selectedId={propertiesLayer.id} onSelect={onSelectLayer} onChange={onChangeBeat} />
+          </div>
           <LayerPropertyPanel layer={propertiesLayer} dataFields={dataSource?.fields ?? []} fps={fps} onChange={(l) => updateLayer(propertiesLayer.id, l)} onDelete={() => deleteLayer(propertiesLayer.id)} />
         </FloatingPanel>
       )}

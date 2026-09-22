@@ -632,3 +632,39 @@ unpaced beat-duration-Knob drag (previously 200), and 0 across the three Layer-p
 Confirmed the monitor itself wasn't just insensitive by re-running it against the pre-fix code via
 `git stash` - it reliably reproduced the 200-frame failure there, then 0 after `git stash pop`
 restored the fix. `git diff --stat` on `src/render`/`LayerRenderer.tsx` is empty.
+
+## Merged Position + Layer properties into one panel; fixed Timeline's scroll and made it resizable
+
+Two more refinements from the same feedback round:
+
+**Position and Layer properties are now one panel, one toggle.** Having two separate icon buttons
+(crosshair for Position, gear for Layer properties) on each node meant two separate floating panels
+to manage for what's really one editing task. `LayerNodeComponent` now has a single gear button;
+clicking it toggles one combined panel open/closed (click again on an already-open node's gear to
+close it - a real toggle, not just open). The panel now renders `LayerCanvas` (the spatial
+drag/resize/rotate surface, previously the separate "Position" panel owned by `RecipeEditor.tsx`)
+above `LayerPropertyPanel`'s knobs, inside `DataGraph.tsx`'s existing property `FloatingPanel` -
+`DataGraph` already had everything `LayerCanvas` needs (`customBeat`, `onSelectLayer`,
+`onChangeBeat`), so this also deleted the cross-component anchor-passing machinery
+(`onRequestPosition`, `positionLayerId`, the separate `positionFor` state and FloatingPanel in
+`RecipeEditor.tsx`) - one state (`propertiesFor`), one owner, one panel.
+
+**Timeline's scrollbar wasn't actually engaging** once enough layers were stacked in a beat to
+overflow the dock - a classic flexbox trap: `.timeline-dock-body` had `overflow: auto` but, as a
+flex item in `.timeline-dock`'s column layout, its default `min-height: auto` resolves to its
+*content's* height, not 0, so it never actually shrank enough to need its own scrollbar and just
+pushed the dock past its `max-height` instead. Fixed with `min-height: 0` (plus `flex: 1`) on
+`.timeline-dock-body`, letting the flex item actually shrink and its `overflow: auto` finally do its
+job.
+
+**Timeline is now resizable by dragging**, not just a fixed 40vh cap - a small handle
+(`.timeline-dock-resize-handle`) along the dock's top edge, plain pointer-drag (same technique as
+everywhere else), clamped between 140px and 75% of the viewport height, height held in
+`RecipeEditor.tsx`'s own `timelineHeight` state.
+
+Verified via Playwright: exactly one gear icon per node, zero crosshair icons; clicking it opens one
+panel containing both the Position drag-hint text and the property knobs; clicking it again closes
+it (count back to 0); after adding 8 layers to a beat, `.timeline-dock-body`'s `scrollHeight` (626px)
+exceeds its `clientHeight` (281px) - confirmed scrollable, not just overflowing; dragging the resize
+handle upward grew the dock's real bounding-box height. `git diff --stat` on
+`src/render`/`LayerRenderer.tsx` is empty - this round touched only the GUI layout/interaction layer.

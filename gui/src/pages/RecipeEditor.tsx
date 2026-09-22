@@ -1,16 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { ReelPreview } from "../components/ReelPreview";
 import { Timeline, type Selection } from "../components/Timeline";
 import { DataGraph } from "../components/DataGraph";
-import { LayerCanvas } from "../components/LayerCanvas";
 import { Inspector, defaultBeat } from "../components/Inspector";
 import { FloatingPanel } from "../components/FloatingPanel";
 import { X } from "lucide-react";
 import type { CompositionRecipe, DataSourceDescriptor, IntroBeat, OutroBeat, PerPhraseBeat, RecipeRecord, ReelConfig } from "../types";
-
-type PanelAnchor = { layerId: string; x: number; y: number };
 
 const DEFAULT_INTRO: IntroBeat = { kind: "intro", theme: "light", text: { source: "config.introText" }, introVoiceKeyword: "sinhala" };
 const DEFAULT_OUTRO: OutroBeat = { kind: "outro", theme: "dark" };
@@ -53,7 +50,24 @@ export function RecipeEditor() {
   const [pushing, setPushing] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(true);
   const [timelineOpen, setTimelineOpen] = useState(true);
-  const [positionFor, setPositionFor] = useState<PanelAnchor | null>(null);
+  const [timelineHeight, setTimelineHeight] = useState(320);
+  const timelineResizeStart = useRef<{ startY: number; startHeight: number } | null>(null);
+
+  function onTimelineResizeDown(e: React.PointerEvent) {
+    (e.target as Element).setPointerCapture(e.pointerId);
+    timelineResizeStart.current = { startY: e.clientY, startHeight: timelineHeight };
+  }
+
+  function onTimelineResizeMove(e: React.PointerEvent) {
+    if (!timelineResizeStart.current) return;
+    const { startY, startHeight } = timelineResizeStart.current;
+    const next = startHeight - (e.clientY - startY);
+    setTimelineHeight(Math.min(window.innerHeight * 0.75, Math.max(140, next)));
+  }
+
+  function onTimelineResizeUp() {
+    timelineResizeStart.current = null;
+  }
 
   function applyRecord(r: RecipeRecord | CompositionRecipe) {
     setName("name" in r ? r.name : "");
@@ -227,13 +241,8 @@ export function RecipeEditor() {
               beat={selectedBeat}
               selectedLayerId={selection.layerId}
               fps={defaults?.fps ?? 30}
-              positionLayerId={positionFor?.layerId ?? null}
               onSelectLayer={(layerId) => numericBeatIndex != null && selectLayer(numericBeatIndex, layerId)}
               onChangeBeat={(b) => numericBeatIndex != null && updateBeat(numericBeatIndex, b)}
-              onRequestPosition={(layerId, anchor) => {
-                if (numericBeatIndex != null) selectLayer(numericBeatIndex, layerId);
-                setPositionFor({ layerId, ...anchor });
-              }}
             />
           ) : (
             <div style={{ padding: 20, maxWidth: 700 }}>
@@ -256,7 +265,15 @@ export function RecipeEditor() {
         </div>
 
         {timelineOpen && defaults && (
-          <div className="timeline-dock">
+          <div className="timeline-dock" style={{ height: timelineHeight }}>
+            <div
+              className="timeline-dock-resize-handle"
+              title="Drag to resize"
+              onPointerDown={onTimelineResizeDown}
+              onPointerMove={onTimelineResizeMove}
+              onPointerUp={onTimelineResizeUp}
+              onPointerCancel={onTimelineResizeUp}
+            />
             <div className="timeline-dock-header">
               <span>Timeline</span>
               <button type="button" className="floating-panel-close" title="Hide Timeline" onClick={() => setTimelineOpen(false)}>
@@ -307,20 +324,6 @@ export function RecipeEditor() {
                 <span className="hint">Loading...</span>
               </div>
             )}
-          </FloatingPanel>
-        )}
-
-        {isCustomSelected && selectedBeat && positionFor && positionFor.layerId === selection.layerId && (
-          <FloatingPanel key={positionFor.layerId} title="Position" defaultX={positionFor.x} defaultY={positionFor.y} width={300} onClose={() => setPositionFor(null)}>
-            <p className="hint" style={{ marginTop: 0 }}>
-              Drag a layer to move it, the square handle to resize, the round handle to rotate.
-            </p>
-            <LayerCanvas
-              beat={selectedBeat}
-              selectedId={selection.layerId}
-              onSelect={(id) => selectLayer(numericBeatIndex!, id)}
-              onChange={(b) => numericBeatIndex != null && updateBeat(numericBeatIndex, b)}
-            />
           </FloatingPanel>
         )}
       </div>

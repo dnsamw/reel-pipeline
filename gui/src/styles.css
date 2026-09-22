@@ -628,16 +628,6 @@ th {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
-.node-icon-btn-position {
-  color: var(--primary);
-}
-
-.node-icon-btn-position.active {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: white;
-}
-
 .node-icon-btn-properties {
   color: var(--gold);
 }
@@ -646,6 +636,12 @@ th {
   background: var(--gold);
   border-color: var(--gold);
   color: white;
+}
+
+.layer-panel-position {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
 }
 
 .datagraph-node-title {
@@ -1088,12 +1084,37 @@ th {
   right: 0;
   bottom: 0;
   z-index: 28;
-  max-height: 40vh;
   display: flex;
   flex-direction: column;
   background: var(--bg);
   border-top: 1px solid var(--border);
   box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.18);
+}
+
+.timeline-dock-resize-handle {
+  flex: none;
+  height: 8px;
+  margin-top: -4px;
+  cursor: ns-resize;
+  touch-action: none;
+  position: relative;
+  z-index: 1;
+}
+
+.timeline-dock-resize-handle::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 3px;
+  width: 36px;
+  height: 3px;
+  margin-left: -18px;
+  border-radius: 2px;
+  background: var(--border);
+}
+
+.timeline-dock-resize-handle:hover::after {
+  background: var(--primary);
 }
 
 .timeline-dock-header {
@@ -1110,6 +1131,8 @@ th {
 }
 
 .timeline-dock-body {
+  flex: 1;
+  min-height: 0;
   padding: 10px;
   overflow: auto;
 }
