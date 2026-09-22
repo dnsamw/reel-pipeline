@@ -638,10 +638,22 @@ th {
   color: white;
 }
 
+.layer-panel-columns {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
 .layer-panel-position {
-  margin-bottom: 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
+  flex: none;
+  width: 190px;
+  padding-right: 14px;
+  border-right: 1px solid var(--border);
+}
+
+.layer-panel-properties {
+  flex: 1;
+  min-width: 0;
 }
 
 .datagraph-node-title {

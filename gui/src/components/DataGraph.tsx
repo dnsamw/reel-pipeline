@@ -151,7 +151,7 @@ export function DataGraph({
           onOpenProperties: (e: React.MouseEvent) => {
             e.stopPropagation();
             onSelectLayer(layer.id);
-            setPropertiesFor((cur) => (cur?.layerId === layer.id ? null : { layerId: layer.id, ...anchorFromEvent(e, 320, 640) }));
+            setPropertiesFor((cur) => (cur?.layerId === layer.id ? null : { layerId: layer.id, ...anchorFromEvent(e, 560, 560) }));
           },
         },
       };
@@ -306,14 +306,18 @@ export function DataGraph({
           title={`Layer: ${propertiesLayer.kind}`}
           defaultX={propertiesFor.x}
           defaultY={propertiesFor.y}
-          width={320}
+          width={560}
           maxHeight={window.innerHeight - 140}
           onClose={() => setPropertiesFor(null)}
         >
-          <div className="layer-panel-position">
-            <LayerCanvas beat={customBeat} selectedId={propertiesLayer.id} onSelect={onSelectLayer} onChange={onChangeBeat} />
+          <div className="layer-panel-columns">
+            <div className="layer-panel-position">
+              <LayerCanvas beat={customBeat} selectedId={propertiesLayer.id} onSelect={onSelectLayer} onChange={onChangeBeat} />
+            </div>
+            <div className="layer-panel-properties">
+              <LayerPropertyPanel layer={propertiesLayer} dataFields={dataSource?.fields ?? []} fps={fps} onChange={(l) => updateLayer(propertiesLayer.id, l)} onDelete={() => deleteLayer(propertiesLayer.id)} />
+            </div>
           </div>
-          <LayerPropertyPanel layer={propertiesLayer} dataFields={dataSource?.fields ?? []} fps={fps} onChange={(l) => updateLayer(propertiesLayer.id, l)} onDelete={() => deleteLayer(propertiesLayer.id)} />
         </FloatingPanel>
       )}
     </div>
