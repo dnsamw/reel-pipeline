@@ -363,10 +363,12 @@ export function RecipeEditor() {
             <p className="hint" style={{ marginTop: 0 }}>
               {previewBeatIndex != null
                 ? "Looping just the beat marked above - click its \"Previewing this beat\" button to go back to the full recipe."
-                : "Uses the current defaults' colors/timing with sample text. Durations are approximate."}
+                : !introOpen || !outroOpen
+                  ? `Uses the current defaults' colors/timing with sample text. Skipping ${[!introOpen && "intro", !outroOpen && "outro"].filter(Boolean).join(" and ")} - "Show" them above to include in the preview loop.`
+                  : "Uses the current defaults' colors/timing with sample text. Durations are approximate."}
             </p>
             {defaults ? (
-              <ReelPreview recipe={previewRecipe} config={defaults} focusBeatIndex={previewBeatIndex} />
+              <ReelPreview recipe={previewRecipe} config={defaults} focusBeatIndex={previewBeatIndex} showIntro={introOpen} showOutro={outroOpen} />
             ) : (
               <div className="preview-frame preview-loading">
                 <span className="hint">Loading...</span>

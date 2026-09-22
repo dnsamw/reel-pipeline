@@ -59,6 +59,8 @@ export function ReelPreview({
   recipe,
   config,
   focusBeatIndex = null,
+  showIntro = true,
+  showOutro = true,
 }: {
   recipe: CompositionRecipe;
   config: ReelConfig;
@@ -70,6 +72,16 @@ export function ReelPreview({
    * it every time makes it hard to focus on the one thing changing.
    */
   focusBeatIndex?: number | null;
+  /**
+   * Mirrors RecipeEditor.tsx's Intro/Outro "Show"/"Hide" toggle - false
+   * skips that segment in the preview's playable range too (still real,
+   * still rendered/exported - the recipe schema requires both - just not
+   * looped past while you're not looking at them). Ignored when
+   * `focusBeatIndex` is set, since a single-beat focus already excludes
+   * intro/outro on its own.
+   */
+  showIntro?: boolean;
+  showOutro?: boolean;
 }) {
   const [fontsLoaded, setFontsLoaded] = useState(false);
 
@@ -101,6 +113,14 @@ export function ReelPreview({
       const start = timeline.slice(0, timeline.indexOf(target)).reduce((sum, it) => sum + it.durationInFrames, 0);
       focusRange = { inFrame: start, outFrame: Math.min(durationInFrames - 1, start + target.durationInFrames - 1) };
     }
+  } else if (!showIntro || !showOutro) {
+    // timeline[0] is always the intro item, timeline[timeline.length - 1]
+    // always the outro item (buildTimelineFromRecipe's own guarantee).
+    const introDuration = timeline[0].durationInFrames;
+    const outroDuration = timeline[timeline.length - 1].durationInFrames;
+    const start = showIntro ? 0 : introDuration;
+    const end = showOutro ? durationInFrames - 1 : durationInFrames - 1 - outroDuration;
+    focusRange = { inFrame: start, outFrame: Math.max(start, end) };
   }
 
   const inputProps: ReelPropsWithRecipe = {
@@ -118,7 +138,7 @@ export function ReelPreview({
 
   return (
     <Player
-      key={`${recipe.id}-${focusBeatIndex ?? "full"}`}
+      key={`${recipe.id}-${focusBeatIndex ?? "full"}-${showIntro}-${showOutro}`}
       component={CompositionFromRecipeDynamic}
       inputProps={inputProps}
       durationInFrames={durationInFrames}

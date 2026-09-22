@@ -310,9 +310,11 @@ served via `staticFile()` the same way at edit time and render time) instead of 
 by hand; a multi-layer beat's field form collapses every layer but the selected one to a one-line
 summary instead of stacking full forms (the vertical-scroll complaint); the canvas caps at 280px wide
 instead of filling the column; Intro/Outro are collapsed by default (a "Show" toggle) since editing a
-custom beat rarely touches them; and each per-phrase beat has a "Preview this beat" button that seeks
-the live preview `Player` to that beat's own frame range (`inFrame`/`outFrame`) and loops just that,
-instead of scrubbing the whole recipe to find it.
+custom beat rarely touches them - and that Hide/Show state now drives `ReelPreview.tsx` too (its
+`showIntro`/`showOutro` props), so a hidden Intro/Outro is skipped in the preview's playable range
+(`inFrame`/`outFrame`) as well, not just hidden from the form while still looping in the player; and
+each per-phrase beat has a "Preview this beat" button that seeks the live preview `Player` to that
+beat's own frame range and loops just that, instead of scrubbing the whole recipe to find it.
 
 **What's still missing:** snapping/alignment guides on the canvas, and (unrelated to the canvas) a
 genuinely new visual *primitive* beyond text/image/shape - e.g. video-clip support, still requires
