@@ -1030,6 +1030,7 @@ th {
 .beat-tools-add {
   width: 36px;
   height: 36px;
+  flex: none;
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--bg-soft);
@@ -1038,6 +1039,14 @@ th {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+}
+
+/* Flex items nested inside a column-direction flex container (.beat-tools-dock)
+   can otherwise get their intrinsic size miscomputed and shrink toward 0 width
+   - these icons are the exact fixed size lucide-react renders them at. */
+.beat-tools-add svg,
+.beat-tools-info svg {
+  flex-shrink: 0;
 }
 
 .beat-tools-add:hover {
@@ -1055,6 +1064,7 @@ th {
 .beat-tools-info {
   width: 28px;
   height: 28px;
+  flex: none;
   border-radius: 50%;
   border: none;
   background: transparent;
