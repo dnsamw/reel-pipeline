@@ -4,6 +4,7 @@ import { api } from "../api";
 import { ReelPreview } from "../components/ReelPreview";
 import { Timeline, type Selection } from "../components/Timeline";
 import { DataGraph } from "../components/DataGraph";
+import { LayerCanvas } from "../components/LayerCanvas";
 import { Inspector, defaultBeat } from "../components/Inspector";
 import type { CompositionRecipe, DataSourceDescriptor, IntroBeat, OutroBeat, PerPhraseBeat, RecipeRecord, ReelConfig } from "../types";
 
@@ -215,14 +216,30 @@ export function RecipeEditor() {
             </button>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-            <DataGraph
-              dataSource={activeDataSource}
-              beat={selectedBeat}
-              selectedLayerId={selection.layerId}
-              onSelectLayer={(layerId) => numericBeatIndex != null && selectLayer(numericBeatIndex, layerId)}
-              onChangeBeat={(b) => numericBeatIndex != null && updateBeat(numericBeatIndex, b)}
-            />
+          {selectedBeat?.kind === "custom" ? (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+              <DataGraph
+                dataSource={activeDataSource}
+                beat={selectedBeat}
+                selectedLayerId={selection.layerId}
+                fps={defaults?.fps ?? 30}
+                onSelectLayer={(layerId) => numericBeatIndex != null && selectLayer(numericBeatIndex, layerId)}
+                onChangeBeat={(b) => numericBeatIndex != null && updateBeat(numericBeatIndex, b)}
+              />
+              <div className="card">
+                <h2>Position</h2>
+                <p className="hint" style={{ marginTop: 0 }}>
+                  Drag a layer to move it, the square handle to resize, the round handle to rotate.
+                </p>
+                <LayerCanvas
+                  beat={selectedBeat}
+                  selectedId={selection.layerId}
+                  onSelect={(id) => selectLayer(numericBeatIndex!, id)}
+                  onChange={(b) => numericBeatIndex != null && updateBeat(numericBeatIndex, b)}
+                />
+              </div>
+            </div>
+          ) : (
             <Inspector
               selection={selection}
               intro={intro}
@@ -236,25 +253,22 @@ export function RecipeEditor() {
               perPhraseBeats={perPhraseBeats}
               onChangeBeat={updateBeat}
               onRemoveBeat={removeBeat}
-              onSelectLayer={selectLayer}
-              dataFields={activeDataSource?.fields ?? []}
-              fps={defaults?.fps ?? 30}
             />
-          </div>
+          )}
 
           {!savedId && <p className="hint">Save at least once before pushing - the JSON export is written on save.</p>}
         </fieldset>
       </form>
 
       {previewOpen && (
-        <div className="card preview-card" style={{ marginTop: 20, maxWidth: 360 }}>
-          <h2>Live preview</h2>
-          <p className="hint" style={{ marginTop: 0 }}>
+        <div className="card preview-card floating-preview">
+          <h2 style={{ fontSize: 14 }}>Live preview</h2>
+          <p className="hint" style={{ marginTop: 0, fontSize: 11 }}>
             {typeof selection.beatIndex === "number"
-              ? "Looping just the selected beat."
+              ? "Looping the selected beat."
               : !introOpen || !outroOpen
-                ? `Skipping ${[!introOpen && "intro", !outroOpen && "outro"].filter(Boolean).join(" and ")} - toggle from the Intro/Outro Inspector panel to include in the preview loop.`
-                : "Uses the current defaults' colors/timing with sample text. Durations are approximate."}
+                ? `Skipping ${[!introOpen && "intro", !outroOpen && "outro"].filter(Boolean).join(" and ")}.`
+                : "Sample text/timing."}
           </p>
           {defaults ? (
             <ReelPreview

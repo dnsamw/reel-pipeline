@@ -2,19 +2,24 @@ import { useCallback, useEffect } from "react";
 import { ReactFlow, Background, Controls, Handle, Position, addEdge, useEdgesState, useNodesState } from "@xyflow/react";
 import type { Connection, Edge, Node, NodeProps, OnConnectEnd } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { defaultAnimation, defaultBox, newLayerId } from "../lib/layerDefaults";
-import type { CustomBeat, DataSourceDescriptor, Layer, PerPhraseBeat } from "../types";
+import { Image as ImageIcon, Moon, Square, Sun, Type } from "lucide-react";
+import { contentForKind, defaultAnimation, defaultBox, newLayerId } from "../lib/layerDefaults";
+import { Knob } from "./Knob";
+import { IconToggleGroup } from "./IconToggleGroup";
+import { LayerPropertyPanel } from "./LayerPropertyPanel";
+import type { CustomBeat, DataSourceDescriptor, Layer, PerPhraseBeat, ThemeVariant } from "../types";
 
 /**
- * Data-binding graph, rebuilt on @xyflow/react (validated in the earlier
- * SpikeGraph.tsx) instead of the hand-rolled pointer/SVG version - real
- * pan/zoom/handles instead of custom wire math, which is what was missing
- * to actually read as "ComfyUI-like."
+ * The one-stop workspace for a selected `custom` beat: add/select/bind/
+ * delete its layers on a real @xyflow/react graph, plus the beat's own
+ * theme/duration in the header - everything except spatial position/size/
+ * rotation, which stays on LayerCanvas.tsx's direct-manipulation canvas.
+ * Replaces what Inspector.tsx used to show for a `custom` beat (see
+ * docs/COMPOSITION_DESIGNER.md's graph-centric editing round).
  *
- * Scoped to the *currently selected* beat only (not the whole recipe) -
- * Timeline.tsx already shows the full sequence, so this panel just needs to
- * answer "what feeds this beat's text" without re-showing every beat at
- * once. Selecting a different beat on the Timeline re-scopes this panel.
+ * Scoped to the *currently selected* beat only - Timeline.tsx already shows
+ * the full sequence, so this panel just needs to answer "what does this one
+ * beat contain and what feeds it" without re-showing every beat at once.
  */
 
 function DataSourceNodeComponent({ data }: NodeProps) {
@@ -32,14 +37,21 @@ function DataSourceNodeComponent({ data }: NodeProps) {
   );
 }
 
+const LAYER_ICON: Record<Layer["kind"], typeof Type> = { text: Type, shape: Square, image: ImageIcon };
+
 function LayerNodeComponent({ data }: NodeProps) {
   const bound = data.bound as string | null;
   const selected = data.selected as boolean;
+  const kind = data.kind as Layer["kind"];
+  const Icon = LAYER_ICON[kind];
   return (
     <div className="datagraph-node" style={{ maxWidth: 200, outline: selected ? "2px solid var(--primary)" : undefined }}>
       <Handle type="target" position={Position.Left} id="text" style={{ background: "var(--primary)", width: 10, height: 10 }} />
-      <div className="datagraph-node-title">{data.label as string}</div>
-      <div className="hint">{bound ? `← ${bound}` : "(fixed text)"}</div>
+      <div className="datagraph-node-title" style={{ display: "flex", alignItems: "center", gap: 5 }}>
+        <Icon size={13} />
+        {data.label as string}
+      </div>
+      <div className="hint">{bound ? `← ${bound}` : kind === "text" ? "(fixed text)" : ""}</div>
     </div>
   );
 }
@@ -47,7 +59,6 @@ function LayerNodeComponent({ data }: NodeProps) {
 const nodeTypes = { dataSource: DataSourceNodeComponent, layer: LayerNodeComponent };
 
 function layerLabel(layer: Layer, index: number): string {
-  if (layer.kind === "text") return `${index + 1}. text`;
   return `${index + 1}. ${layer.kind}`;
 }
 
@@ -55,13 +66,15 @@ export function DataGraph({
   dataSource,
   beat,
   selectedLayerId,
+  fps,
   onSelectLayer,
   onChangeBeat,
 }: {
   dataSource: DataSourceDescriptor | null;
   beat: PerPhraseBeat | null;
   selectedLayerId: string | null;
-  onSelectLayer: (layerId: string) => void;
+  fps: number;
+  onSelectLayer: (layerId: string | null) => void;
   onChangeBeat: (beat: CustomBeat) => void;
 }) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
@@ -83,6 +96,7 @@ export function DataGraph({
       position: { x: 420, y: i * 110 },
       data: {
         label: layerLabel(layer, i),
+        kind: layer.kind,
         bound: layer.kind === "text" && layer.text.source === "dataField" ? layer.text.field : null,
         selected: layer.id === selectedLayerId,
       },
@@ -132,37 +146,101 @@ export function DataGraph({
     [customBeat, onChangeBeat, onSelectLayer],
   );
 
+  function addLayer(kind: Layer["kind"]) {
+    if (!customBeat) return;
+    const newLayer = contentForKind(kind, defaultBox(), defaultAnimation(), newLayerId());
+    onChangeBeat({ ...customBeat, layers: [...customBeat.layers, newLayer] });
+    onSelectLayer(newLayer.id);
+  }
+
+  function deleteLayer(layerId: string) {
+    if (!customBeat || customBeat.layers.length <= 1) return;
+    onChangeBeat({ ...customBeat, layers: customBeat.layers.filter((l) => l.id !== layerId) });
+    if (selectedLayerId === layerId) onSelectLayer(null);
+  }
+
+  function updateLayer(layerId: string, layer: Layer) {
+    if (!customBeat) return;
+    onChangeBeat({ ...customBeat, layers: customBeat.layers.map((l) => (l.id === layerId ? layer : l)) });
+  }
+
   if (!customBeat) {
     return (
       <div className="card" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 200 }}>
-        <p className="hint">Select a Custom beat on the Timeline to bind its text layers to data.</p>
+        <p className="hint">Select a Custom beat on the Timeline to work on it here.</p>
       </div>
     );
   }
 
+  const selectedLayer = customBeat.layers.find((l) => l.id === selectedLayerId) ?? null;
+
   return (
     <div className="card">
-      <h2>Data binding</h2>
-      <p className="hint" style={{ marginTop: 0 }}>
-        Drag from a field's dot to a text layer's dot to bind it, or drop it on empty space to add a new bound layer.
-      </p>
-      <div style={{ height: 320, border: "1px solid var(--border)", borderRadius: 10, background: "var(--bg)" }}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onConnectEnd={onConnectEnd}
-          nodeTypes={nodeTypes}
-          onNodeClick={(_e, node) => {
-            if (node.type === "layer") onSelectLayer(node.id);
-          }}
-          fitView
-        >
-          <Background />
-          <Controls showInteractive={false} />
-        </ReactFlow>
+      <div className="graph-toolbar">
+        <div className="graph-toolbar-add">
+          <button type="button" className="secondary" title="Add a text layer" onClick={() => addLayer("text")}>
+            <Type size={14} /> Text
+          </button>
+          <button type="button" className="secondary" title="Add a shape layer" onClick={() => addLayer("shape")}>
+            <Square size={14} /> Shape
+          </button>
+          <button type="button" className="secondary" title="Add an image layer" onClick={() => addLayer("image")}>
+            <ImageIcon size={14} /> Image
+          </button>
+        </div>
+        <IconToggleGroup
+          value={customBeat.theme}
+          onChange={(theme: ThemeVariant) => onChangeBeat({ ...customBeat, theme })}
+          options={[
+            { value: "light", label: "Light theme", icon: <Sun size={14} /> },
+            { value: "dark", label: "Dark theme", icon: <Moon size={14} /> },
+          ]}
+        />
+        <Knob
+          label="secs"
+          value={Math.round((customBeat.durationInFrames / fps) * 10) / 10}
+          min={0.5}
+          max={20}
+          step={0.1}
+          sensitivity={0.1}
+          format={(v) => `${v.toFixed(1)}s`}
+          onChange={(v) => onChangeBeat({ ...customBeat, durationInFrames: Math.round(v * fps) })}
+        />
+      </div>
+
+      <div className="graph-body">
+        <div className="graph-canvas-wrap">
+          <div style={{ height: 360, border: "1px solid var(--border)", borderRadius: 10, background: "var(--bg)" }}>
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onConnectEnd={onConnectEnd}
+              nodeTypes={nodeTypes}
+              onNodeClick={(_e, node) => {
+                if (node.type === "layer") onSelectLayer(node.id);
+              }}
+              onNodesDelete={(deleted) => {
+                for (const n of deleted) if (n.type === "layer") deleteLayer(n.id);
+              }}
+              deleteKeyCode={["Backspace", "Delete"]}
+              fitView
+            >
+              <Background />
+              <Controls showInteractive={false} />
+            </ReactFlow>
+          </div>
+          <p className="hint" style={{ marginTop: 6, marginBottom: 0 }}>
+            Drag a field's dot onto a layer's dot to bind it, or drop it on empty space to add a new bound layer. Select
+            a layer to edit it; Delete/Backspace removes it.
+          </p>
+        </div>
+
+        {selectedLayer && (
+          <LayerPropertyPanel layer={selectedLayer} dataFields={dataSource?.fields ?? []} fps={fps} onChange={(l) => updateLayer(selectedLayer.id, l)} onDelete={() => deleteLayer(selectedLayer.id)} />
+        )}
       </div>
     </div>
   );

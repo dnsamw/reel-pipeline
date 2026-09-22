@@ -758,3 +758,167 @@ th {
     max-width: 220px;
   }
 }
+
+/* --- Knob --- */
+
+.knob {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  position: relative;
+  width: 52px;
+}
+
+.knob-dial {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--bg-soft);
+  border: 2px solid var(--border);
+  position: relative;
+  cursor: ns-resize;
+  touch-action: none;
+  flex: none;
+}
+
+.knob-dial.knob-dragging {
+  border-color: var(--primary);
+}
+
+.knob-indicator {
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  width: 2px;
+  height: 12px;
+  background: var(--primary);
+  transform-origin: 1px 15px;
+  margin-left: -1px;
+  pointer-events: none;
+}
+
+.knob-label {
+  font-size: 9px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.knob-value-bubble {
+  position: absolute;
+  top: -22px;
+  background: var(--fg);
+  color: white;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* --- Icon toggle group --- */
+
+.icon-toggle-group {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.icon-toggle {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-toggle.active {
+  background: var(--primary);
+  color: white;
+}
+
+.icon-toggle:not(.active):hover {
+  background: var(--border);
+}
+
+/* --- Graph panel: toolbar + node property panel --- */
+
+.graph-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.graph-toolbar-add {
+  display: flex;
+  gap: 4px;
+}
+
+.graph-toolbar-add button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.graph-body {
+  display: flex;
+  gap: 12px;
+}
+
+.graph-canvas-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.node-property-panel {
+  flex: none;
+  width: 220px;
+  border-left: 1px solid var(--border);
+  padding-left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.node-property-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.node-property-row label {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* --- Floating live preview --- */
+
+.floating-preview {
+  position: fixed;
+  top: 88px;
+  right: 16px;
+  width: 220px;
+  z-index: 40;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+  max-height: calc(100vh - 104px);
+  overflow-y: auto;
+}

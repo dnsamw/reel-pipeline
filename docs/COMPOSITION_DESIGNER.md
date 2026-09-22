@@ -435,3 +435,55 @@ pattern hit twice earlier in this project's Playwright verifications); selecting
 editable fields and the Show/Hide-in-preview toggle; saving through the real `POST /api/recipes`
 succeeds with zero console errors. `renderBatch.ts`/`manifest.ts`/`batch.ts`/`getPhrases.ts` are
 untouched (empty `git diff`) - rendering and rendered/not-rendered tracking work exactly as before.
+
+## Graph-centric editing: DAW/video-editor conventions instead of a web form
+
+Still more feedback after the Timeline/Graph/Inspector rebuild landed ("now that's more like it, but
+not exactly what I want"): reclaim horizontal space for the data-binding graph (clarified: "canvas" in
+this round of feedback means the graph - "the one that looks like ComfyUI" - not the spatial
+`LayerCanvas.tsx`, which wasn't part of this feedback and stayed untouched), replace labeled
+input-field rows with compact icon/knob controls, add layers from a toolbar instead of a button
+buried in a form, edit/delete a layer right where it lives instead of in a separate column, and float
+the live preview so it doesn't force scrolling to check it.
+
+**`Knob.tsx`** (new) - a DJ-console-style control: drag vertically to change a numeric value, an
+indicator line sweeps -135deg to +135deg across the value's range, a tooltip/drag-bubble shows the
+exact number. Plain pointer events, same technique as every other drag interaction in this project
+(`LayerCanvas.tsx`, `Timeline.tsx`, `DataGraph.tsx`'s wires) - no new dependency for something this
+simple. **`IconToggleGroup.tsx`** (new) - a row of icon buttons (one active, each with a tooltip),
+the compact replacement for a labeled `<select>` on enum fields (align, font, shape, color/text
+source, animation type). Both are generic/reusable, not specific to layers.
+
+**`DataGraph.tsx`** absorbed everything `Inspector.tsx` used to show for a `custom` beat's layers:
+- A toolbar (Text/Shape/Image icon buttons) at the top adds a new layer node directly, auto-selected.
+- The beat's own theme (icon-toggle Sun/Moon) and duration (a Knob, in seconds) sit next to the
+  toolbar - the whole "editing this custom beat" experience lives in one card now.
+- Clicking a layer node opens `LayerPropertyPanel.tsx` beside the canvas (docked to the graph card's
+  side, not trying to track the node's exact pan/zoom screen position - fragile, and not what was
+  asked for) - Knobs for `fontSizePx`/`fontWeight`/`strokeWidthPx`/`cornerRadiusPx`/animation
+  duration-delay-fromScale, `IconToggleGroup`s for `align`/`font`/shape/`text source`/`color
+  source`/animation type. A few fields genuinely can't be a knob or icon (literal text content, a hex
+  color, an uploaded file) and stay as a plain, unlabeled input with a tooltip - matching the "icons
+  and tooltips, not labeled rows" spirit without forcing a bad fit.
+- Deleting a layer happens in the graph itself - Delete/Backspace on a selected node (React Flow's
+  native `onNodesDelete`) or a trash icon in the property panel.
+
+**`Inspector.tsx`** shrank to only what has no layer/node metaphor: Intro/Outro (theme, voice,
+literal-text toggle - unchanged content) and non-`custom` beat kinds (`guessReveal`'s theme/
+direction, or nothing to configure). `RecipeEditor.tsx` doesn't even mount it when a `custom` beat is
+selected - instead it shows `DataGraph` and `LayerCanvas` side by side, full width, since both are
+now genuinely interactive canvases with nothing left for a form column to add. That's what actually
+reclaims the horizontal space - not the sidebar collapse alone.
+
+**Live preview** is now `position: fixed`, top-right, still toggled by the existing show/hide button
+- verified to hold its screen position through a 600px scroll rather than being pushed down the page.
+
+Verified via Playwright against the real dev server (with deliberately slow, multi-step pointer
+moves this round - single fast `mouse.move` jumps produced two false-negative "didn't move" readings
+earlier in this project, not real bugs): adding a Shape layer via the toolbar creates a second graph
+node and opens its property panel; dragging the beat-duration Knob changes the Timeline block's real
+width; dragging a Knob in the property panel doesn't crash; clicking a shape-type icon-toggle updates
+the field; the trash icon removes a layer node; selecting Intro shows Inspector (with the Graph
+toolbar correctly absent) instead of the Graph+LayerCanvas pair; saving through the real
+`POST /api/recipes` succeeds with zero console errors. `git diff --stat` on
+`src/render`/`LayerRenderer.tsx` is empty - this round touched only the GUI layout/interaction layer.
