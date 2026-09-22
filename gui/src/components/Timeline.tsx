@@ -1,5 +1,7 @@
 import { useRef, useState } from "react";
+import { GripVertical } from "lucide-react";
 import { buildTimelineFromRecipe } from "../../../src/compositions/recipe/timeline";
+import { boundDataField, layerLabel } from "../lib/layerDefaults";
 import type { CompositionRecipe, CustomBeat, Layer, PerPhraseBeat, ReelConfig } from "../types";
 
 /**
@@ -40,7 +42,10 @@ const BEAT_KIND_LABEL: Record<PerPhraseBeat["kind"], string> = {
 };
 
 type BeatDrag = { kind: "move" | "resize"; index: number; startX: number; startDurationInFrames: number } | null;
-type LayerDrag = { kind: "move" | "resize"; layerId: string; startX: number; startFrame: number; startDurationFrames: number } | null;
+type LayerDrag =
+  | { kind: "move" | "resize"; layerId: string; startX: number; startFrame: number; startDurationFrames: number }
+  | { kind: "reorder"; layerId: string; startY: number; index: number }
+  | null;
 
 export function Timeline({
   recipe,
@@ -254,8 +259,40 @@ function LayersTrack({
     setDrag({ kind: "resize", layerId: layer.id, startX: e.clientX, startFrame: start, startDurationFrames: duration });
   }
 
+  // Row reorder (vertical) - swaps this layer's position in beat.layers,
+  // which is also what determines both the Graph's numbering and z-index.
+  // Maps the cursor's current absolute position to a target row (same
+  // "drop wherever the cursor is" scheme as the Beats track's own reorder
+  // above), not an incremental delta - a delta-from-last-swap scheme
+  // over/under-fires when a single drag motion arrives as several pointer
+  // move events, since each swap resets the reference point mid-gesture.
+  const ROW_HEIGHT = 38;
+  const rowsRef = useRef<HTMLDivElement>(null);
+
+  function startReorder(layer: Layer, index: number, e: React.PointerEvent) {
+    e.stopPropagation();
+    (e.target as Element).setPointerCapture(e.pointerId);
+    onSelectLayer(layer.id);
+    setDrag({ kind: "reorder", layerId: layer.id, startY: e.clientY, index });
+  }
+
   function onPointerMove(e: React.PointerEvent) {
     if (!drag) return;
+
+    if (drag.kind === "reorder") {
+      const rowsTop = rowsRef.current?.getBoundingClientRect().top ?? 0;
+      const relY = e.clientY - rowsTop;
+      const target = Math.max(0, Math.min(beat.layers.length - 1, Math.floor(relY / ROW_HEIGHT)));
+      if (target !== drag.index) {
+        const next = [...beat.layers];
+        const [moved] = next.splice(drag.index, 1);
+        next.splice(target, 0, moved);
+        onChangeBeat({ ...beat, layers: next });
+        setDrag({ ...drag, index: target });
+      }
+      return;
+    }
+
     const deltaFrames = Math.round((e.clientX - drag.startX) / pxPerFrame);
     const layer = beat.layers.find((l) => l.id === drag.layerId);
     if (!layer) return;
@@ -279,21 +316,28 @@ function LayersTrack({
   return (
     <div style={{ marginTop: 10 }}>
       <div className="hint" style={{ marginBottom: 4 }}>
-        Layers in beat {beatIndex + 1} - drag to move, drag the edge to trim
+        Layers in beat {beatIndex + 1} - drag the grip to reorder, drag to move, drag the edge to trim
       </div>
-      <div onPointerMove={onPointerMove} onPointerUp={endDrag} onPointerCancel={endDrag} style={{ position: "relative", paddingLeft: offsetPx, touchAction: "none" }}>
-        {beat.layers.map((layer) => {
+      <div ref={rowsRef} onPointerMove={onPointerMove} onPointerUp={endDrag} onPointerCancel={endDrag} style={{ position: "relative", paddingLeft: offsetPx, touchAction: "none" }}>
+        {beat.layers.map((layer, i) => {
           const start = layer.timing?.startFrame ?? 0;
           const duration = layer.timing?.durationFrames ?? beat.durationInFrames - start;
           const selected = selectedLayerId === layer.id;
+          const bound = boundDataField(layer);
           return (
             <div key={layer.id} style={{ position: "relative", height: 34, marginBottom: 4 }}>
               <div
                 onPointerDown={(e) => startMove(layer, e)}
-                className={`timeline-block${selected ? " timeline-block-selected" : ""}`}
+                className={`timeline-block timeline-block-layer${selected ? " timeline-block-selected" : ""}${drag?.kind === "reorder" && drag.layerId === layer.id ? " timeline-block-dragging" : ""}`}
                 style={{ position: "absolute", left: start * pxPerFrame, width: duration * pxPerFrame, height: 34, background: "var(--muted)" }}
               >
-                {layer.kind}
+                <div onPointerDown={(e) => startReorder(layer, i, e)} className="timeline-reorder-handle" title="Drag to reorder">
+                  <GripVertical size={12} />
+                </div>
+                <span className="timeline-block-label">
+                  {layerLabel(layer, i)}
+                  {bound ? ` (${bound})` : ""}
+                </span>
                 <div onPointerDown={(e) => startResize(layer, e)} className="timeline-resize-handle" title="Drag to trim" />
               </div>
             </div>

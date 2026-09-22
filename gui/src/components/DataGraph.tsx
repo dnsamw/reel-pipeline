@@ -3,7 +3,7 @@ import { ReactFlow, Background, Controls, Handle, Position, addEdge, useEdgesSta
 import type { Connection, Edge, Node, NodeProps, OnConnectEnd } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Image as ImageIcon, Info, Moon, Settings, Square, Sun, Type } from "lucide-react";
-import { contentForKind, defaultAnimation, defaultBox, newLayerId } from "../lib/layerDefaults";
+import { boundDataField, contentForKind, defaultAnimation, defaultBox, layerLabel, newLayerId } from "../lib/layerDefaults";
 import { Knob } from "./Knob";
 import { IconToggleGroup } from "./IconToggleGroup";
 import { LayerPropertyPanel } from "./LayerPropertyPanel";
@@ -67,11 +67,7 @@ function LayerNodeComponent({ data }: NodeProps) {
 
 const nodeTypes = { dataSource: DataSourceNodeComponent, layer: LayerNodeComponent };
 
-function layerLabel(layer: Layer, index: number): string {
-  return `${index + 1}. ${layer.kind}`;
-}
-
-type PanelAnchor = { layerId: string; x: number; y: number };
+type PanelAnchor = { x: number; y: number };
 
 // Clamps a floating panel's anchor - given in coordinates local to the
 // workspace container (FloatingPanel's own coordinate space) - so it stays
@@ -145,13 +141,21 @@ export function DataGraph({
         data: {
           label: layerLabel(layer, i),
           kind: layer.kind,
-          bound: layer.kind === "text" && layer.text.source === "dataField" ? layer.text.field : null,
+          bound: boundDataField(layer),
           selected: layer.id === selectedLayerId,
-          propertiesActive: layer.id === propertiesFor?.layerId,
+          // Active only for the currently *selected* node, not whichever
+          // node's gear was last clicked - the panel now always shows
+          // whatever's selected, so its "open" indicator should follow too.
+          propertiesActive: layer.id === selectedLayerId && !!propertiesFor,
           onOpenProperties: (e: React.MouseEvent) => {
             e.stopPropagation();
+            const alreadyOpenForThis = layer.id === selectedLayerId && !!propertiesFor;
             onSelectLayer(layer.id);
-            setPropertiesFor((cur) => (cur?.layerId === layer.id ? null : { layerId: layer.id, ...anchorFromEvent(e, 560, 560) }));
+            // Closing only happens when re-clicking the gear of the node
+            // that's already showing - clicking a *different* node's gear
+            // while the panel is open just retargets its content in place
+            // (keeps the existing anchor) instead of jumping to the new node.
+            setPropertiesFor(alreadyOpenForThis ? null : (propertiesFor ?? anchorFromEvent(e, 620, 560)));
           },
         },
       };
@@ -222,7 +226,6 @@ export function DataGraph({
     if (!customBeat || customBeat.layers.length <= 1) return;
     onChangeBeat({ ...customBeat, layers: customBeat.layers.filter((l) => l.id !== layerId) });
     if (selectedLayerId === layerId) onSelectLayer(null);
-    if (propertiesFor?.layerId === layerId) setPropertiesFor(null);
   }
 
   function updateLayer(layerId: string, layer: Layer) {
@@ -239,7 +242,11 @@ export function DataGraph({
   }
 
   const selectedLayer = customBeat.layers.find((l) => l.id === selectedLayerId) ?? null;
-  const propertiesLayer = propertiesFor && selectedLayer?.id === propertiesFor.layerId ? selectedLayer : null;
+  // The panel always shows whichever layer is currently *selected* - not a
+  // remembered layer id - so selecting a different one (a plain node click,
+  // or clicking a different element on the Position canvas itself) retargets
+  // its content in place instead of the panel disappearing.
+  const propertiesLayer = propertiesFor ? selectedLayer : null;
 
   return (
     <div ref={wrapperRef} style={{ position: "absolute", inset: 0 }}>
@@ -302,11 +309,10 @@ export function DataGraph({
 
       {propertiesLayer && propertiesFor && (
         <FloatingPanel
-          key={propertiesLayer.id}
           title={`Layer: ${propertiesLayer.kind}`}
           defaultX={propertiesFor.x}
           defaultY={propertiesFor.y}
-          width={560}
+          width={620}
           maxHeight={window.innerHeight - 140}
           onClose={() => setPropertiesFor(null)}
         >

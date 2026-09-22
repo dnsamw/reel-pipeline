@@ -668,3 +668,55 @@ it (count back to 0); after adding 8 layers to a beat, `.timeline-dock-body`'s `
 exceeds its `clientHeight` (281px) - confirmed scrollable, not just overflowing; dragging the resize
 handle upward grew the dock's real bounding-box height. `git diff --stat` on
 `src/render`/`LayerRenderer.tsx` is empty - this round touched only the GUI layout/interaction layer.
+
+## Side-by-side layout, panel-follows-selection fix, matching Timeline labels, layer reorder
+
+Four more refinements from the same feedback round:
+
+**Position and Layer properties sit side by side** in the merged panel now (Position/`LayerCanvas`
+in a fixed 240px-wide left column with a border-right divider, property knobs filling the rest) -
+the earlier stacked layout made the single merged panel too tall; this matches the two-panel
+side-by-side arrangement from before the merge, just inside one panel/one gear toggle. The panel
+also grew from 320px to 620px wide to fit both comfortably, and the Position canvas itself is
+noticeably bigger (240px vs. the old 190px column).
+
+**Fixed: the merged panel used to disappear** when selecting a different layer while it was open -
+for example opening it via one node's gear icon, then clicking a *different* layer's box inside the
+Position canvas itself. Root cause: the panel's content was gated on `propertiesFor.layerId ===
+selectedLayer.id`, a specific remembered layer id set only when a gear icon was clicked - any other
+way of changing the selection (clicking a different element in the Position canvas, clicking a
+different node's body on the graph) left that remembered id stale, so the equality check failed and
+the panel's content vanished. Fixed by dropping the remembered id entirely: `propertiesFor` now only
+tracks whether the panel is open and where it's anchored; its content is always whichever layer is
+currently *selected*. Clicking a different node's gear while the panel is already open now retargets
+it in place (keeps the current anchor, just swaps content) rather than jumping to a new position;
+re-clicking the gear of the node it's *currently* showing is what closes it. This also generalized
+the fix to every other way selection can change (Timeline layer clicks, plain graph node clicks) -
+same underlying mismatch, same fix.
+
+**Timeline layer rows now show the same name as their Graph node** - `layerLabel(layer, index)` (`"1.
+text"`, `"2. shape"`, ...) moved out of `DataGraph.tsx` into `lib/layerDefaults.ts` so both consumers
+stay in sync automatically instead of duplicating the format. A layer bound to a data field also
+shows the field name in parentheses in the Timeline row (`"1. text (phrase)"`) via a new shared
+`boundDataField()` helper (also now used for the Graph node's own "← field" hint, replacing a third
+copy of the same source/field check).
+
+**Layers can be reordered by dragging**, DAW/NLE-style - a small grip handle
+(`GripVertical`) on the left edge of each Timeline layer row starts a vertical drag distinct from the
+existing horizontal move (which still works from anywhere else on the block); dropping re-splices
+`beat.layers` to the row currently under the cursor. This is a real reorder of the underlying array -
+it's also what the Graph numbers and z-index derive from, so dragging "2. shape" above "1. text" in
+the Timeline renumbers and re-stacks it in the Graph too. Implemented the same way the Beats track's
+own reorder already works - mapping the cursor's *absolute* position to a target row via the rows
+container's `getBoundingClientRect()`, not an incremental delta from the last swap. The delta approach
+was tried first and over-fired: a single drag motion arrives as several pointer-move events, and
+resetting the reference point after each swap meant more than one swap could trigger from what should
+have been a single one-row move (verified concretely: a 42px drag - just past one 38px row - moved a
+layer two rows instead of one, until switched to the absolute-position scheme).
+
+Verified via Playwright: clicking a different element in the Position canvas while the panel is open
+keeps it open and showing the new layer's properties (previously: panel count dropped to 0); Timeline
+labels read `"1. text"`, `"2. shape"`, `"3. image"` matching the Graph's own node titles; dragging
+layer 1's grip down past row 2 resulted in exactly one swap (`text, shape, image` →
+`shape, text, image`) confirmed both in the Timeline's labels and the Graph's node titles. `git diff
+--stat` on `src/render`/`LayerRenderer.tsx` is empty.

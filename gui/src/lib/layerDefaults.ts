@@ -27,3 +27,13 @@ export function contentForKind(kind: Layer["kind"], box: LayerBox, animation: An
 export function defaultLayer(): Layer {
   return contentForKind("text", defaultBox(), defaultAnimation(), newLayerId());
 }
+
+// Shared between DataGraph.tsx's node labels and Timeline.tsx's layer-track
+// rows so a layer reads as the same thing in both places.
+export function layerLabel(layer: Layer, index: number): string {
+  return `${index + 1}. ${layer.kind}`;
+}
+
+export function boundDataField(layer: Layer): string | null {
+  return layer.kind === "text" && layer.text.source === "dataField" ? layer.text.field : null;
+}
