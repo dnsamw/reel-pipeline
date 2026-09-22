@@ -130,16 +130,17 @@ Two ways to render from the GUI:
 
 **Recipes page** — which scenes a "Composition" choice actually sequences (intro → a repeating per-phrase
 unit → outro), as data instead of one hand-written React component per composition. The 3 built-ins
-(Classic/Side-by-side/Reversed) are read-only; create a custom one by picking beats (phrase/countdown/reveal/
-guess-and-reveal, in any order/count) with a live preview, same save/edit/push-to-git flow as template color
-presets. One beat kind, **Custom**, goes further — instead of one of the fixed scene layouts, it's a stack of
-positioned text/shape/image layers (position, size, color, animation) you arrange by dragging/resizing/
-rotating on a canvas (plus a form for text/color/animation fields), no code needed for a new visual
-arrangement of that beat's content. A text layer's content can be bound to a data field (phrase,
-Sinhala meaning, pronunciation, explanation...) by dragging it from a small node-graph view onto the
-layer, instead of picking from a dropdown — built against a registry (`src/data/dataSources.ts`) so
-more data models beyond phrases can be added later without changing the editor. A custom recipe is
-fully renderable, not just previewable — pick it anywhere a "Composition" is chosen. See
+(Classic/Side-by-side/Reversed) are read-only; create a custom one on a canvas-style editor: a
+multi-track **Timeline** (drag beats to reorder, resize a Custom beat's duration; select one to see its
+layers as their own track underneath, each independently trimmable) drives a **Graph** panel (a real
+node/wire canvas — drag a data field, like phrase/Sinhala meaning/pronunciation/explanation, onto a
+text layer to bind it, scoped to whichever beat is selected) and an **Inspector** panel (every other
+field — position/size/rotation/color/font/animation/shape — for exactly whatever's selected, one thing
+at a time). One beat kind, **Custom**, is what unlocks all this — instead of one of the fixed scene
+layouts, it's a stack of positioned text/shape/image layers with no code needed for a new visual
+arrangement. Data bindings are matched against a registry (`src/data/dataSources.ts`) so more data
+models beyond phrases can be added later without changing the editor. A custom recipe is fully
+renderable, not just previewable — pick it anywhere a "Composition" is chosen. See
 [docs/COMPOSITION_DESIGNER.md](docs/COMPOSITION_DESIGNER.md) for the full design.
 
 **Settings page** — GUI-wide defaults (durations/volumes/TTS/colors/copy, plus the default composition and

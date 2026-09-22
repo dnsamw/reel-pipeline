@@ -4,11 +4,12 @@ import type { Anchor, CustomBeat, Layer, LayerBox } from "../types";
 /**
  * Phase 3 of docs/COMPOSITION_DESIGNER.md's layer-designer plan: drag to
  * move, a corner handle to resize, a top handle to rotate - directly on a
- * scaled-down 1080x1920 canvas, instead of only the typed %-number fields
- * in LayerEditor.tsx (which stays alongside this for font/color/animation/
- * text-source, none of which a mouse is a better input for). Plain pointer
- * events, no drag library - the math is simple enough (percent-of-canvas
- * deltas) that one wasn't worth adding as a dependency.
+ * scaled-down 1080x1920 canvas, instead of only typed %-number fields.
+ * Lives inside Inspector.tsx, which shows the typed fields (font/color/
+ * animation/text-source, none of which a mouse is a better input for) for
+ * whichever layer is selected here. Plain pointer events, no drag library -
+ * the math is simple enough (percent-of-canvas deltas) that one wasn't
+ * worth adding as a dependency.
  */
 
 // Mirrors LayerRenderer.tsx's anchorOffset table exactly - if the two ever

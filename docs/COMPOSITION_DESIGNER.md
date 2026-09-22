@@ -367,3 +367,71 @@ flipped), saved through the real `POST /api/recipes` - zero console errors. A re
 render via `Reel-Custom` with two `dataField`-bound layers (`explanation`, `pronunciationSi`)
 confirmed the renamed binding still resolves correctly in the actual production renderer, not just
 the browser preview.
+
+## The canvas-style rebuild: multi-track timeline + a real node-graph library
+
+The vertical stacked-card editor and the hand-rolled data-binding graph above were both real, working
+features - and both still got real user feedback that they were confusing, and that the graph
+specifically didn't read as "node-graph" at all. Rather than iterate blind a third time, two throwaway
+evaluation spikes were built and shown to the user before committing to a rebuild: one on
+`@xyflow/react` (React Flow - MIT, actively maintained; the library ComfyUI-style tools are actually
+built on) for the graph feel, one on plain pointer events (the same technique already proven in
+`LayerCanvas.tsx`) for a real timeline feel. Both were approved, and only then was the full page
+rebuilt around them - see the two "AskUserQuestion" decisions in the project history: **structured**
+graph/timeline (beats stay in their existing array order; only data bindings are free wires) over a
+true free-form ComfyUI clone, and **stay in this Vite+Express project** over a Next.js rewrite (the
+render pipeline/data layer were never the problem - library choice inside the editor was).
+
+**Per-layer timing, the data-model change that makes "multi-track" real:** `layers/schema.ts`'s three
+layer kinds gained an optional `timing: { startFrame, durationFrames }` - omitted means "spans the
+whole beat" (the only behavior that existed before), so nothing stored anywhere needed to change.
+`LayerRenderer.tsx`'s `LayerView` computes a layer-local frame/duration from this and returns `null`
+outside the window, feeding the local values into the existing enter/exit animation math. Verified
+with a real production still render at two frames: a layer trimmed to frames 45-89 of a 90-frame beat
+is absent before frame 45 and present after, in the actual `Reel-Custom` output.
+
+**`Timeline.tsx`** (new) - the primary navigation surface, replacing the old vertical beat-card list:
+- **Beats track**: one block per `perPhraseBeats[i]` plus fixed Intro/Outro end-caps, widths from the
+  real `buildTimelineFromRecipe` (the same function the actual renderer uses) with `batchSize=1`, so
+  the timeline never drifts from what actually renders. Drag to reorder (a real array splice, not
+  adjacent-swap), drag the right edge to resize - only `custom` beats have their own
+  `durationInFrames` to resize (others derive duration from shared config, the same constraint that
+  already existed).
+- **Layers track**: appears only under the selected `custom` beat, one row per layer, driven by its
+  new `timing` field - drag moves `startFrame`, drag the edge resizes `durationFrames`. A layer with
+  no room to move (its trim already spans the whole beat) correctly can't be dragged until it's been
+  shrunk first - not a bug, the same constraint a real video editor's full-width clip has.
+
+**`DataGraph.tsx`** rebuilt on real React Flow nodes/handles/edges instead of hand-rolled pointer/SVG
+math, and re-scoped to *only the selected beat's layers* (not the whole recipe at once, which
+`Timeline.tsx` already shows) - real pan/zoom/minimap, real connectable handles. Dragging a field's
+handle onto a text layer's handle binds it (`onConnect`); dropping on empty canvas creates a new bound
+layer there (`onConnectEnd`, checking `connectionState.isValid`).
+
+**`Inspector.tsx`** (new, absorbing `LayerEditor.tsx`'s retired form) - fields for exactly whatever the
+shared `selection` (`{ beatIndex: number | "intro" | "outro" | null, layerId }`) points at: one beat's
+kind-specific options, one layer's full field set, or Intro/Outro's own theme/voice/text fields (a real
+gap caught during the rebuild - the first draft dropped Intro/Outro editing entirely by only reusing
+the old per-phrase-beat card content). Exactly one thing's fields show at a time - no more scrolling
+past a growing stack of cards. `LayerCanvas.tsx` (spatial drag/resize/rotate, internals untouched)
+lives inside this panel, scoped to the selected beat.
+
+**Sidebar**: collapsible to an icon-only rail (`lucide-react`, ISC-licensed), state in `localStorage`
+(a per-viewer convenience, never authoritative - same discipline as every other browser-storage use in
+this GUI).
+
+**What this deliberately doesn't build yet** (flagged by the user as upcoming, not immediate): a
+richer animation-curve editor beyond the current fade/slide/scaleSpring set, sound FX bound to a
+transition, transition types beyond the current single fixed crossfade-before-outro. Nothing here
+blocks adding them later.
+
+Verified end-to-end via Playwright against the real dev server: sidebar collapse persists across a
+reload; adding and selecting a beat, switching its kind to Custom, shows the Layers track and scopes
+the Graph panel; resizing a beat block and (after first shrinking a layer to make room) moving a layer
+block both update real `durationInFrames`/`timing` state; a real React Flow drag-connect binds a field
+to a layer (confirmed via `Playwright`'s `dragTo`, after raw synthesized coordinates twice missed the
+handle's exact hit-area by a few pixels - a test-precision artifact, not a product bug, the same
+pattern hit twice earlier in this project's Playwright verifications); selecting Intro shows its real
+editable fields and the Show/Hide-in-preview toggle; saving through the real `POST /api/recipes`
+succeeds with zero console errors. `renderBatch.ts`/`manifest.ts`/`batch.ts`/`getPhrases.ts` are
+untouched (empty `git diff`) - rendering and rendered/not-rendered tracking work exactly as before.

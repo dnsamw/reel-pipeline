@@ -41,12 +41,41 @@ body {
   top: 0;
   height: 100vh;
   overflow-y: auto;
+  transition: width 0.15s ease;
+}
+
+.app-sidebar.collapsed {
+  width: 60px;
+  padding: 20px 10px;
+}
+
+.app-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .app-sidebar .brand {
   font-weight: 700;
   font-size: 17px;
   padding: 0 10px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sidebar-toggle {
+  background: transparent;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  flex: none;
+}
+
+.sidebar-toggle:hover {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .app-sidebar nav {
@@ -56,12 +85,30 @@ body {
 }
 
 .app-sidebar nav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   color: rgba(255, 255, 255, 0.8);
   text-decoration: none;
   font-size: 14px;
   padding: 10px 12px;
   border-radius: 6px;
   border-left: 3px solid transparent;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.app-sidebar nav a svg {
+  flex: none;
+}
+
+.app-sidebar.collapsed nav a {
+  justify-content: center;
+  padding: 10px;
+}
+
+.app-sidebar.collapsed .nav-label {
+  display: none;
 }
 
 .app-sidebar nav a.active,
@@ -563,6 +610,41 @@ th {
   font-size: 13px;
   margin-bottom: 4px;
   display: block;
+}
+
+.timeline-block {
+  position: relative;
+  flex: none;
+  height: 56px;
+  color: white;
+  font-size: 12px;
+  padding: 6px 8px;
+  border-right: 2px solid var(--bg);
+  cursor: grab;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  touch-action: none;
+}
+
+.timeline-block-fixed {
+  background: var(--muted);
+  cursor: pointer;
+}
+
+.timeline-block-selected {
+  outline: 2px solid var(--fg);
+  outline-offset: -2px;
+}
+
+.timeline-resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+  background: rgba(0, 0, 0, 0.25);
 }
 
 .review-layout {

@@ -1,50 +1,23 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { ReelPreview } from "../components/ReelPreview";
-import { LayerEditor } from "../components/LayerEditor";
+import { Timeline, type Selection } from "../components/Timeline";
 import { DataGraph } from "../components/DataGraph";
-import type { CompositionRecipe, CustomBeat, DataSourceDescriptor, GuessRevealField, IntroBeat, OutroBeat, PerPhraseBeat, RecipeRecord, ReelConfig, ThemeVariant } from "../types";
-
-const BEAT_KIND_LABEL: Record<PerPhraseBeat["kind"], string> = {
-  phrase: "Phrase",
-  countdown: "Countdown",
-  reveal: "Reveal",
-  guessReveal: "Guess + Reveal (combined)",
-  custom: "Custom (layers)",
-};
-
-function defaultCustomBeat(): CustomBeat {
-  return {
-    kind: "custom",
-    theme: "light",
-    durationInFrames: 90,
-    layers: [
-      {
-        kind: "text",
-        id: `layer-${Math.random().toString(36).slice(2, 9)}`,
-        box: { position: { xPct: 50, yPct: 50 }, anchor: "center", widthPct: 70, rotationDeg: 0, zIndex: 1 },
-        text: { source: "dataField", field: "phrase" },
-        font: "sans",
-        fontSizePx: 56,
-        fontWeight: 700,
-        color: { source: "theme", token: "foreground" },
-        align: "center",
-        animation: { enter: { type: "fade", durationInFrames: 15 }, exit: { type: "none" }, delayFrames: 0 },
-      },
-    ],
-  };
-}
-
-function defaultBeat(kind: PerPhraseBeat["kind"]): PerPhraseBeat {
-  if (kind === "guessReveal") return { kind, theme: "light", prompt: "phrase", answer: "translationSi" };
-  if (kind === "custom") return defaultCustomBeat();
-  return { kind };
-}
+import { Inspector, defaultBeat } from "../components/Inspector";
+import type { CompositionRecipe, DataSourceDescriptor, IntroBeat, OutroBeat, PerPhraseBeat, RecipeRecord, ReelConfig } from "../types";
 
 const DEFAULT_INTRO: IntroBeat = { kind: "intro", theme: "light", text: { source: "config.introText" }, introVoiceKeyword: "sinhala" };
 const DEFAULT_OUTRO: OutroBeat = { kind: "outro", theme: "dark" };
 
+/**
+ * Canvas-style rebuild - replaces the old vertical stacked-card form with
+ * one screen: a Timeline (primary navigation/sequencing, multi-track),
+ * a Graph (data-binding, scoped to the selected beat), and an Inspector
+ * (fields for exactly the current selection). All three read/write the same
+ * `perPhraseBeats` state and a single shared `selection`, kept in sync with
+ * the live preview's focus. See docs/COMPOSITION_DESIGNER.md.
+ */
 export function RecipeEditor() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
@@ -59,11 +32,9 @@ export function RecipeEditor() {
   const [intro, setIntro] = useState<IntroBeat>(DEFAULT_INTRO);
   const [perPhraseBeats, setPerPhraseBeats] = useState<PerPhraseBeat[]>([defaultBeat("phrase")]);
   const [outro, setOutro] = useState<OutroBeat>(DEFAULT_OUTRO);
-  // Collapsed by default - while working on per-phrase beat layouts, intro/outro
-  // are usually untouched and just add scrolling; expand only when needed.
-  const [introOpen, setIntroOpen] = useState(false);
-  const [outroOpen, setOutroOpen] = useState(false);
-  const [previewBeatIndex, setPreviewBeatIndex] = useState<number | null>(null);
+  const [introOpen, setIntroOpen] = useState(true);
+  const [outroOpen, setOutroOpen] = useState(true);
+  const [selection, setSelection] = useState<Selection>({ beatIndex: null, layerId: null });
 
   const [builtin, setBuiltin] = useState(false);
   const [defaults, setDefaults] = useState<ReelConfig | null>(null);
@@ -72,7 +43,7 @@ export function RecipeEditor() {
   const [savedId, setSavedId] = useState<string | null>(isNew ? null : id ?? null);
   const [saving, setSaving] = useState(false);
   const [pushing, setPushing] = useState(false);
-  const beatCardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const [previewOpen, setPreviewOpen] = useState(true);
 
   function applyRecord(r: RecipeRecord | CompositionRecipe) {
     setName("name" in r ? r.name : "");
@@ -81,6 +52,7 @@ export function RecipeEditor() {
     setIntro(r.intro);
     setPerPhraseBeats(r.perPhraseBeats);
     setOutro(r.outro);
+    setSelection({ beatIndex: null, layerId: null });
   }
 
   useEffect(() => {
@@ -109,26 +81,28 @@ export function RecipeEditor() {
     setPerPhraseBeats((cur) => cur.map((b, i) => (i === index ? beat : b)));
   }
 
-  function moveBeat(index: number, delta: -1 | 1) {
-    const target = index + delta;
-    if (target < 0 || target >= perPhraseBeats.length) return;
+  function reorderBeat(from: number, to: number) {
+    if (from === to) return;
     setPerPhraseBeats((cur) => {
       const next = [...cur];
-      [next[index], next[target]] = [next[target], next[index]];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
       return next;
     });
-    setPreviewBeatIndex((cur) => (cur === index ? target : cur === target ? index : cur));
+    setSelection((cur) => (cur.beatIndex === from ? { ...cur, beatIndex: to } : cur));
   }
 
   function removeBeat(index: number) {
     setPerPhraseBeats((cur) => (cur.length <= 1 ? cur : cur.filter((_, i) => i !== index)));
-    setPreviewBeatIndex((cur) => (cur == null ? cur : cur === index ? null : cur > index ? cur - 1 : cur));
+    setSelection((cur) => (cur.beatIndex === index ? { beatIndex: null, layerId: null } : cur));
   }
 
-  /** DataGraph.tsx's node clicks go through here - sets the live-preview focus (same as "Preview this beat") and scrolls the matching form card into view, so the graph, the form, and the preview stay one navigation, not three. */
-  function selectBeat(index: number) {
-    setPreviewBeatIndex(index);
-    beatCardRefs.current.get(index)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  function selectBeat(index: number | "intro" | "outro") {
+    setSelection({ beatIndex: index, layerId: null });
+  }
+
+  function selectLayer(beatIndex: number, layerId: string | null) {
+    setSelection({ beatIndex, layerId });
   }
 
   async function onSave(e: React.FormEvent) {
@@ -176,261 +150,127 @@ export function RecipeEditor() {
   };
 
   const activeDataSource = dataSourceList.find((d) => d.id === dataSourceId) ?? null;
+  const numericBeatIndex = typeof selection.beatIndex === "number" ? selection.beatIndex : null;
+  const selectedBeat = numericBeatIndex != null ? perPhraseBeats[numericBeatIndex] : null;
 
   return (
     <div>
-      <h1>{isNew ? "New Recipe" : builtin ? `Built-in: ${name || id}` : `Edit: ${name || id}`}</h1>
-      {error && <div className="error-banner">{error}</div>}
-      {status && <div className="success-banner">{status}</div>}
-
-      {builtin && (
-        <div className="card">
-          <p className="hint" style={{ marginTop: 0 }}>
-            This is a built-in recipe (matches Composition {id}) and can't be edited or deleted directly.
-          </p>
-          <div className="button-row" style={{ marginTop: 0 }}>
-            <button type="button" onClick={() => navigate(`/recipes/new?from=${id}`)}>
-              Clone to customize
+      <form onSubmit={onSave}>
+        <fieldset disabled={builtin} style={{ border: "none", padding: 0, margin: 0 }}>
+          <div className="card" style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Recipe name" required style={{ fontSize: 16, fontWeight: 700, flex: "1 1 220px" }} />
+            {dataSourceList.length > 1 ? (
+              <select value={dataSourceId} onChange={(e) => setDataSourceId(e.target.value)} title="Data source">
+                {dataSourceList.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="hint">Data source: {activeDataSource?.label ?? dataSourceId}</span>
+            )}
+            <button type="button" className="secondary" onClick={() => setPreviewOpen((o) => !o)}>
+              {previewOpen ? "Hide preview" : "Show preview"}
+            </button>
+            <button type="submit" disabled={saving}>
+              {saving ? "Saving..." : "Save recipe"}
+            </button>
+            <button type="button" className="secondary" disabled={!savedId || pushing} onClick={onPush}>
+              {pushing ? "Pushing..." : "Push to GitHub"}
             </button>
           </div>
-        </div>
-      )}
 
-      <div className="editor-layout">
-        <form onSubmit={onSave} className="editor-form">
-          <fieldset disabled={builtin} style={{ border: "none", padding: 0, margin: 0 }}>
+          {error && <div className="error-banner">{error}</div>}
+          {status && <div className="success-banner">{status}</div>}
+          {builtin && (
             <div className="card">
-              <h2>Basics</h2>
-              <div className="grid">
-                <div className="field">
-                  <label>Name</label>
-                  <input type="text" value={name} onChange={(e) => setName(e.target.value)} required />
-                </div>
-                <div className="field" style={{ gridColumn: "1 / -1" }}>
-                  <label>Description</label>
-                  <textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
-                </div>
-                <div className="field">
-                  <label>Data source</label>
-                  {dataSourceList.length > 1 ? (
-                    <select value={dataSourceId} onChange={(e) => setDataSourceId(e.target.value)}>
-                      {dataSourceList.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.label}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input type="text" value={activeDataSource?.label ?? dataSourceId} disabled />
-                  )}
-                </div>
-              </div>
+              <p className="hint" style={{ marginTop: 0 }}>
+                This is a built-in recipe (matches Composition {id}) and can't be edited or deleted directly.
+              </p>
+              <button type="button" onClick={() => navigate(`/recipes/new?from=${id}`)}>
+                Clone to customize
+              </button>
             </div>
+          )}
 
-            <DataGraph
-              dataSource={activeDataSource}
-              intro={intro}
-              outro={outro}
-              introOpen={introOpen}
-              outroOpen={outroOpen}
-              onToggleIntro={() => setIntroOpen((o) => !o)}
-              onToggleOutro={() => setOutroOpen((o) => !o)}
+          {defaults && (
+            <Timeline
+              recipe={previewRecipe}
+              config={defaults}
               perPhraseBeats={perPhraseBeats}
               onChangeBeat={updateBeat}
-              onMoveBeat={moveBeat}
-              selectedBeatIndex={previewBeatIndex}
+              onReorderBeat={reorderBeat}
+              introOpen={introOpen}
+              outroOpen={outroOpen}
+              selection={selection}
               onSelectBeat={selectBeat}
+              onSelectLayer={selectLayer}
             />
+          )}
 
-            <div className="card">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: introOpen ? 12 : 0 }}>
-                <h2 style={{ margin: 0 }}>Intro</h2>
-                <button type="button" className="secondary" onClick={() => setIntroOpen((o) => !o)}>
-                  {introOpen ? "Hide" : "Show"}
-                </button>
-              </div>
-              {introOpen && (
-                <div className="grid">
-                  <div className="field">
-                    <label>Theme</label>
-                    <select value={intro.theme} onChange={(e) => setIntro((cur) => ({ ...cur, theme: e.target.value as ThemeVariant }))}>
-                      <option value="light">Light</option>
-                      <option value="dark">Dark</option>
-                    </select>
-                  </div>
-                  <div className="field">
-                    <label>Narration voice set</label>
-                    <select
-                      value={intro.introVoiceKeyword}
-                      onChange={(e) => setIntro((cur) => ({ ...cur, introVoiceKeyword: e.target.value as "sinhala" | "english" }))}
-                    >
-                      <option value="sinhala">Sinhala ("what does this mean?")</option>
-                      <option value="english">English ("how do you say this?")</option>
-                    </select>
-                  </div>
-                  <div className="field checkbox">
-                    <input
-                      id="intro-literal"
-                      type="checkbox"
-                      checked={intro.text.source === "literal"}
-                      onChange={(e) =>
-                        setIntro((cur) => ({
-                          ...cur,
-                          text: e.target.checked ? { source: "literal", value: cur.text.source === "literal" ? cur.text.value : "" } : { source: "config.introText" },
-                        }))
-                      }
-                    />
-                    <label htmlFor="intro-literal">Use fixed text instead of the global default (Settings' Intro text)</label>
-                  </div>
-                  {intro.text.source === "literal" && (
-                    <div className="field" style={{ gridColumn: "1 / -1" }}>
-                      <label>Fixed intro text</label>
-                      <input
-                        type="text"
-                        value={intro.text.value}
-                        onChange={(e) => setIntro((cur) => ({ ...cur, text: { source: "literal", value: e.target.value } }))}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="card">
-              <h2>Per-phrase beats</h2>
-              <p className="hint" style={{ marginTop: 0 }}>
-                Repeats once for every phrase in a reel, in this order, between the intro and outro.
-              </p>
-              {perPhraseBeats.map((beat, i) => (
-                <div
-                  className="queue-phrase-card"
-                  key={i}
-                  ref={(el) => {
-                    if (el) beatCardRefs.current.set(i, el);
-                    else beatCardRefs.current.delete(i);
-                  }}
-                  style={previewBeatIndex === i ? { outline: "2px solid var(--primary)" } : undefined}
-                >
-                  <div className="hint" style={{ marginBottom: 6 }}>
-                    Beat {i + 1} of {perPhraseBeats.length}
-                  </div>
-                  <div className="grid">
-                    <div className="field">
-                      <label>Kind</label>
-                      <select value={beat.kind} onChange={(e) => updateBeat(i, defaultBeat(e.target.value as PerPhraseBeat["kind"]))}>
-                        {Object.entries(BEAT_KIND_LABEL).map(([kind, label]) => (
-                          <option key={kind} value={kind}>
-                            {label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    {beat.kind === "guessReveal" && (
-                      <>
-                        <div className="field">
-                          <label>Theme</label>
-                          <select value={beat.theme} onChange={(e) => updateBeat(i, { ...beat, theme: e.target.value as ThemeVariant })}>
-                            <option value="light">Light</option>
-                            <option value="dark">Dark</option>
-                          </select>
-                        </div>
-                        <div className="field">
-                          <label>Direction</label>
-                          <select
-                            value={beat.prompt}
-                            onChange={(e) => {
-                              const prompt = e.target.value as GuessRevealField;
-                              const answer: GuessRevealField = prompt === "phrase" ? "translationSi" : "phrase";
-                              updateBeat(i, { ...beat, prompt, answer });
-                            }}
-                          >
-                            <option value="phrase">English first, then Sinhala meaning</option>
-                            <option value="translationSi">Sinhala meaning first, then English</option>
-                          </select>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                  {beat.kind === "custom" && (
-                    <LayerEditor beat={beat} onChange={(next) => updateBeat(i, next)} fps={defaults?.fps ?? 30} dataFields={activeDataSource?.fields ?? []} />
-                  )}
-                  <div className="button-row">
-                    <button
-                      type="button"
-                      className={previewBeatIndex === i ? "" : "secondary"}
-                      onClick={() => setPreviewBeatIndex((cur) => (cur === i ? null : i))}
-                    >
-                      {previewBeatIndex === i ? "Previewing this beat" : "Preview this beat"}
-                    </button>
-                    <button type="button" className="secondary" disabled={i === 0} onClick={() => moveBeat(i, -1)}>
-                      ↑ Move up
-                    </button>
-                    <button type="button" className="secondary" disabled={i === perPhraseBeats.length - 1} onClick={() => moveBeat(i, 1)}>
-                      ↓ Move down
-                    </button>
-                    <button type="button" className="danger" disabled={perPhraseBeats.length <= 1} onClick={() => removeBeat(i)}>
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ))}
-              <div className="button-row" style={{ marginTop: 0 }}>
-                <button type="button" className="secondary" onClick={() => setPerPhraseBeats((cur) => [...cur, defaultBeat("phrase")])}>
-                  + Add beat
-                </button>
-              </div>
-            </div>
-
-            <div className="card">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: outroOpen ? 12 : 0 }}>
-                <h2 style={{ margin: 0 }}>Outro</h2>
-                <button type="button" className="secondary" onClick={() => setOutroOpen((o) => !o)}>
-                  {outroOpen ? "Hide" : "Show"}
-                </button>
-              </div>
-              {outroOpen && (
-                <div className="field">
-                  <label>Theme</label>
-                  <select value={outro.theme} onChange={(e) => setOutro({ theme: e.target.value as ThemeVariant, kind: "outro" })}>
-                    <option value="light">Light</option>
-                    <option value="dark">Dark</option>
-                  </select>
-                </div>
-              )}
-            </div>
-
-            <div className="button-row">
-              <button type="submit" disabled={saving}>
-                {saving ? "Saving..." : "Save recipe"}
-              </button>
-              <button type="button" className="secondary" disabled={!savedId || pushing} onClick={onPush}>
-                {pushing ? "Pushing..." : "Push to GitHub"}
-              </button>
-            </div>
-            {!savedId && <p className="hint">Save at least once before pushing - the JSON export is written on save.</p>}
-          </fieldset>
-        </form>
-
-        <aside className="editor-preview">
-          <div className="card preview-card">
-            <h2>Live preview</h2>
-            <p className="hint" style={{ marginTop: 0 }}>
-              {previewBeatIndex != null
-                ? "Looping just the beat marked above - click its \"Previewing this beat\" button to go back to the full recipe."
-                : !introOpen || !outroOpen
-                  ? `Uses the current defaults' colors/timing with sample text. Skipping ${[!introOpen && "intro", !outroOpen && "outro"].filter(Boolean).join(" and ")} - "Show" them above to include in the preview loop.`
-                  : "Uses the current defaults' colors/timing with sample text. Durations are approximate."}
-            </p>
-            {defaults ? (
-              <ReelPreview recipe={previewRecipe} config={defaults} focusBeatIndex={previewBeatIndex} showIntro={introOpen} showOutro={outroOpen} />
-            ) : (
-              <div className="preview-frame preview-loading">
-                <span className="hint">Loading...</span>
-              </div>
-            )}
+          <div className="button-row" style={{ marginTop: 0, marginBottom: 20 }}>
+            <button type="button" className="secondary" onClick={() => setPerPhraseBeats((cur) => [...cur, defaultBeat("phrase")])}>
+              + Add beat
+            </button>
           </div>
-        </aside>
-      </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+            <DataGraph
+              dataSource={activeDataSource}
+              beat={selectedBeat}
+              selectedLayerId={selection.layerId}
+              onSelectLayer={(layerId) => numericBeatIndex != null && selectLayer(numericBeatIndex, layerId)}
+              onChangeBeat={(b) => numericBeatIndex != null && updateBeat(numericBeatIndex, b)}
+            />
+            <Inspector
+              selection={selection}
+              intro={intro}
+              outro={outro}
+              onChangeIntro={setIntro}
+              onChangeOutro={setOutro}
+              introOpen={introOpen}
+              outroOpen={outroOpen}
+              onToggleIntroOpen={() => setIntroOpen((o) => !o)}
+              onToggleOutroOpen={() => setOutroOpen((o) => !o)}
+              perPhraseBeats={perPhraseBeats}
+              onChangeBeat={updateBeat}
+              onRemoveBeat={removeBeat}
+              onSelectLayer={selectLayer}
+              dataFields={activeDataSource?.fields ?? []}
+              fps={defaults?.fps ?? 30}
+            />
+          </div>
+
+          {!savedId && <p className="hint">Save at least once before pushing - the JSON export is written on save.</p>}
+        </fieldset>
+      </form>
+
+      {previewOpen && (
+        <div className="card preview-card" style={{ marginTop: 20, maxWidth: 360 }}>
+          <h2>Live preview</h2>
+          <p className="hint" style={{ marginTop: 0 }}>
+            {typeof selection.beatIndex === "number"
+              ? "Looping just the selected beat."
+              : !introOpen || !outroOpen
+                ? `Skipping ${[!introOpen && "intro", !outroOpen && "outro"].filter(Boolean).join(" and ")} - toggle from the Intro/Outro Inspector panel to include in the preview loop.`
+                : "Uses the current defaults' colors/timing with sample text. Durations are approximate."}
+          </p>
+          {defaults ? (
+            <ReelPreview
+              recipe={previewRecipe}
+              config={defaults}
+              focusBeatIndex={typeof selection.beatIndex === "number" ? selection.beatIndex : null}
+              showIntro={introOpen}
+              showOutro={outroOpen}
+            />
+          ) : (
+            <div className="preview-frame preview-loading">
+              <span className="hint">Loading...</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

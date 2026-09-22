@@ -144,6 +144,12 @@ export interface AnimationSpec {
   delayFrames: number;
 }
 
+/** A layer's own trim within its parent beat - omitted means "the whole beat" (see LayerRenderer.tsx). What Timeline.tsx's per-layer track drags. */
+export interface LayerTiming {
+  startFrame: number;
+  durationFrames?: number;
+}
+
 export interface TextLayer {
   kind: "text";
   id: string;
@@ -155,6 +161,7 @@ export interface TextLayer {
   color: ColorRef;
   align: "left" | "center" | "right";
   animation: AnimationSpec;
+  timing?: LayerTiming;
 }
 export interface ImageLayer {
   kind: "image";
@@ -162,6 +169,7 @@ export interface ImageLayer {
   box: LayerBox;
   src: { source: "asset"; path: string } | { source: "sceneFrameChrome" };
   animation: AnimationSpec;
+  timing?: LayerTiming;
 }
 export interface ShapeLayer {
   kind: "shape";
@@ -174,6 +182,7 @@ export interface ShapeLayer {
   cornerRadiusPx?: number;
   progress?: { source: "countdownProgress" };
   animation: AnimationSpec;
+  timing?: LayerTiming;
 }
 export type Layer = TextLayer | ImageLayer | ShapeLayer;
 
