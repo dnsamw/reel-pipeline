@@ -25,48 +25,80 @@ body {
 .app {
   min-height: 100vh;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
 }
 
-.app-header {
+.app-sidebar {
+  flex: none;
+  width: 220px;
   display: flex;
-  align-items: center;
-  gap: 32px;
-  padding: 16px 28px;
+  flex-direction: column;
+  gap: 24px;
+  padding: 20px 16px;
   background: var(--primary);
   color: white;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
 }
 
-.app-header .brand {
+.app-sidebar .brand {
   font-weight: 700;
-  font-size: 18px;
+  font-size: 17px;
+  padding: 0 10px;
 }
 
-.app-header nav {
+.app-sidebar nav {
   display: flex;
-  gap: 20px;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.app-header nav a {
+.app-sidebar nav a {
   color: rgba(255, 255, 255, 0.8);
   text-decoration: none;
   font-size: 14px;
-  padding: 6px 0;
-  border-bottom: 2px solid transparent;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border-left: 3px solid transparent;
 }
 
-.app-header nav a.active,
-.app-header nav a:hover {
+.app-sidebar nav a.active,
+.app-sidebar nav a:hover {
   color: white;
-  border-bottom-color: var(--gold);
+  background: rgba(255, 255, 255, 0.12);
+  border-left-color: var(--gold);
 }
 
 .app-main {
   flex: 1;
+  min-width: 0;
   padding: 28px;
-  max-width: 1100px;
+  max-width: 1400px;
   width: 100%;
   margin: 0 auto;
+}
+
+@media (max-width: 720px) {
+  .app {
+    flex-direction: column;
+  }
+
+  .app-sidebar {
+    width: 100%;
+    height: auto;
+    position: static;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+  }
+
+  .app-sidebar nav {
+    flex-direction: row;
+    overflow-x: auto;
+  }
 }
 
 h1 {
@@ -220,6 +252,12 @@ th {
 .badge.error {
   background: #fde2df;
   color: var(--danger);
+}
+
+.badge.queued {
+  background: var(--bg-soft);
+  color: var(--muted);
+  border: 1px solid var(--border);
 }
 
 .log-panel {
@@ -469,5 +507,155 @@ th {
   .editor-preview {
     width: 100%;
     position: static;
+  }
+}
+
+.queue-row {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.queue-row-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  background: var(--bg-soft);
+}
+
+.queue-row-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.queue-row-body {
+  padding: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.queue-phrase-card {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.review-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.review-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.review-right {
+  flex: none;
+  width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: sticky;
+  top: 20px;
+}
+
+.review-right .card {
+  margin-bottom: 0;
+}
+
+@media (max-width: 960px) {
+  .review-layout {
+    flex-direction: column;
+  }
+
+  .review-right {
+    width: 100%;
+    position: static;
+  }
+}
+
+.tab-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab-row .tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--muted);
+  padding: 8px 14px;
+  font-weight: 600;
+}
+
+.tab-row .tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.tab-row .tab:hover:not(.active) {
+  color: var(--fg);
+}
+
+.queued-badge {
+  background: var(--primary-tint);
+  color: var(--primary);
+  flex: none;
+}
+
+.render-queue-list .queue-row {
+  margin-bottom: 10px;
+}
+
+.render-queue-row .queue-row-header {
+  gap: 10px;
+}
+
+.render-queue-remove {
+  flex: none;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.manifest-row-playback {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.manifest-row-video {
+  flex: none;
+  width: 160px;
+  aspect-ratio: 9 / 16;
+  border-radius: 8px;
+  background: #000;
+}
+
+.manifest-row-details {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .manifest-row-playback {
+    flex-direction: column;
+  }
+
+  .manifest-row-video {
+    width: 100%;
+    max-width: 220px;
   }
 }

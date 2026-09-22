@@ -89,6 +89,8 @@ export interface ManifestEntry {
   outputPath: string;
   renderedAt: string;
   suggestedCaption: string;
+  /** Playable URL for the rendered mp4 (server/index.ts's /media static route) - added server-side, not part of the raw manifest.json file. */
+  mediaUrl: string;
 }
 
 export type Manifest = Record<string, ManifestEntry>;
@@ -101,6 +103,67 @@ export interface RenderRun {
   logs: string[];
   startedAt: string;
   finishedAt: string | null;
+}
+
+// Mirrors src/data/phrase.ts's Phrase.
+export interface Phrase {
+  id: string;
+  phrase: string;
+  translationSi: string | null;
+  pronunciationSi: string | null;
+  explanation: string;
+  explanationSi: string | null;
+  chapterId: string;
+  chapterTitle: string;
+  chapterOrder: number;
+  order: number;
+}
+
+export interface QueueItem {
+  batchId: string;
+  chapterOrder: number;
+  chapterTitle: string;
+  phrases: Phrase[];
+  rendered: boolean;
+  outputPath: string | null;
+  renderedAt: string | null;
+}
+
+export interface Settings {
+  /** Merged onto ReelConfig's defaults as the new baseline for every render - same shape as a TemplateRecord's config. */
+  config: Partial<ReelConfig>;
+  /** Initial value for the "Duck music under dialogue/sfx" checkbox on Batch Render / Queue Render. */
+  defaultSidechain: boolean;
+  /** Initial value for the "Composition" dropdown on Batch Render / Queue Render. */
+  defaultTemplateNumber: "1" | "2" | "3";
+}
+
+export interface FacebookPageInfo {
+  id: string;
+  name: string;
+  connectedAt: string;
+}
+
+export interface FacebookStatus {
+  page: FacebookPageInfo | null;
+  /** Set when a just-completed Facebook login found more than one Page to pick from - see Settings.tsx. */
+  pendingPages: { id: string; name: string }[] | null;
+}
+
+export interface Publication {
+  id: string;
+  batchId: string;
+  template: string;
+  outputPath: string;
+  pageId: string;
+  pageName: string;
+  fbVideoId: string | null;
+  fbPermalink: string | null;
+  status: "uploading" | "published" | "error";
+  error: string | null;
+  caption: string;
+  createdAt: string;
+  publishedAt: string | null;
 }
 
 export interface VideoSpec {

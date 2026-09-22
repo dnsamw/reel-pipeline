@@ -52,6 +52,12 @@ Edit `.env`:
 DATABASE_URL=postgresql://<user>:<password>@<host>:<port>/<db>
 AZURE_SPEECH_KEY=            # only needed for --tts=true — Azure Portal → your Speech resource → Keys and Endpoint
 AZURE_SPEECH_REGION=eastus   # match your Speech resource's region
+
+# Only needed for the GUI's Settings page "Connect with Facebook" (see below) - leave blank otherwise
+FACEBOOK_APP_ID=
+FACEBOOK_APP_SECRET=
+FACEBOOK_REDIRECT_URI=http://localhost:4300/api/facebook/callback
+FACEBOOK_CONFIG_ID=          # from a "Facebook Login for Business" Configuration - see docs/ARCHITECTURE.md
 ```
 
 Then generate the Prisma client against the schema in this repo:
@@ -96,11 +102,12 @@ Finished videos land in `output/`, alongside `manifest.json` (what's been render
 a suggested social caption for each). Re-running the same command later only renders what's new — add
 `--force` to redo everything anyway.
 
-### GUI (batch monitor, start-render form, template library)
+### GUI (batch monitor, start-render form, template library, settings, Facebook publishing)
 
 A local React + Express control panel wraps the CLI above — same `render:batch` underneath, just with a form
-instead of flags, a live view of `manifest.json`/running renders, and a library of saved config/color presets
-("templates" in the GUI sense, not to be confused with the three visual Templates 1/2/3).
+instead of flags, a live view of `manifest.json`/running renders (with inline playback), a library of saved
+config/color presets ("templates" in the GUI sense, not to be confused with the three visual Templates 1/2/3),
+a Settings page for GUI-wide defaults, and one-click publishing of a rendered reel to a connected Facebook Page.
 
 ```bash
 npm run gui   # starts the API server (:4300) and the Vite dev server (:5183) together
@@ -109,6 +116,28 @@ npm run gui   # starts the API server (:4300) and the Vite dev server (:5183) to
 Then open `http://localhost:5183`. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#gui-batch-monitor--template-library)
 for how it's wired together, what "template" presets can and can't do yet, and where intro/outro video-clip
 support (not implemented yet) fits in.
+
+Two ways to render from the GUI:
+- **Batch Render** — bulk/unattended, same as the CLI flags below.
+- **Queue Render** — a two-column workspace: the left column lists every reel in scope (tabbed "Not yet" /
+  "Rendered"), where you can expand a reel to correct its text and save it straight to the database. The right
+  column floats alongside it with the style to render against and a Render Queue you hand-pick reels into from
+  the left, then batch-render together (or one at a time) once you're happy with the text. Corrections save
+  straight to the database either way, so they also fix the main StudyPal app's content, not just this tool's
+  renders.
+
+**Settings page** — GUI-wide defaults (durations/volumes/TTS/colors/copy, plus the default composition and
+whether music-ducking is on by default) that every render starts from, whether it goes through the CLI flags
+above, Batch Render, or Queue Render. A saved template preset still overrides these where it sets a field;
+explicit flags on a single run override both. This is also where a Facebook Page gets connected ("Connect with
+Facebook").
+
+**Publishing to Facebook** — once a Page is connected, the Monitor page's "Rendered batches" list plays each
+reel back inline and can publish it straight to that Page (`POST /{page-id}/videos` via the Graph API) with an
+editable caption, pre-filled from the manifest's suggested caption. Every publish attempt (and its result) is
+recorded, so Monitor always shows what's been generated vs. what's actually live, with a link to the post once
+it's up. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#gui-batch-monitor--template-library) for the OAuth
+setup steps and how the Page token is stored.
 
 | Flag | Meaning |
 |---|---|
@@ -119,7 +148,8 @@ support (not implemented yet) fits in.
 | `--limit=N` | Stop after N *new* renders this run |
 | `--force` | Re-render even batches already in the manifest |
 | `--sidechain=true\|false` | Duck background music under dialogue/sfx via ffmpeg's real `sidechaincompress` filter (default `false`). Costs a second render pass per batch (~10-20% more total time, measured — not a flat 2x, since frame-painting isn't the dominant render cost here). Requires `ffmpeg` on `PATH`; if it's missing, the whole run warns once and falls back to the normal single-pass mix instead of failing |
-| `--presetFile=path.json` | Merge a JSON `ReelConfig` (partial) into `defaultConfig` as this run's baseline, before the flags above apply — how the GUI's template library applies a saved preset. Rarely hand-written; see [Template library](docs/ARCHITECTURE.md#template-library) |
+| `--presetFile=path.json` | Merge a JSON `ReelConfig` (partial) into `defaultConfig` as this run's baseline, before the flags above apply — how the GUI's template library applies a saved preset. Rarely hand-written; see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#gui-batch-monitor--template-library) |
+| `--phraseIds=id1,id2,id3` | Render (or re-render) exactly these phrases as one reel, in this order — ignores `--chapters`/`--book`/`--limit` and always renders regardless of manifest state. How the GUI's Queue Render page targets one specific reel from its Render Queue; rarely hand-written |
 
 Add more background music any time by dropping `.mp3`/`.wav`/`.m4a`/`.ogg` files into `assets/music/` — new
 tracks are automatically included in the rotation for the next generation, no config change needed.
@@ -132,7 +162,7 @@ tracks are automatically included in the rotation for the next generation, no co
 ## Project layout
 
 ```
-prisma/           Read-only schema, points at StudyPal's real DB
+prisma/           Schema pointing at StudyPal's real DB (mostly read; the Queue Render page writes phrase corrections)
 src/
   data/            DB access + phrase batching (Node-only)
   theme/           Brand colors/fonts (ported from the main StudyPal app) + ThemeContext for per-template overrides
@@ -140,10 +170,13 @@ src/
   audio/           Music/sfx/voice/TTS selection + ffmpeg availability check (Node-only)
   compositions/    The Remotion video templates + shared scene components
   render/          The batch runner (renderBatch.ts), manifest tracking, and sidechain ducking post-process
-server/            Express API for the GUI - template library (SQLite + git export), render orchestration, chapter/book lookups
-gui/               React + Vite control panel (batch monitor, start-render form, template library, video-clip spec reference)
+server/            Express API for the GUI - template library (SQLite + git export), global settings, Facebook
+                   OAuth + publishing, render orchestration, chapter/book lookups
+gui/               React + Vite control panel (batch monitor w/ playback+publish, Batch Render form, Queue
+                   Render, template library, settings, video-clip spec reference)
 templates/         Git-tracked JSON export of every saved template preset (one file per template) - see server/templates.ts
-data/              SQLite db for the GUI's template library (gitignored - templates/*.json is the source of truth in git)
+data/              SQLite db for the GUI's own state - template library, global settings, connected Facebook
+                   Page token, publish history (gitignored - templates/*.json is the only part with a git export)
 assets/            fonts, music, sfx, voice-over, and generated TTS audio
 output/            Rendered videos + manifest.json (gitignored)
 ```
@@ -155,4 +188,6 @@ output/            Rendered videos + manifest.json (gitignored)
 - `assets/music/` and `audio-samples/` are gitignored (large binary files) — source your own tracks and drop
   them in `assets/music/` after cloning. `assets/voice/` and `assets/sfx/` (small, already-sourced clips) are
   committed.
-- `.env` (DB credentials, Azure key) is gitignored — never commit real credentials.
+- `.env` (DB credentials, Azure key, Facebook app credentials) is gitignored — never commit real credentials.
+- The connected Facebook Page's access token lives in `data/gui.db` (gitignored, same trust boundary as
+  `.env`) — the GUI frontend is only ever shown the Page's name/id, never the token itself.

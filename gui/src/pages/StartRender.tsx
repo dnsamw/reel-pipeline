@@ -36,6 +36,13 @@ export function StartRender() {
       })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
     api.defaultTheme().then(setDefaultTheme).catch(() => {});
+    api
+      .settings()
+      .then((s) => {
+        setSidechain(s.defaultSidechain);
+        setTemplate(s.defaultTemplateNumber);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -102,7 +109,7 @@ export function StartRender() {
 
   return (
     <div>
-      <h1>Start Render</h1>
+      <h1>Batch Render</h1>
       {error && <div className="error-banner">{error}</div>}
       {started && (
         <div className="success-banner">

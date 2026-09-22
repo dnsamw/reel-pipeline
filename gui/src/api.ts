@@ -1,10 +1,15 @@
 import type {
   Book,
   Chapter,
+  FacebookStatus,
   Manifest,
+  Phrase,
+  Publication,
+  QueueItem,
   ReelConfig,
   ReelTheme,
   RenderRun,
+  Settings,
   TemplateRecord,
   VideoSpec,
 } from "./types";
@@ -38,6 +43,18 @@ export const api = {
   manifest: () => request<Manifest>("/manifest"),
   videoSpec: () => request<VideoSpec>("/video-spec"),
 
+  queue: (params: { book?: string | null; min?: number | null; max?: number | null; phrasesPerReel?: number; template?: "1" | "2" | "3" }) => {
+    const q = new URLSearchParams();
+    if (params.book) q.set("book", params.book);
+    if (params.min != null) q.set("min", String(params.min));
+    if (params.max != null) q.set("max", String(params.max));
+    if (params.phrasesPerReel != null) q.set("phrasesPerReel", String(params.phrasesPerReel));
+    if (params.template) q.set("template", params.template);
+    return request<QueueItem[]>(`/queue?${q.toString()}`);
+  },
+  updatePhrase: (id: string, fields: Pick<Phrase, "phrase" | "translationSi" | "pronunciationSi" | "explanation" | "explanationSi">) =>
+    request<{ ok: boolean }>(`/phrases/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(fields) }),
+
   templates: () => request<TemplateRecord[]>("/templates"),
   template: (id: string) => request<TemplateRecord>(`/templates/${encodeURIComponent(id)}`),
   createTemplate: (input: Omit<TemplateRecord, "id" | "createdAt" | "updatedAt">) =>
@@ -60,8 +77,24 @@ export const api = {
     book?: string;
     sidechain?: boolean;
     templateId?: string;
+    phraseIds?: string[];
   }) => request<RenderRun>("/render/start", { method: "POST", body: JSON.stringify(body) }),
   listRuns: () => request<RenderRun[]>("/render"),
   getRun: (id: string) => request<RenderRun>(`/render/${encodeURIComponent(id)}`),
   cancelRun: (id: string) => request<{ cancelled: boolean }>(`/render/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
+
+  settings: () => request<Settings>("/settings"),
+  saveSettings: (input: Settings) => request<Settings>("/settings", { method: "PUT", body: JSON.stringify(input) }),
+
+  facebookStatus: () => request<FacebookStatus>("/facebook/status"),
+  // Full-page navigation (window.location.href), not fetch() - the OAuth
+  // dialog is a real page Facebook needs to redirect the user's browser to.
+  facebookConnectUrl: () => "/api/facebook/connect",
+  facebookSelectPage: (pageId: string) =>
+    request<{ id: string; name: string }>("/facebook/select-page", { method: "POST", body: JSON.stringify({ pageId }) }),
+  facebookDisconnect: () => request<void>("/facebook/disconnect", { method: "POST" }),
+
+  publications: () => request<Publication[]>("/publications"),
+  publish: (body: { batchId: string; template: string; caption?: string }) =>
+    request<Publication>("/publish", { method: "POST", body: JSON.stringify(body) }),
 };

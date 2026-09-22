@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { bundle } from "@remotion/bundler";
 import { renderMedia, selectComposition } from "@remotion/renderer";
-import { getPhrases, disconnect } from "../data/getPhrases";
+import { getPhrases, getPhrasesByIds, disconnect } from "../data/getPhrases";
 import { batchPhrases, type ReelBatch } from "../data/batch";
 import { defaultConfig, type ReelConfig } from "../config/config";
 import { pickMusicTrack, pickMusicStartFrame, getAudioDurationSeconds } from "../audio/music";
@@ -36,6 +36,11 @@ import type { ReelProps } from "../compositions/Reel";
  *                                                    # before the flags above are applied - this is how the GUI's template library
  *                                                    # (server/templates.ts) applies a saved preset (durations/volumes/theme/ttsRate/etc.)
  *                                                    # without needing a dedicated CLI flag per config field
+ *   npm run render:batch -- --phraseIds=id1,id2,id3 # render (or re-render) exactly these phrases as one reel, in this order - ignores
+ *                                                    # --chapters/--book/--limit entirely and always renders regardless of manifest state
+ *                                                    # (no need for --force). This is how the GUI's Queue Render page (server/index.ts's
+ *                                                    # /api/queue + /api/render/start) targets one specific reel instead of "whatever
+ *                                                    # the chapter range's next unrendered batch happens to be" - see ARCHITECTURE.md.
  */
 type Template = "1" | "2" | "3" | "4";
 
@@ -56,6 +61,7 @@ function parseArgs(argv: string[]) {
     book: typeof args.book === "string" ? args.book : null,
     sidechain: args.sidechain === "true",
     presetFile: typeof args.presetFile === "string" ? args.presetFile : null,
+    phraseIds: typeof args.phraseIds === "string" ? args.phraseIds.split(",").filter(Boolean) : null,
   };
 }
 
@@ -104,7 +110,7 @@ function manifestKey(batch: ReelBatch, template: Template): string {
 }
 
 async function main() {
-  const { chapters, limit, force, tts, template, book, sidechain, presetFile } = parseArgs(process.argv.slice(2));
+  const { chapters, limit, force, tts, template, book, sidechain, presetFile, phraseIds } = parseArgs(process.argv.slice(2));
   const compositionId = COMPOSITION_IDS[template];
   const introVoiceKeyword = INTRO_VOICE_KEYWORDS[template];
   const bookTag = book ? sanitizeTag(book) : null;
@@ -136,10 +142,27 @@ async function main() {
   if (tts != null) config.ttsEnabled = tts;
   if (book) config.bookId = book;
 
-  const phrases = await getPhrases(config.chapterOrderRange, config.bookId);
-  const batches = batchPhrases(phrases, config.phrasesPerReel);
+  // --phraseIds bypasses the normal chapter-range scan entirely - it's an
+  // explicit "render exactly this reel" request (new or a re-render after a
+  // Queue Render correction), not "whatever the next unrendered batch is".
+  let batches: ReelBatch[];
+  if (phraseIds) {
+    const phrases = await getPhrasesByIds(phraseIds);
+    batches = [
+      {
+        id: phrases.map((p) => p.id).join("-"),
+        chapterId: phrases[0].chapterId,
+        chapterTitle: phrases[0].chapterTitle,
+        chapterOrder: phrases[0].chapterOrder,
+        phrases,
+      },
+    ];
+  } else {
+    const phrases = await getPhrases(config.chapterOrderRange, config.bookId);
+    batches = batchPhrases(phrases, config.phrasesPerReel);
+  }
   if (batches.length === 0) {
-    console.log("No phrases matched - check --chapters/--book and that the DB is seeded.");
+    console.log("No phrases matched - check --chapters/--book/--phraseIds and that the DB is seeded.");
     await disconnect();
     return;
   }
@@ -156,15 +179,27 @@ async function main() {
   // Decide which batches this run will actually render *before* bundling -
   // bundle() below takes a one-time snapshot copy of assets/, so any TTS
   // audio generated after that point would silently 404 at render time.
-  const toRender: { batch: ReelBatch; index: number }[] = [];
+  // --phraseIds implies force - an explicit single-target request should
+  // always render, never silently skip because a manifest entry already
+  // exists (that's exactly the "I corrected a typo, re-render this one"
+  // case the Render Queue relies on).
+  const effectiveForce = force || phraseIds != null;
+  const toRender: { batch: ReelBatch; index: number; rotationSeed: number }[] = [];
   let skipped = 0;
   for (let i = 0; i < batches.length; i++) {
-    if (!force && isRendered(manifest, manifestKey(batches[i], template))) {
+    if (!effectiveForce && isRendered(manifest, manifestKey(batches[i], template))) {
       skipped++;
       continue;
     }
     if (limit != null && toRender.length >= limit) break;
-    toRender.push({ batch: batches[i], index: i });
+    // Music/voice rotation is normally seeded by position within the full
+    // chapter-scope batch list (stable across runs of the same scope). A
+    // --phraseIds run only ever has one synthetic batch, so `i` would
+    // always be 0 - use the first phrase's own DB order instead, so
+    // repeated single-reel renders from the Render Queue still get some
+    // variety instead of always picking the same track/voice pair.
+    const rotationSeed = phraseIds ? batches[i].phrases[0].order : i;
+    toRender.push({ batch: batches[i], index: i, rotationSeed });
   }
   console.log(`Selected ${toRender.length} batch(es) to render this run (${skipped} already in manifest).`);
 
@@ -176,8 +211,8 @@ async function main() {
   if (toRender.length > 0 && config.ttsEnabled) {
     console.log(`Synthesizing TTS audio for ${toRender.length} batch(es) (cached by content hash - reruns won't re-pay)...`);
   }
-  for (const { batch, index } of toRender) {
-    const voicePair = VOICE_PAIRS[index % VOICE_PAIRS.length];
+  for (const { batch, rotationSeed } of toRender) {
+    const voicePair = VOICE_PAIRS[rotationSeed % VOICE_PAIRS.length];
     const ttsPhraseFiles: (string | null)[] = [];
     const ttsRevealFiles: (string | null)[] = [];
     if (config.ttsEnabled) {
@@ -196,9 +231,9 @@ async function main() {
     const musicFile = pickMusicTrack(config.musicDir, index);
     const musicDurationSeconds = musicFile ? await getAudioDurationSeconds(config.musicDir, musicFile) : 0;
     audioPlan.set(batch.id, {
-      musicFile,
-      musicStartFrame: musicFile ? pickMusicStartFrame(index, config.fps, musicDurationSeconds) : 0,
-      introVoiceFile: pickIntroVoice(config.voiceDir, index, introVoiceKeyword),
+      musicFile: pickMusicTrack(config.musicDir, rotationSeed),
+      musicStartFrame: pickMusicStartFrame(rotationSeed, config.fps),
+      introVoiceFile: pickIntroVoice(config.voiceDir, rotationSeed, introVoiceKeyword),
       ttsPhraseFiles,
       ttsRevealFiles,
     });

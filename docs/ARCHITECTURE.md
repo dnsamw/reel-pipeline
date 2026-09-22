@@ -61,7 +61,8 @@ Node-only — keep it out of `src/compositions/`.
 
 ```
 studypal-reels/
-  prisma/schema.prisma        Read-only Prisma schema (Book/BookChapter/BookPhrase only) - same DATABASE_URL as ubuntu-node
+  prisma/schema.prisma        Prisma schema (Book/BookChapter/BookPhrase only) - same DATABASE_URL as ubuntu-node.
+                              Mostly read; the Queue Render page's phrase corrections are the one write path (see below)
   src/
     data/
       phrase.ts                Phrase type + Zod schema - Prisma-free, safe to import anywhere
@@ -329,11 +330,12 @@ streams stdout/stderr back to the browser via polling). If something here seems 
 the CLI, the bug is almost certainly in how the GUI is invoking `render:batch`, not in `render:batch` itself.
 
 **Storage split, and why**: book/chapter/phrase data stays in the shared Postgres DB via Prisma exactly as
-described above — the GUI's `server/` never writes to it, only reads (`listBooks`/`listChapters` in
-`src/data/getPhrases.ts`, added for the GUI's chapter picker). Everything GUI-specific (saved template
-presets) lives in **SQLite** (`server/db.ts`, file at `data/gui.db`, gitignored) instead — that Postgres
-schema is documented as read-only and shared with the separate `ubuntu-node` app, so it was deliberately not
-extended for tool-local state.
+described above. The GUI's `server/` mostly only reads it (`listBooks`/`listChapters` in
+`src/data/getPhrases.ts`, added for the GUI's chapter picker) — the one deliberate exception is Queue
+Render's phrase corrections, see below. Everything GUI-specific (saved template presets, global settings, the
+connected Facebook Page's token, publish history) lives in **SQLite** (`server/db.ts`, file at `data/gui.db`,
+gitignored) instead — that Postgres schema is shared with the separate `ubuntu-node` app, so it was
+deliberately not extended for tool-local state like this.
 
 **Template library = saved `ReelConfig` overrides, not a second config system**. A "template" record
 (`server/templates.ts`) is `{ name, description, templateNumber, config }`, where `config` is a
@@ -353,6 +355,97 @@ the GUI's "Push to GitHub" button) is a **separate, explicit action** — saving
 pushes on its own, same as any other git client. JSON (one file per template) was chosen over committing the
 `.db` file directly because SQLite's binary format doesn't diff or merge in git; `data/gui.db` itself is
 gitignored for exactly this reason.
+
+**Queue Render: review/correct phrase text, hand-pick reels, then batch-render them.** `render:batch`'s bulk
+mode (**Batch Render** in the GUI) is fire-and-forget — it never shows you a phrase's text before baking it
+into a video. The Queue Render page (`gui/src/pages/ReviewQueue.tsx` — file name predates the page's rename)
+is a second, deliberately different workflow for the same underlying pipeline, laid out in two columns:
+
+- **Left column — Scope + Queue.** `GET /api/queue` returns *every* batch in a scope (not just unrendered
+  ones — see "rendered" below), with its phrases' actual text, tabbed "Not yet" (default) / "Rendered" so a
+  reviewer can catch a DB typo/mistranslation before it ever reaches a rendered video, or after (if it's
+  spotted once a video's already out). Each reel is an accordion: expand it, correct its text, "Save
+  corrections". A reel can also be added to the Render Queue from here — it stays visible in the Queue either
+  way (just badged "In Render Queue"), so adding it doesn't lose your place in the list.
+- **Right column — Style + Render Queue, floats alongside the left column** (same sticky treatment as the
+  Template Editor's live preview, see [above](#gui-batch-monitor--template-library)). "Style for renders from
+  this queue" is one shared template/composition/TTS/sidechain choice applied to every reel currently in the
+  Render Queue — there's no per-reel style override. The Render Queue itself is empty until reels are sent to
+  it from the left; each entry can still be expanded and edited one last time before rendering, then rendered
+  either individually ("Save & render this one") or all together ("Render batch").
+- **Corrections write directly to Postgres** (`updatePhrase()` in `src/data/getPhrases.ts`, called via
+  `PUT /api/phrases/:id`) — a deliberate exception to the "GUI mostly only reads the DB" rule above, chosen so
+  a fix benefits the main StudyPal app too, not just this pipeline's renders. It's narrow on purpose: only the
+  five content fields (`phrase`/`translationSi`/`pronunciationSi`/`explanation`/`explanationSi`) are writable,
+  never `chapterId`/`order`/etc, so a correction can't accidentally move a phrase between chapters or corrupt
+  ordering. This only ever runs from an explicit "Save corrections" click on the left, or right before a render
+  fires from the Render Queue on the right — never automatically.
+- **The Render Queue renders sequentially, not in parallel**, even for "Render batch" — each render shells out
+  to ffmpeg, and concurrent renders would fight over the same machine's CPU/GPU rather than finish faster.
+- **Rendering one specific reel** (new or a re-render after a correction) uses `renderBatch.ts`'s
+  `--phraseIds=id1,id2,id3` flag instead of `--chapters`/`--limit`. This bypasses the normal chapter-range
+  scan and manifest-skip logic entirely — it always renders exactly those phrases, in that order, regardless
+  of whether a manifest entry already exists for them (equivalent to an implicit `--force`, scoped to just
+  that one batch). This is what makes "I found a typo in an already-rendered reel, fix it and redo just that
+  one" work without disturbing anything else in the chapter.
+- **"Rendered" is per-composition, not global** — the same phrase batch can be done under Composition 1 but
+  not Composition 3, since manifest keys are template-suffixed (see `manifestKey`/`outputFilename` in
+  `renderBatch.ts`). `/api/queue`'s `template` query param must match whatever composition you're about to
+  render with, or the rendered/not badges won't reflect the composition you're actually targeting.
+- **Music/voice rotation for a `--phraseIds` render** can't use "position in this run" as its rotation seed
+  the way bulk mode does (there's only ever one synthetic batch, so that position is always `0`) — it uses the
+  first phrase's own DB `order` field instead, so repeated single-reel renders from the Render Queue still get
+  some variety instead of always picking the same track/voice pair. This is a deliberate simplification, not
+  an attempt to reproduce exactly what a hypothetical full bulk run over the same chapter would have picked.
+
+**Settings page: one global-defaults baseline, same merge mechanism as a template.** `server/settings.ts`
+stores a single SQLite row (`id = 'global'`) shaped like `{ config: Partial<ReelConfig>, defaultSidechain,
+defaultTemplateNumber }` - `config` is the exact same shape a template's `config` is. Two things read it:
+
+- `GET /api/config/defaults` merges it onto `defaultConfig` (`resolveDefaultConfig`) before returning - this
+  is what the GUI calls "defaults" everywhere (Batch Render/Queue Render's baseline, the Template Editor's own
+  merge, live-preview fallbacks), so a Settings change is visible immediately without touching any other page.
+- `POST /api/render/start` merges Settings' `config` with the chosen template's `config` (template wins where
+  both set the same field) into **one** `--presetFile`, since `render:batch` only accepts a single one - see
+  the precedence chain in [Template library](#gui-batch-monitor--template-library) above: Settings sets the
+  floor, a template overrides it, an explicit flag on that one run overrides both.
+
+`defaultSidechain`/`defaultTemplateNumber` aren't `ReelConfig` fields (sidechain is a `render:batch`-only CLI
+flag, not a config field) - they only ever set the *initial* value of Batch Render's and Queue Render's own
+form controls (fetched once on mount), same as any other GUI default; they don't get merged into a preset file.
+
+**Publishing a rendered reel to Facebook.** `server/facebook.ts` implements the OAuth "Login for Business"
+flow to get a Page Access Token without ever asking the admin to paste one by hand:
+
+1. Settings' "Connect with Facebook" button does a full-page navigation to `GET /api/facebook/connect`, which
+   redirects to Facebook's OAuth dialog (`buildAuthUrl`) requesting `pages_show_list`, `pages_read_engagement`,
+   `pages_manage_posts` - all three work for an app in *Development Mode* (no App Review needed) as long as the
+   logged-in Facebook account is an admin of both the app and the target Page, which holds for this tool's
+   intended single-admin use. **Those three can't be passed as a plain `scope` list on a newer app** - Meta
+   rejects them with an "Invalid Scopes" error unless they come from a **Facebook Login for Business
+   Configuration** instead (App Dashboard -> Facebook Login for Business -> Configurations -> New, asset type
+   "Pages", with those permissions checked) - `buildAuthUrl` passes that Configuration's id as `config_id`
+   when `FACEBOOK_CONFIG_ID` is set in `.env`, and only falls back to the plain `scope` param without it.
+2. Facebook redirects the browser to `GET /api/facebook/callback` with a `code`. The server exchanges it for a
+   short-lived user token, then that for a **long-lived** (~60 day) user token (`exchangeCodeForLongLivedUserToken`).
+3. `fetchManagedPages` calls `/me/accounts` with that long-lived user token, which returns a **Page** Access
+   Token per Page the account admins - a Page token minted this way doesn't itself expire on the ~60-day timer.
+   Single-page scope: if the account admins more than one Page, the list is held in memory
+   (`setPendingPages`/`getPendingPages`) and the Settings page shows a picker (`POST /api/facebook/select-page`)
+   rather than guessing which one to keep; connecting a new Page always replaces whichever one was saved before.
+4. The Page's id/name/token are saved to the `facebook_page` SQLite table. **The token never reaches the GUI
+   frontend** - `getConnectedPage()` (used by every status-returning endpoint) deliberately selects only
+   `id`/`name`/`connected_at`; only the server-internal `publishVideoToConnectedPage` reads the token column.
+
+**Publishing itself** (`POST /api/publish`, called from the Monitor page's "Publish to Facebook" button) looks
+up the rendered file via the existing manifest (`loadManifest` + the same `manifestKey` scheme Queue Render
+uses), uploads it with a multipart `POST` to `graph-video.facebook.com/{page-id}/videos` (Node's built-in
+`fetch`/`FormData`/`Blob` - no extra HTTP client dependency), and records the attempt in the `publications`
+SQLite table (`server/publications.ts`) before and after the upload (`status`: `uploading` → `published` or
+`error`) - this is the "what's generated vs. what's published" record. Monitor's manifest table gets a
+`mediaUrl` per entry (added server-side by `/api/manifest`, mapping `output/<file>` to the `/media/<file>`
+static route also mounted in `server/index.ts`) for inline `<video>` playback, and matches each entry to its
+latest publish attempt by `(batchId, template)` to show a live/failed/not-yet-published badge next to it.
 
 **Intro/outro video clips are spec'd, not implemented.** `IntroScene`/`OutroScene` are still plain
 React+CSS+`Html5Audio` (see [How a template is put together](#how-a-template-is-put-together)) — there is no

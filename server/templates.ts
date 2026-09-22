@@ -110,14 +110,6 @@ export function deleteTemplate(id: string): void {
   if (existsSync(file)) unlinkSync(file);
 }
 
-/** Writes this template's config overrides to a temp file for renderBatch.ts's --presetFile flag. */
-export function writePresetFile(record: TemplateRecord, tmpDir: string): string {
-  mkdirSync(tmpDir, { recursive: true });
-  const path = join(tmpDir, `preset-${record.id}-${Date.now()}.json`);
-  writeFileSync(path, JSON.stringify(record.config, null, 2));
-  return path;
-}
-
 /**
  * Commits and pushes templates/*.json to the current branch - this, not the
  * save above, is the actual "push to GitHub" action, and only ever runs when
