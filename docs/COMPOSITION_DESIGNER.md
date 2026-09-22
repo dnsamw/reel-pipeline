@@ -320,3 +320,50 @@ beat's own frame range and loops just that, instead of scrubbing the whole recip
 genuinely new visual *primitive* beyond text/image/shape - e.g. video-clip support, still requires
 code. The original 4-phase plan (renderer, chrome/contrast bindings, canvas, real schema wiring) is
 otherwise complete, on `feature/layer-designer`.
+
+## Data binding: a future-proof registry + a structured graph editor
+
+Real testers tried the branch and called it "too confusing, not user friendly" - specifically:
+picking a phrase field from a plain dropdown wasn't visual enough, and the whole editor needed a
+more drag-and-drop feel. They also flagged that more data models beyond `BookPhrase` are coming and
+asked for the binding system to not need a rewrite when that happens.
+
+**Registry, not a hardcoded enum**: `src/data/dataSources.ts` is a small, Prisma-free registry
+(same isolation discipline as `src/data/phrase.ts`) of `DataSourceDescriptor`s - today just
+`BookPhrase`'s 5 text fields. `compositionRecipeSchema` gained `dataSourceId` (defaults to
+`"BookPhrase"`), and `layers/schema.ts`'s `textRefSchema` renamed its `phraseField` variant to
+`dataField`, widening `field` from a closed 5-value enum to an open `string` - validated against the
+active recipe's registry entry in the GUI, resolved as a plain property lookup by
+`LayerRenderer.tsx` (functionally identical to before; `Phrase` is still the only shape ever passed
+in). `GET /api/data-sources` exposes the registry to the GUI. Adding a real second source later
+means one more registry entry plus that model's own Prisma-isolated fetch file - the recipe schema,
+`LayerRenderer.tsx`, and every GUI component that reads the registry stay unchanged.
+**Deliberately not built**: a generic multi-model fetch/batch/manifest pipeline - no second source
+exists yet, so there's nothing real to design that against. `renderBatch.ts`, `manifest.ts`,
+`batch.ts`, `getPhrases.ts` are untouched by this whole change (confirmed via an empty `git diff`)
+- rendering and rendered/not-rendered tracking work exactly as before.
+
+**`DataGraph.tsx`**: a *structured* node graph, not a free-form ComfyUI clone - beats stay in their
+existing fixed left-to-right array order (reordering is still the move-left/move-right buttons, not
+a wire, so render order can never be accidentally rewired by dragging the wrong connection). Only
+data bindings are free wires: drag a dot from the Data Source node's field list onto a text layer's
+input socket anywhere in the sequence to bind it; drag onto empty space inside a `custom` beat's
+column to create a new bound text layer there. Intro/Outro nodes get no input socket at all -
+`IntroScene`/`OutroScene` render once per whole reel, not once per phrase, so there's no single
+`phrase` in scope for them to bind to (already true before this: `introTextSchema` never offered a
+phrase-field option). Clicking any node selects/scrolls to the matching card in the existing
+per-beat form below and focuses the live preview on it (reusing "Preview this beat"); clicking
+Intro/Outro toggles their existing Show/Hide state. Sits above `LayerEditor.tsx`'s form and
+`LayerCanvas.tsx`'s spatial drag/resize/rotate surface - both untouched, since they answer a
+different question ("what data feeds this" vs. "what does this say" vs. "where is this on screen")
+and deliberately stay separate rather than merging drag-to-wire and drag-to-move into one crowded
+canvas.
+
+Verified via Playwright against the real dev server: dragged a field's socket onto an existing text
+layer (confirmed the form's text source updated to the binding), dragged a field onto empty
+custom-beat space (confirmed a new bound layer appeared), clicked a beat node (confirmed the
+"Preview this beat" state followed), clicked the Intro node (confirmed its Show/Hide button
+flipped), saved through the real `POST /api/recipes` - zero console errors. A real `remotion still`
+render via `Reel-Custom` with two `dataField`-bound layers (`explanation`, `pronunciationSi`)
+confirmed the renamed binding still resolves correctly in the actual production renderer, not just
+the browser preview.

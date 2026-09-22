@@ -60,9 +60,13 @@ const textRefSchema = z.union([
   z.object({ source: z.literal("literal"), value: z.string() }),
   z.object({ source: z.literal("config"), path: z.enum(["introText"]) }), // grows as more config fields become bindable
   z.object({
-    source: z.literal("phraseField"),
-    // Matches data/phrase.ts's Phrase fields exactly.
-    field: z.enum(["phrase", "translationSi", "pronunciationSi", "explanation", "explanationSi"]),
+    source: z.literal("dataField"),
+    // An open string, not a closed enum - which keys are valid depends on
+    // the owning recipe's dataSourceId (data/dataSources.ts), which this
+    // layer schema has no way to see (it's a sibling field, not an ancestor
+    // in scope here). The GUI validates against the live registry when
+    // authoring; the renderer just does a plain property lookup either way.
+    field: z.string(),
   }),
 ]);
 

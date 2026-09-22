@@ -115,8 +115,22 @@ export interface LayerBox {
 
 export type ColorRef = { source: "literal"; hex: string } | { source: "theme"; token: keyof Palette } | { source: "oppositeThemeToken"; token: "primary" | "brand2" | "gold" };
 
-export type PhraseTextField = "phrase" | "translationSi" | "pronunciationSi" | "explanation" | "explanationSi";
-export type TextRef = { source: "literal"; value: string } | { source: "config"; path: "introText" } | { source: "phraseField"; field: PhraseTextField };
+// Mirrors src/data/dataSources.ts field-for-field - the registry of record
+// shapes a recipe's dataField text bindings can point at. Only "BookPhrase"
+// exists today; more get added there as more Prisma models come online, see
+// docs/COMPOSITION_DESIGNER.md's data-binding design.
+export interface DataSourceField {
+  key: string;
+  label: string;
+  type: "text";
+}
+export interface DataSourceDescriptor {
+  id: string;
+  label: string;
+  fields: DataSourceField[];
+}
+
+export type TextRef = { source: "literal"; value: string } | { source: "config"; path: "introText" } | { source: "dataField"; field: string };
 
 export type AnimationStep =
   | { type: "none" }
@@ -177,6 +191,8 @@ export interface CompositionRecipe {
   id: string;
   name: string;
   description: string;
+  /** Which data/dataSources.ts registry entry (mirrored below as DataSourceDescriptor) perPhraseBeats' dataField text bindings resolve against - see docs/COMPOSITION_DESIGNER.md. */
+  dataSourceId: string;
   intro: IntroBeat;
   perPhraseBeats: PerPhraseBeat[];
   outro: OutroBeat;

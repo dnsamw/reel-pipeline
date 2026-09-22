@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { ReelPreview } from "../components/ReelPreview";
 import { LayerEditor } from "../components/LayerEditor";
-import type { CompositionRecipe, CustomBeat, GuessRevealField, IntroBeat, OutroBeat, PerPhraseBeat, RecipeRecord, ReelConfig, ThemeVariant } from "../types";
+import { DataGraph } from "../components/DataGraph";
+import type { CompositionRecipe, CustomBeat, DataSourceDescriptor, GuessRevealField, IntroBeat, OutroBeat, PerPhraseBeat, RecipeRecord, ReelConfig, ThemeVariant } from "../types";
 
 const BEAT_KIND_LABEL: Record<PerPhraseBeat["kind"], string> = {
   phrase: "Phrase",
@@ -23,7 +24,7 @@ function defaultCustomBeat(): CustomBeat {
         kind: "text",
         id: `layer-${Math.random().toString(36).slice(2, 9)}`,
         box: { position: { xPct: 50, yPct: 50 }, anchor: "center", widthPct: 70, rotationDeg: 0, zIndex: 1 },
-        text: { source: "phraseField", field: "phrase" },
+        text: { source: "dataField", field: "phrase" },
         font: "sans",
         fontSizePx: 56,
         fontWeight: 700,
@@ -53,6 +54,8 @@ export function RecipeEditor() {
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [dataSourceId, setDataSourceId] = useState("BookPhrase");
+  const [dataSourceList, setDataSourceList] = useState<DataSourceDescriptor[]>([]);
   const [intro, setIntro] = useState<IntroBeat>(DEFAULT_INTRO);
   const [perPhraseBeats, setPerPhraseBeats] = useState<PerPhraseBeat[]>([defaultBeat("phrase")]);
   const [outro, setOutro] = useState<OutroBeat>(DEFAULT_OUTRO);
@@ -69,10 +72,12 @@ export function RecipeEditor() {
   const [savedId, setSavedId] = useState<string | null>(isNew ? null : id ?? null);
   const [saving, setSaving] = useState(false);
   const [pushing, setPushing] = useState(false);
+  const beatCardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
   function applyRecord(r: RecipeRecord | CompositionRecipe) {
     setName("name" in r ? r.name : "");
     setDescription("description" in r ? r.description : "");
+    setDataSourceId(r.dataSourceId);
     setIntro(r.intro);
     setPerPhraseBeats(r.perPhraseBeats);
     setOutro(r.outro);
@@ -80,6 +85,7 @@ export function RecipeEditor() {
 
   useEffect(() => {
     api.defaults().then(setDefaults).catch(() => {});
+    api.dataSources().then(setDataSourceList).catch(() => {});
     if (!isNew) {
       api
         .recipe(id!)
@@ -119,12 +125,18 @@ export function RecipeEditor() {
     setPreviewBeatIndex((cur) => (cur == null ? cur : cur === index ? null : cur > index ? cur - 1 : cur));
   }
 
+  /** DataGraph.tsx's node clicks go through here - sets the live-preview focus (same as "Preview this beat") and scrolls the matching form card into view, so the graph, the form, and the preview stay one navigation, not three. */
+  function selectBeat(index: number) {
+    setPreviewBeatIndex(index);
+    beatCardRefs.current.get(index)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setSaving(true);
     try {
-      const payload = { name, description, intro, perPhraseBeats, outro, transition: { at: "beforeOutro" as const, type: "fade" as const } };
+      const payload = { name, description, dataSourceId, intro, perPhraseBeats, outro, transition: { at: "beforeOutro" as const, type: "fade" as const } };
       const record = savedId ? await api.updateRecipe(savedId, payload) : await api.createRecipe(payload);
       setSavedId(record.id);
       setStatus("Saved to SQLite and exported to recipes/" + record.id + ".json");
@@ -156,11 +168,14 @@ export function RecipeEditor() {
     id: savedId ?? "preview-draft",
     name: name || "Untitled",
     description,
+    dataSourceId,
     intro,
     perPhraseBeats,
     outro,
     transition: { at: "beforeOutro", type: "fade" },
   };
+
+  const activeDataSource = dataSourceList.find((d) => d.id === dataSourceId) ?? null;
 
   return (
     <div>
@@ -195,8 +210,37 @@ export function RecipeEditor() {
                   <label>Description</label>
                   <textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
                 </div>
+                <div className="field">
+                  <label>Data source</label>
+                  {dataSourceList.length > 1 ? (
+                    <select value={dataSourceId} onChange={(e) => setDataSourceId(e.target.value)}>
+                      {dataSourceList.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input type="text" value={activeDataSource?.label ?? dataSourceId} disabled />
+                  )}
+                </div>
               </div>
             </div>
+
+            <DataGraph
+              dataSource={activeDataSource}
+              intro={intro}
+              outro={outro}
+              introOpen={introOpen}
+              outroOpen={outroOpen}
+              onToggleIntro={() => setIntroOpen((o) => !o)}
+              onToggleOutro={() => setOutroOpen((o) => !o)}
+              perPhraseBeats={perPhraseBeats}
+              onChangeBeat={updateBeat}
+              onMoveBeat={moveBeat}
+              selectedBeatIndex={previewBeatIndex}
+              onSelectBeat={selectBeat}
+            />
 
             <div className="card">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: introOpen ? 12 : 0 }}>
@@ -258,7 +302,15 @@ export function RecipeEditor() {
                 Repeats once for every phrase in a reel, in this order, between the intro and outro.
               </p>
               {perPhraseBeats.map((beat, i) => (
-                <div className="queue-phrase-card" key={i} style={previewBeatIndex === i ? { outline: "2px solid var(--primary)" } : undefined}>
+                <div
+                  className="queue-phrase-card"
+                  key={i}
+                  ref={(el) => {
+                    if (el) beatCardRefs.current.set(i, el);
+                    else beatCardRefs.current.delete(i);
+                  }}
+                  style={previewBeatIndex === i ? { outline: "2px solid var(--primary)" } : undefined}
+                >
                   <div className="hint" style={{ marginBottom: 6 }}>
                     Beat {i + 1} of {perPhraseBeats.length}
                   </div>
@@ -299,7 +351,9 @@ export function RecipeEditor() {
                       </>
                     )}
                   </div>
-                  {beat.kind === "custom" && <LayerEditor beat={beat} onChange={(next) => updateBeat(i, next)} fps={defaults?.fps ?? 30} />}
+                  {beat.kind === "custom" && (
+                    <LayerEditor beat={beat} onChange={(next) => updateBeat(i, next)} fps={defaults?.fps ?? 30} dataFields={activeDataSource?.fields ?? []} />
+                  )}
                   <div className="button-row">
                     <button
                       type="button"

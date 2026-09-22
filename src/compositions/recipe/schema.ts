@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { customBeatSchema } from "./layers/schema";
+import { defaultDataSourceId } from "../../data/dataSources";
 
 /**
  * A "composition recipe": data describing which of the existing scene
@@ -93,6 +94,8 @@ export const compositionRecipeSchema = z.object({
   id: z.string().describe('Matches the CLI/GUI "template" number today (1/2/3) for the built-ins; a free string for a new recipe'),
   name: z.string(),
   description: z.string().default(""),
+  /** Which data/dataSources.ts registry entry perPhraseBeats' `dataField` text bindings resolve field keys against - see docs/COMPOSITION_DESIGNER.md's data-binding design. Only "BookPhrase" exists today; defaulted so older recipes still parse once a second source is registered. */
+  dataSourceId: z.string().default(defaultDataSourceId),
   intro: introBeatSchema,
   /** The repeating unit between intro and outro, expanded once per phrase in the batch - e.g. [phrase, countdown, reveal] (Template 1) or [guessReveal] (Template 2/3). */
   perPhraseBeats: z.array(perPhraseBeatSchema).min(1),

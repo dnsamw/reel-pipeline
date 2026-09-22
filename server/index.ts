@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { defaultConfig } from "../src/config/config";
 import { colors as lightPalette, darkColors as darkPalette } from "../src/theme/tokens";
+import { dataSources } from "../src/data/dataSources";
 import { getPhrases, listBooks, listChapters, updatePhrase, disconnect } from "../src/data/getPhrases";
 import { batchPhrases } from "../src/data/batch";
 import { loadManifest, isRendered } from "../src/render/manifest";
@@ -173,6 +174,13 @@ app.get("/api/video-spec", (_req, res) => {
 /** The built-in brand palette (theme/tokens.ts) - used by the GUI to prefill a new template's color overrides instead of guessing. */
 app.get("/api/theme/default", (_req, res) => {
   res.json({ light: lightPalette, dark: darkPalette });
+});
+
+// The data-binding registry (src/data/dataSources.ts) - which record shapes
+// a recipe's custom-beat text layers can bind against. See
+// docs/COMPOSITION_DESIGNER.md's data-binding design.
+app.get("/api/data-sources", (_req, res) => {
+  res.json(Object.values(dataSources));
 });
 
 // --- Template library ---

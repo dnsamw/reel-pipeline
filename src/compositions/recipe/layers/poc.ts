@@ -3,7 +3,7 @@ import type { CustomBeat } from "./schema";
 /**
  * Hand-written proof beat for Root.tsx's "LayerDesignerPOC" composition -
  * exercises every layer kind, every animation shape, both binding sources
- * (phraseField + oppositeThemeToken), and the sceneFrameChrome escape hatch,
+ * (dataField + oppositeThemeToken), and the sceneFrameChrome escape hatch,
  * so a single still-frame/visual check proves the generic interpreter
  * actually works, not just that it type-checks. See
  * docs/COMPOSITION_DESIGNER.md's "A concrete design for the true visual
@@ -28,7 +28,7 @@ export const pocBeat: CustomBeat = {
       kind: "text",
       id: "heading",
       box: { position: { xPct: 50, yPct: 55 }, anchor: "center", widthPct: 80, rotationDeg: 0, zIndex: 2 },
-      text: { source: "phraseField", field: "phrase" },
+      text: { source: "dataField", field: "phrase" },
       font: "sans",
       fontSizePx: 64,
       fontWeight: 700,
@@ -40,7 +40,7 @@ export const pocBeat: CustomBeat = {
       kind: "text",
       id: "subheading",
       box: { position: { xPct: 50, yPct: 68 }, anchor: "center", widthPct: 70, rotationDeg: 0, zIndex: 2 },
-      text: { source: "phraseField", field: "translationSi" },
+      text: { source: "dataField", field: "translationSi" },
       font: "sinhala",
       fontSizePx: 40,
       fontWeight: 500,

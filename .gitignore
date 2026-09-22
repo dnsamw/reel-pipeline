@@ -5,7 +5,11 @@ cache/
 # SQLite store for the GUI's template library (server/db.ts) - the live/query
 # copy. templates/*.json (its git-tracked export) is intentionally NOT
 # ignored - that's what gets pushed to GitHub, see server/templates.ts.
-data/
+# Leading slash matters: unanchored "data/" also matches src/data/ (a real
+# source directory, not gitignore-able) since gitignore patterns without a
+# slash match at any depth - caught when a new src/data/dataSources.ts
+# silently failed to show up in `git status`.
+/data/
 gui/dist/
 assets/music/*
 !assets/music/.gitkeep

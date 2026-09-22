@@ -135,8 +135,11 @@ guess-and-reveal, in any order/count) with a live preview, same save/edit/push-t
 presets. One beat kind, **Custom**, goes further — instead of one of the fixed scene layouts, it's a stack of
 positioned text/shape/image layers (position, size, color, animation) you arrange by dragging/resizing/
 rotating on a canvas (plus a form for text/color/animation fields), no code needed for a new visual
-arrangement of that beat's content. A custom recipe is fully renderable, not just previewable — pick it
-anywhere a "Composition" is chosen. See
+arrangement of that beat's content. A text layer's content can be bound to a data field (phrase,
+Sinhala meaning, pronunciation, explanation...) by dragging it from a small node-graph view onto the
+layer, instead of picking from a dropdown — built against a registry (`src/data/dataSources.ts`) so
+more data models beyond phrases can be added later without changing the editor. A custom recipe is
+fully renderable, not just previewable — pick it anywhere a "Composition" is chosen. See
 [docs/COMPOSITION_DESIGNER.md](docs/COMPOSITION_DESIGNER.md) for the full design.
 
 **Settings page** — GUI-wide defaults (durations/volumes/TTS/colors/copy, plus the default composition and

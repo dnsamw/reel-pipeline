@@ -30,7 +30,7 @@ function clamp(v: number, min: number, max: number): number {
 }
 
 function layerLabel(layer: Layer): string {
-  if (layer.kind === "text") return layer.text.source === "literal" ? layer.text.value || "(empty text)" : layer.text.source === "phraseField" ? `{${layer.text.field}}` : "{introText}";
+  if (layer.kind === "text") return layer.text.source === "literal" ? layer.text.value || "(empty text)" : layer.text.source === "dataField" ? `{${layer.text.field}}` : "{introText}";
   if (layer.kind === "shape") return layer.shape;
   return layer.src.source === "sceneFrameChrome" ? "chrome" : layer.src.path || "(asset)";
 }

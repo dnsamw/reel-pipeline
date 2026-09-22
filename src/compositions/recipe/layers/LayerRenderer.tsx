@@ -50,7 +50,12 @@ function resolveColor(ref: ColorRef | undefined, c: ResolvedPalette, opposite: R
 function resolveText(ref: TextRef, phrase: Phrase | null, config: ReelConfig): string {
   if (ref.source === "literal") return ref.value;
   if (ref.source === "config") return config.introText;
-  return (phrase?.[ref.field] ?? "") as string;
+  // dataField - an open field key (data/dataSources.ts), not one of Phrase's
+  // named keys, so this is a genuine untyped lookup - Phrase is still the
+  // only record shape ever passed in today (see docs/COMPOSITION_DESIGNER.md's
+  // data-binding design for what changes once a second data source exists).
+  const value = (phrase as Record<string, unknown> | null)?.[ref.field];
+  return typeof value === "string" ? value : "";
 }
 
 type AnimationStep = CustomBeat["layers"][number]["animation"]["enter"];

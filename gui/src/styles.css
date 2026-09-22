@@ -548,6 +548,23 @@ th {
   margin-bottom: 12px;
 }
 
+.datagraph-node {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  min-width: 160px;
+  max-width: 200px;
+  flex: none;
+}
+
+.datagraph-node-title {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 4px;
+  display: block;
+}
+
 .review-layout {
   display: flex;
   gap: 24px;

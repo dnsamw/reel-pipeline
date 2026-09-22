@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { api } from "../api";
 import { LayerCanvas } from "./LayerCanvas";
-import type { Anchor, AnimationSpec, AnimationStep, ColorRef, CustomBeat, Layer, LayerBox, Palette, PhraseTextField, ShapeLayer, TextRef, ThemeVariant } from "../types";
+import type { Anchor, AnimationSpec, AnimationStep, ColorRef, CustomBeat, DataSourceField, Layer, LayerBox, Palette, ShapeLayer, TextRef, ThemeVariant } from "../types";
 
 /**
  * Editor for a `custom` beat's Layer[] - the GUI side of
@@ -17,25 +17,21 @@ import type { Anchor, AnimationSpec, AnimationStep, ColorRef, CustomBeat, Layer,
  */
 
 const ANCHORS: Anchor[] = ["top-left", "top-center", "top-right", "center-left", "center", "center-right", "bottom-left", "bottom-center", "bottom-right"];
-const PHRASE_FIELDS: { value: PhraseTextField; label: string }[] = [
-  { value: "phrase", label: "Phrase (English)" },
-  { value: "translationSi", label: "Sinhala meaning" },
-  { value: "pronunciationSi", label: "Sinhala pronunciation" },
-  { value: "explanation", label: "Explanation (English)" },
-  { value: "explanationSi", label: "Explanation (Sinhala)" },
-];
 const THEME_TOKENS: (keyof Palette)[] = ["primary", "brand2", "gold", "goldInk", "foreground", "mutedForeground", "border", "background"];
 const OPPOSITE_TOKENS: ("primary" | "brand2" | "gold")[] = ["primary", "brand2", "gold"];
 
-function newLayerId(): string {
+// Exported for DataGraph.tsx, which creates new (pre-bound) text layers from
+// a data-field drop the same way "+ Add layer" does here - one place for
+// what a freshly-created layer looks like.
+export function newLayerId(): string {
   return `layer-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-function defaultBox(): LayerBox {
+export function defaultBox(): LayerBox {
   return { position: { xPct: 50, yPct: 50 }, anchor: "center", widthPct: 70, rotationDeg: 0, zIndex: 1 };
 }
 
-function defaultAnimation(): AnimationSpec {
+export function defaultAnimation(): AnimationSpec {
   return { enter: { type: "fade", durationInFrames: 15 }, exit: { type: "none" }, delayFrames: 0 };
 }
 
@@ -149,7 +145,7 @@ function AnimationStepFields({ label, step, onChange }: { label: string; step: A
 }
 
 function layerSummary(layer: Layer): string {
-  if (layer.kind === "text") return layer.text.source === "literal" ? layer.text.value || "(empty text)" : layer.text.source === "phraseField" ? `{${layer.text.field}}` : "{introText}";
+  if (layer.kind === "text") return layer.text.source === "literal" ? layer.text.value || "(empty text)" : layer.text.source === "dataField" ? `{${layer.text.field}}` : "{introText}";
   if (layer.kind === "shape") return layer.shape;
   return layer.src.source === "sceneFrameChrome" ? "scene chrome" : layer.src.path || "(no image chosen)";
 }
@@ -159,6 +155,7 @@ function LayerCard({
   index,
   total,
   selected,
+  dataFields,
   onSelect,
   onChange,
   onMove,
@@ -168,6 +165,7 @@ function LayerCard({
   index: number;
   total: number;
   selected: boolean;
+  dataFields: DataSourceField[];
   onSelect: () => void;
   onChange: (l: Layer) => void;
   onMove: (delta: -1 | 1) => void;
@@ -275,21 +273,22 @@ function LayerCard({
                   value={layer.text.source}
                   onChange={(e) => {
                     const source = e.target.value as TextRef["source"];
-                    const text: TextRef = source === "literal" ? { source, value: "" } : source === "config" ? { source, path: "introText" } : { source, field: "phrase" };
+                    const text: TextRef =
+                      source === "literal" ? { source, value: "" } : source === "config" ? { source, path: "introText" } : { source, field: dataFields[0]?.key ?? "" };
                     onChange({ ...layer, text });
                   }}
                 >
                   <option value="literal">Fixed text</option>
-                  <option value="phraseField">From the phrase</option>
+                  <option value="dataField">From the data source</option>
                   <option value="config">Global intro text</option>
                 </select>
                 {layer.text.source === "literal" && (
                   <input type="text" value={layer.text.value} onChange={(e) => onChange({ ...layer, text: { source: "literal", value: e.target.value } })} />
                 )}
-                {layer.text.source === "phraseField" && (
-                  <select value={layer.text.field} onChange={(e) => onChange({ ...layer, text: { source: "phraseField", field: e.target.value as PhraseTextField } })}>
-                    {PHRASE_FIELDS.map((f) => (
-                      <option key={f.value} value={f.value}>
+                {layer.text.source === "dataField" && (
+                  <select value={layer.text.field} onChange={(e) => onChange({ ...layer, text: { source: "dataField", field: e.target.value } })}>
+                    {dataFields.map((f) => (
+                      <option key={f.key} value={f.key}>
                         {f.label}
                       </option>
                     ))}
@@ -412,7 +411,7 @@ function LayerCard({
   );
 }
 
-export function LayerEditor({ beat, onChange, fps }: { beat: CustomBeat; onChange: (beat: CustomBeat) => void; fps: number }) {
+export function LayerEditor({ beat, onChange, fps, dataFields }: { beat: CustomBeat; onChange: (beat: CustomBeat) => void; fps: number; dataFields: DataSourceField[] }) {
   const [selectedId, setSelectedId] = useState<string | null>(beat.layers[0]?.id ?? null);
 
   function updateLayer(index: number, layer: Layer) {
@@ -461,6 +460,7 @@ export function LayerEditor({ beat, onChange, fps }: { beat: CustomBeat; onChang
             layer={layer}
             index={i}
             total={beat.layers.length}
+            dataFields={dataFields}
             selected={layer.id === selectedId}
             onSelect={() => setSelectedId((cur) => (cur === layer.id ? null : layer.id))}
             onChange={(l) => updateLayer(i, l)}

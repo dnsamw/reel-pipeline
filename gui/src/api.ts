@@ -2,6 +2,7 @@ import type {
   Book,
   Chapter,
   CompositionRecipe,
+  DataSourceDescriptor,
   FacebookStatus,
   Manifest,
   Phrase,
@@ -32,6 +33,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   defaults: () => request<ReelConfig>("/config/defaults"),
   defaultTheme: () => request<ReelTheme>("/theme/default"),
+  dataSources: () => request<DataSourceDescriptor[]>("/data-sources"),
   books: () => request<Book[]>("/books"),
   chapters: (book?: string | null) => request<Chapter[]>(`/chapters${book ? `?book=${encodeURIComponent(book)}` : ""}`),
   previewBatches: (params: { book?: string | null; min?: number | null; max?: number | null; phrasesPerReel?: number }) => {
