@@ -530,3 +530,60 @@ exactly `(1800-220) x (1000-60)` px against an 1800x1000 viewport with the sideb
 the Timeline panel by its titlebar moved its real screen position; closing and reopening the Live
 preview panel via the topbar toggle worked; the Position and Layer-property panels both appeared on
 selecting a layer. Zero console errors throughout.
+
+## Fixed a real bug (nodes "disappearing"), docked Timeline/beat-tools, per-node summon buttons
+
+Reported: dragging a Knob in the layer property panel made every graph node - including the
+Data Source node - visually vanish; recovering required deselecting and reselecting the custom beat
+(which fully unmounts/remounts `DataGraph`).
+
+**Root cause**, confirmed with an instrumented Playwright repro (polling `.react-flow__node` count
+and reading `.react-flow__viewport`'s transform on every step of a slow, paced knob drag): node
+count never changed - nodes were never removed. `<ReactFlow>`'s `fitView` boolean prop was
+recalculating the pan/zoom transform on every rapid `setNodes`/`setEdges` call (the node-rebuilding
+`useEffect` re-running on every knob-drag tick), eventually panning/zooming the nodes out of the
+visible area even though they stayed in the DOM.
+
+**Fix**: removed the reactive `fitView` prop; replaced it with `onInit={(instance) =>
+instance.fitView({ padding: 0.3 })}` so the view auto-fits exactly once, when `<ReactFlow>` first
+mounts (switching between a non-custom and a custom beat unmounts/remounts it; `<Controls
+showInteractive={false}>` already has a manual fit-view button for the remaining case of switching
+directly between two different custom beats). Also switched the node-rebuilding effect to the
+functional `setNodes((current) => ...)` form, looking up each node's existing position before
+falling back to a computed default, so edits no longer reset every node's position on every change -
+one less source of churn. Re-ran the same repro after the fix: the viewport transform is now
+provably stable (identical, unchanging) at every single step of the drag, and a screenshot confirmed
+both nodes stayed rendered and visible throughout.
+
+**Per-node summon buttons** replace the old "select a node → its Position and Layer-properties
+panels force themselves open, often far from the node" behavior. `LayerNodeComponent` now renders
+two small circular icon buttons in its top-right corner: a purple crosshair (Position) and a gold
+gear (Layer properties) - colored via `--primary`/`--gold` so they read as distinct, meaningful
+toggles, each lighting up solid when its panel is open for that node. Clicking a node's body only
+selects/highlights it; clicking either icon button selects the node *and* opens that specific panel,
+anchored near the button's actual screen position (`getBoundingClientRect()` on the button, made
+relative to the graph's own wrapper `ref`, then clamped so the panel can't land partly off-screen).
+Closing a panel (its own X) just closes that panel - it no longer deselects the node. The Layer
+Properties panel lives in `DataGraph.tsx` (`propertiesFor` state); Position lives up in
+`RecipeEditor.tsx` since it renders `LayerCanvas` there, reached via a new `onRequestPosition`
+callback prop carrying the already-clamped anchor down from `DataGraph`.
+
+**Timeline is now docked to the bottom, full width** (`.timeline-dock` - `position: absolute; left:
+0; right: 0; bottom: 0`) instead of a freely-draggable `FloatingPanel`, with its own header/close
+button styled like a `FloatingPanel`'s but without the drag handle.
+
+**The "Custom beat" toolbar is now a docked vertical strip** (`.beat-tools-dock`, 60px wide) pinned
+to the graph's left edge - since the workspace itself already starts immediately right of the
+collapsible global sidebar, this strip lands exactly "next to the sidebar" as asked. Add
+Text/Shape/Image buttons, the theme `IconToggleGroup` (now supports a `direction="column"` prop),
+and the duration `Knob` all stack vertically; the previous descriptive hint paragraph became a
+single info-icon button carrying the same text as its tooltip, to keep the strip narrow.
+
+Verified via Playwright against the real dev server (slow, multi-step pointer moves throughout, per
+this project's established lesson about false-negative fast-jump readings): Timeline's box spans the
+full workspace width flush to the bottom; the beat-tools strip sits flush to the workspace's left
+edge; a plain click on a node opens neither panel; clicking the gear/crosshair icons opens Layer
+properties/Position near that node and clamped fully on-screen; dragging the delay Knob afterward
+keeps both nodes visible with a provably stable viewport transform throughout the drag; closing the
+properties panel leaves the node selected. `git diff --stat` on `src/render`/`LayerRenderer.tsx` is
+empty - this round touched only the GUI layout/interaction layer.

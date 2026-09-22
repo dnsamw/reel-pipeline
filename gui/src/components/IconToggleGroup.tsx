@@ -10,13 +10,15 @@ export function IconToggleGroup<T extends string>({
   value,
   options,
   onChange,
+  direction = "row",
 }: {
   value: T;
   options: { value: T; label: string; icon: ReactNode }[];
   onChange: (v: T) => void;
+  direction?: "row" | "column";
 }) {
   return (
-    <div className="icon-toggle-group">
+    <div className={`icon-toggle-group${direction === "column" ? " icon-toggle-group-vertical" : ""}`}>
       {options.map((opt) => (
         <button
           key={opt.value}

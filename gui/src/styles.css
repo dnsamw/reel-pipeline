@@ -596,6 +596,7 @@ th {
 }
 
 .datagraph-node {
+  position: relative;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -603,6 +604,48 @@ th {
   min-width: 160px;
   max-width: 200px;
   flex: none;
+}
+
+.node-icon-btns {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  display: flex;
+  gap: 4px;
+}
+
+.node-icon-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.node-icon-btn-position {
+  color: var(--primary);
+}
+
+.node-icon-btn-position.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+.node-icon-btn-properties {
+  color: var(--gold);
+}
+
+.node-icon-btn-properties.active {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: white;
 }
 
 .datagraph-node-title {
@@ -829,6 +872,10 @@ th {
   padding: 2px;
 }
 
+.icon-toggle-group-vertical {
+  flex-direction: column;
+}
+
 .icon-toggle {
   background: transparent;
   border: none;
@@ -851,30 +898,7 @@ th {
   background: var(--border);
 }
 
-/* --- Graph panel: toolbar + node property panel --- */
-
-.graph-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--border);
-}
-
-.graph-toolbar-add {
-  display: flex;
-  gap: 4px;
-}
-
-.graph-toolbar-add button {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 10px;
-  font-size: 12px;
-}
+/* --- Graph panel: node property panel --- */
 
 .node-property-panel {
   display: flex;
@@ -982,4 +1006,100 @@ th {
 .workspace-toggle-row {
   display: flex;
   gap: 6px;
+}
+
+/* --- Beat tools: docked left strip, immediately right of the global sidebar --- */
+
+.beat-tools-dock {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 25;
+  width: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 6px;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+}
+
+.beat-tools-add {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+  color: var(--fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.beat-tools-add:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.beat-tools-divider {
+  width: 32px;
+  height: 1px;
+  background: var(--border);
+  flex: none;
+}
+
+.beat-tools-info {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: auto;
+}
+
+.beat-tools-info:hover {
+  color: var(--primary);
+}
+
+/* --- Timeline: docked to the bottom, full width --- */
+
+.timeline-dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 28;
+  max-height: 40vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.18);
+}
+
+.timeline-dock-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-soft);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.timeline-dock-body {
+  padding: 10px;
+  overflow: auto;
 }

@@ -7,7 +7,10 @@ import { DataGraph } from "../components/DataGraph";
 import { LayerCanvas } from "../components/LayerCanvas";
 import { Inspector, defaultBeat } from "../components/Inspector";
 import { FloatingPanel } from "../components/FloatingPanel";
+import { X } from "lucide-react";
 import type { CompositionRecipe, DataSourceDescriptor, IntroBeat, OutroBeat, PerPhraseBeat, RecipeRecord, ReelConfig } from "../types";
+
+type PanelAnchor = { layerId: string; x: number; y: number };
 
 const DEFAULT_INTRO: IntroBeat = { kind: "intro", theme: "light", text: { source: "config.introText" }, introVoiceKeyword: "sinhala" };
 const DEFAULT_OUTRO: OutroBeat = { kind: "outro", theme: "dark" };
@@ -50,14 +53,7 @@ export function RecipeEditor() {
   const [pushing, setPushing] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(true);
   const [timelineOpen, setTimelineOpen] = useState(true);
-  const [positionOpen, setPositionOpen] = useState(true);
-
-  // A newly-selected layer re-opens the Position panel even if it was
-  // closed for a previous one - "closed" is a per-look convenience, not a
-  // standing preference.
-  useEffect(() => {
-    if (selection.layerId) setPositionOpen(true);
-  }, [selection.layerId]);
+  const [positionFor, setPositionFor] = useState<PanelAnchor | null>(null);
 
   function applyRecord(r: RecipeRecord | CompositionRecipe) {
     setName("name" in r ? r.name : "");
@@ -231,8 +227,13 @@ export function RecipeEditor() {
               beat={selectedBeat}
               selectedLayerId={selection.layerId}
               fps={defaults?.fps ?? 30}
+              positionLayerId={positionFor?.layerId ?? null}
               onSelectLayer={(layerId) => numericBeatIndex != null && selectLayer(numericBeatIndex, layerId)}
               onChangeBeat={(b) => numericBeatIndex != null && updateBeat(numericBeatIndex, b)}
+              onRequestPosition={(layerId, anchor) => {
+                if (numericBeatIndex != null) selectLayer(numericBeatIndex, layerId);
+                setPositionFor({ layerId, ...anchor });
+              }}
             />
           ) : (
             <div style={{ padding: 20, maxWidth: 700 }}>
@@ -255,25 +256,33 @@ export function RecipeEditor() {
         </div>
 
         {timelineOpen && defaults && (
-          <FloatingPanel title="Timeline" defaultX={16} defaultY={16} width={Math.min(1100, window.innerWidth - 340)} onClose={() => setTimelineOpen(false)}>
-            <Timeline
-              recipe={previewRecipe}
-              config={defaults}
-              perPhraseBeats={perPhraseBeats}
-              onChangeBeat={updateBeat}
-              onReorderBeat={reorderBeat}
-              introOpen={introOpen}
-              outroOpen={outroOpen}
-              selection={selection}
-              onSelectBeat={selectBeat}
-              onSelectLayer={selectLayer}
-            />
-            <div className="button-row" style={{ marginTop: 8, marginBottom: 0 }}>
-              <button type="button" className="secondary" onClick={() => setPerPhraseBeats((cur) => [...cur, defaultBeat("phrase")])}>
-                + Add beat
+          <div className="timeline-dock">
+            <div className="timeline-dock-header">
+              <span>Timeline</span>
+              <button type="button" className="floating-panel-close" title="Hide Timeline" onClick={() => setTimelineOpen(false)}>
+                <X size={13} />
               </button>
             </div>
-          </FloatingPanel>
+            <div className="timeline-dock-body">
+              <Timeline
+                recipe={previewRecipe}
+                config={defaults}
+                perPhraseBeats={perPhraseBeats}
+                onChangeBeat={updateBeat}
+                onReorderBeat={reorderBeat}
+                introOpen={introOpen}
+                outroOpen={outroOpen}
+                selection={selection}
+                onSelectBeat={selectBeat}
+                onSelectLayer={selectLayer}
+              />
+              <div className="button-row" style={{ marginTop: 8, marginBottom: 0 }}>
+                <button type="button" className="secondary" onClick={() => setPerPhraseBeats((cur) => [...cur, defaultBeat("phrase")])}>
+                  + Add beat
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {previewOpen && (
@@ -301,8 +310,8 @@ export function RecipeEditor() {
           </FloatingPanel>
         )}
 
-        {isCustomSelected && selectedBeat && positionOpen && selection.layerId && (
-          <FloatingPanel title="Position" defaultX={16} defaultY={window.innerHeight - 420} width={300} onClose={() => setPositionOpen(false)}>
+        {isCustomSelected && selectedBeat && positionFor && positionFor.layerId === selection.layerId && (
+          <FloatingPanel key={positionFor.layerId} title="Position" defaultX={positionFor.x} defaultY={positionFor.y} width={300} onClose={() => setPositionFor(null)}>
             <p className="hint" style={{ marginTop: 0 }}>
               Drag a layer to move it, the square handle to resize, the round handle to rotate.
             </p>

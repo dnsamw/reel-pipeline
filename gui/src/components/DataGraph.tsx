@@ -1,8 +1,8 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ReactFlow, Background, Controls, Handle, Position, addEdge, useEdgesState, useNodesState } from "@xyflow/react";
 import type { Connection, Edge, Node, NodeProps, OnConnectEnd } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Image as ImageIcon, Moon, Square, Sun, Type } from "lucide-react";
+import { Crosshair, Image as ImageIcon, Info, Moon, Settings, Square, Sun, Type } from "lucide-react";
 import { contentForKind, defaultAnimation, defaultBox, newLayerId } from "../lib/layerDefaults";
 import { Knob } from "./Knob";
 import { IconToggleGroup } from "./IconToggleGroup";
@@ -44,9 +44,21 @@ function LayerNodeComponent({ data }: NodeProps) {
   const bound = data.bound as string | null;
   const selected = data.selected as boolean;
   const kind = data.kind as Layer["kind"];
+  const positionActive = data.positionActive as boolean;
+  const propertiesActive = data.propertiesActive as boolean;
+  const onOpenPosition = data.onOpenPosition as (e: React.MouseEvent) => void;
+  const onOpenProperties = data.onOpenProperties as (e: React.MouseEvent) => void;
   const Icon = LAYER_ICON[kind];
   return (
     <div className="datagraph-node" style={{ maxWidth: 200, outline: selected ? "2px solid var(--primary)" : undefined }}>
+      <div className="node-icon-btns">
+        <button type="button" className={`node-icon-btn node-icon-btn-position${positionActive ? " active" : ""}`} title="Position" onClick={onOpenPosition}>
+          <Crosshair size={11} />
+        </button>
+        <button type="button" className={`node-icon-btn node-icon-btn-properties${propertiesActive ? " active" : ""}`} title="Layer properties" onClick={onOpenProperties}>
+          <Settings size={11} />
+        </button>
+      </div>
       <Handle type="target" position={Position.Left} id="text" style={{ background: "var(--primary)", width: 10, height: 10 }} />
       <div className="datagraph-node-title" style={{ display: "flex", alignItems: "center", gap: 5 }}>
         <Icon size={13} />
@@ -63,53 +75,105 @@ function layerLabel(layer: Layer, index: number): string {
   return `${index + 1}. ${layer.kind}`;
 }
 
+type PanelAnchor = { layerId: string; x: number; y: number };
+
+// Clamps a floating panel's anchor - given in coordinates local to the
+// workspace container (FloatingPanel's own coordinate space) - so it stays
+// fully within that container even when summoned from a node near its edge.
+// Deliberately measured against the container's own rect rather than
+// window.innerWidth/Height, since the container is offset from the viewport
+// by the collapsible sidebar's width.
+function clampAnchor(x: number, y: number, w: number, h: number, containerW: number, containerH: number) {
+  return {
+    x: Math.min(Math.max(x, 0), Math.max(0, containerW - w - 24)),
+    y: Math.min(Math.max(y, 0), Math.max(0, containerH - h - 24)),
+  };
+}
+
 export function DataGraph({
   dataSource,
   beat,
   selectedLayerId,
   fps,
+  positionLayerId,
   onSelectLayer,
   onChangeBeat,
+  onRequestPosition,
 }: {
   dataSource: DataSourceDescriptor | null;
   beat: PerPhraseBeat | null;
   selectedLayerId: string | null;
   fps: number;
+  positionLayerId: string | null;
   onSelectLayer: (layerId: string | null) => void;
   onChangeBeat: (beat: CustomBeat) => void;
+  onRequestPosition: (layerId: string, anchor: { x: number; y: number }) => void;
 }) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [propertiesFor, setPropertiesFor] = useState<PanelAnchor | null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   const customBeat = beat?.kind === "custom" ? beat : null;
 
+  // Summoning a panel from a node's icon button anchors it near that node's
+  // actual screen position (workspace-relative, matching FloatingPanel's
+  // coordinate space) instead of a fixed far-away default, clamped to the
+  // workspace container so it can't land partly off-screen.
+  function anchorFromEvent(e: React.MouseEvent, panelW: number, panelH: number): { x: number; y: number } {
+    const wrapperRect = wrapperRef.current?.getBoundingClientRect();
+    const btnRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = btnRect.left - (wrapperRect?.left ?? 0) + 16;
+    const y = btnRect.top - (wrapperRect?.top ?? 0);
+    return clampAnchor(x, y, panelW, panelH, wrapperRect?.width ?? window.innerWidth, wrapperRect?.height ?? window.innerHeight);
+  }
+
   useEffect(() => {
     if (!dataSource) return;
-    const dataNode: Node = { id: "data", type: "dataSource", position: { x: 0, y: 0 }, data: { label: dataSource.label, fields: dataSource.fields } };
+    // Preserves each existing node's on-screen position across an edit
+    // (only a brand-new layer gets a fresh default position) - besides being
+    // less jarring, constantly resetting positions was part of what made
+    // fitView's continuous re-fit (see the ReactFlow props below) unstable.
+    setNodes((current) => {
+      const existingById = new Map(current.map((n) => [n.id, n]));
+      const dataNode: Node = { id: "data", type: "dataSource", position: existingById.get("data")?.position ?? { x: 0, y: 0 }, data: { label: dataSource.label, fields: dataSource.fields } };
+      if (!customBeat) return [dataNode];
+      const layerNodes: Node[] = customBeat.layers.map((layer, i) => ({
+        id: layer.id,
+        type: "layer",
+        position: existingById.get(layer.id)?.position ?? { x: 420, y: i * 110 },
+        data: {
+          label: layerLabel(layer, i),
+          kind: layer.kind,
+          bound: layer.kind === "text" && layer.text.source === "dataField" ? layer.text.field : null,
+          selected: layer.id === selectedLayerId,
+          positionActive: layer.id === positionLayerId,
+          propertiesActive: layer.id === propertiesFor?.layerId,
+          onOpenPosition: (e: React.MouseEvent) => {
+            e.stopPropagation();
+            onSelectLayer(layer.id);
+            onRequestPosition(layer.id, anchorFromEvent(e, 300, 420));
+          },
+          onOpenProperties: (e: React.MouseEvent) => {
+            e.stopPropagation();
+            onSelectLayer(layer.id);
+            setPropertiesFor({ layerId: layer.id, ...anchorFromEvent(e, 300, 480) });
+          },
+        },
+      }));
+      return [dataNode, ...layerNodes];
+    });
     if (!customBeat) {
-      setNodes([dataNode]);
       setEdges([]);
       return;
     }
-    const layerNodes: Node[] = customBeat.layers.map((layer, i) => ({
-      id: layer.id,
-      type: "layer",
-      position: { x: 420, y: i * 110 },
-      data: {
-        label: layerLabel(layer, i),
-        kind: layer.kind,
-        bound: layer.kind === "text" && layer.text.source === "dataField" ? layer.text.field : null,
-        selected: layer.id === selectedLayerId,
-      },
-    }));
-    setNodes([dataNode, ...layerNodes]);
     setEdges(
       customBeat.layers
         .filter((l): l is Layer & { kind: "text" } => l.kind === "text" && l.text.source === "dataField")
         .map((l) => ({ id: `${l.id}-edge`, source: "data", sourceHandle: (l.text as { field: string }).field, target: l.id, targetHandle: "text", style: { stroke: "var(--primary)" } })),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataSource, customBeat, selectedLayerId]);
+  }, [dataSource, customBeat, selectedLayerId, positionLayerId, propertiesFor]);
 
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -158,6 +222,7 @@ export function DataGraph({
     if (!customBeat || customBeat.layers.length <= 1) return;
     onChangeBeat({ ...customBeat, layers: customBeat.layers.filter((l) => l.id !== layerId) });
     if (selectedLayerId === layerId) onSelectLayer(null);
+    if (propertiesFor?.layerId === layerId) setPropertiesFor(null);
   }
 
   function updateLayer(layerId: string, layer: Layer) {
@@ -174,9 +239,10 @@ export function DataGraph({
   }
 
   const selectedLayer = customBeat.layers.find((l) => l.id === selectedLayerId) ?? null;
+  const propertiesLayer = propertiesFor && selectedLayer?.id === propertiesFor.layerId ? selectedLayer : null;
 
   return (
-    <div style={{ position: "absolute", inset: 0 }}>
+    <div ref={wrapperRef} style={{ position: "absolute", inset: 0 }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -192,60 +258,59 @@ export function DataGraph({
           for (const n of deleted) if (n.type === "layer") deleteLayer(n.id);
         }}
         deleteKeyCode={["Backspace", "Delete"]}
-        fitView
+        onInit={(instance) => instance.fitView({ padding: 0.3 })}
       >
         <Background />
         <Controls showInteractive={false} />
       </ReactFlow>
 
-      <FloatingPanel title="Custom beat" defaultX={16} defaultY={16} width={360}>
-        <div className="graph-toolbar" style={{ marginBottom: 0, paddingBottom: 0, border: "none" }}>
-          <div className="graph-toolbar-add">
-            <button type="button" className="secondary" title="Add a text layer" onClick={() => addLayer("text")}>
-              <Type size={14} /> Text
-            </button>
-            <button type="button" className="secondary" title="Add a shape layer" onClick={() => addLayer("shape")}>
-              <Square size={14} /> Shape
-            </button>
-            <button type="button" className="secondary" title="Add an image layer" onClick={() => addLayer("image")}>
-              <ImageIcon size={14} /> Image
-            </button>
-          </div>
-          <IconToggleGroup
-            value={customBeat.theme}
-            onChange={(theme: ThemeVariant) => onChangeBeat({ ...customBeat, theme })}
-            options={[
-              { value: "light", label: "Light theme", icon: <Sun size={14} /> },
-              { value: "dark", label: "Dark theme", icon: <Moon size={14} /> },
-            ]}
-          />
-          <Knob
-            label="secs"
-            value={Math.round((customBeat.durationInFrames / fps) * 10) / 10}
-            min={0.5}
-            max={20}
-            step={0.1}
-            sensitivity={0.1}
-            format={(v) => `${v.toFixed(1)}s`}
-            onChange={(v) => onChangeBeat({ ...customBeat, durationInFrames: Math.round(v * fps) })}
-          />
-        </div>
-        <p className="hint" style={{ marginTop: 8, marginBottom: 0 }}>
-          Drag a field's dot onto a layer's dot to bind it, or drop it on empty space to add a new bound layer. Select a
-          layer to edit it; Delete/Backspace removes it.
-        </p>
-      </FloatingPanel>
+      <div className="beat-tools-dock">
+        <button type="button" className="beat-tools-add" title="Add a text layer" onClick={() => addLayer("text")}>
+          <Type size={16} />
+        </button>
+        <button type="button" className="beat-tools-add" title="Add a shape layer" onClick={() => addLayer("shape")}>
+          <Square size={16} />
+        </button>
+        <button type="button" className="beat-tools-add" title="Add an image layer" onClick={() => addLayer("image")}>
+          <ImageIcon size={16} />
+        </button>
+        <div className="beat-tools-divider" />
+        <IconToggleGroup
+          direction="column"
+          value={customBeat.theme}
+          onChange={(theme: ThemeVariant) => onChangeBeat({ ...customBeat, theme })}
+          options={[
+            { value: "light", label: "Light theme", icon: <Sun size={14} /> },
+            { value: "dark", label: "Dark theme", icon: <Moon size={14} /> },
+          ]}
+        />
+        <Knob
+          label="secs"
+          value={Math.round((customBeat.durationInFrames / fps) * 10) / 10}
+          min={0.5}
+          max={20}
+          step={0.1}
+          sensitivity={0.1}
+          format={(v) => `${v.toFixed(1)}s`}
+          onChange={(v) => onChangeBeat({ ...customBeat, durationInFrames: Math.round(v * fps) })}
+        />
+        <div className="beat-tools-divider" />
+        <button type="button" className="beat-tools-info" title="Drag a field's dot onto a layer's dot to bind it, or drop it on empty space to add a new bound layer. Use the target/gear buttons on a layer node to summon its Position and Layer properties panels; Delete/Backspace removes a selected node.">
+          <Info size={15} />
+        </button>
+      </div>
 
-      {selectedLayer && (
+      {propertiesLayer && propertiesFor && (
         <FloatingPanel
-          title={`Layer: ${selectedLayer.kind}`}
-          defaultX={Math.max(16, window.innerWidth - 320)}
-          defaultY={16}
+          key={propertiesLayer.id}
+          title={`Layer: ${propertiesLayer.kind}`}
+          defaultX={propertiesFor.x}
+          defaultY={propertiesFor.y}
           width={300}
           maxHeight={window.innerHeight - 140}
-          onClose={() => onSelectLayer(null)}
+          onClose={() => setPropertiesFor(null)}
         >
-          <LayerPropertyPanel layer={selectedLayer} dataFields={dataSource?.fields ?? []} fps={fps} onChange={(l) => updateLayer(selectedLayer.id, l)} onDelete={() => deleteLayer(selectedLayer.id)} />
+          <LayerPropertyPanel layer={propertiesLayer} dataFields={dataSource?.fields ?? []} fps={fps} onChange={(l) => updateLayer(propertiesLayer.id, l)} onDelete={() => deleteLayer(propertiesLayer.id)} />
         </FloatingPanel>
       )}
     </div>
