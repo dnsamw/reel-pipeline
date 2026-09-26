@@ -46,7 +46,7 @@ export function PostTemplatePicker({
       <button type="button" className="template-picker-trigger" onClick={toggle}>
         {selected ? (
           <>
-            <PostPreview def={selected} fields={selected.defaultFields} colors={selected.defaultColors} width={56} />
+            <Thumb def={selected} box={56} />
             <span className="template-picker-trigger-text">{selected.name}</span>
           </>
         ) : (
@@ -64,7 +64,7 @@ export function PostTemplatePicker({
               className={`template-picker-option${t.id === value ? " selected" : ""}`}
               onClick={() => pick(t.id)}
             >
-              <PostPreview def={t} fields={t.defaultFields} colors={t.defaultColors} width={72} />
+              <Thumb def={t} box={72} />
               <span className="template-picker-option-text">
                 <strong>{t.name}</strong>
                 <span className="hint">{t.description}</span>
@@ -74,5 +74,15 @@ export function PostTemplatePicker({
         </div>
       )}
     </div>
+  );
+}
+
+/** Fits any aspect ratio (square post, 9:16 story...) inside a box×box square so every option lines up. */
+function Thumb({ def, box }: { def: PostTemplateDef; box: number }) {
+  const width = Math.round(box * Math.min(1, def.width / def.height));
+  return (
+    <span className="post-picker-thumb" style={{ width: box, height: box }}>
+      <PostPreview def={def} fields={def.defaultFields} lists={def.defaultLists} colors={def.defaultColors} width={width} />
+    </span>
   );
 }

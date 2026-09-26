@@ -2,17 +2,19 @@ import { useCallback, useEffect, useState } from "react";
 import { continueRender, delayRender, type CalculateMetadataFunction } from "remotion";
 import { PostHoldContext, type HoldFn } from "./PostReady";
 import { getPostTemplate, postTemplates } from "./registry";
-import type { PostColors, PostFields } from "./types";
+import type { PostColors, PostFields, PostLists } from "./types";
 
 export interface PostStillProps extends Record<string, unknown> {
   templateId: string;
   fields: PostFields;
+  lists: PostLists;
   colors: PostColors;
 }
 
 export const postStillDefaultProps: PostStillProps = {
   templateId: postTemplates[0].id,
   fields: postTemplates[0].defaultFields,
+  lists: postTemplates[0].defaultLists ?? {},
   colors: postTemplates[0].defaultColors,
 };
 
@@ -29,7 +31,7 @@ export const calculatePostMetadata: CalculateMetadataFunction<PostStillProps> = 
  * difference is this supplies a delayRender-backed hold() so the capture
  * waits for fonts, image decode and the headline fit.
  */
-export function PostStill({ templateId, fields, colors }: PostStillProps) {
+export function PostStill({ templateId, fields, lists, colors }: PostStillProps) {
   const def = getPostTemplate(templateId);
   const [fontHandle] = useState(() => delayRender("post: fonts"));
   const [fontsReady, setFontsReady] = useState(false);
@@ -68,7 +70,7 @@ export function PostStill({ templateId, fields, colors }: PostStillProps) {
   const Component = def.component;
   return (
     <PostHoldContext.Provider value={hold}>
-      <Component fields={{ ...def.defaultFields, ...fields }} colors={{ ...def.defaultColors, ...colors }} />
+      <Component fields={{ ...def.defaultFields, ...fields }} lists={{ ...def.defaultLists, ...lists }} colors={{ ...def.defaultColors, ...colors }} />
     </PostHoldContext.Provider>
   );
 }

@@ -30,6 +30,7 @@ import { listPublications, createPublication, markPublished, markError } from ".
 import { startRender, getRun, listRuns, cancelRun } from "./renderRunner";
 import { introOutroVideoSpec } from "./videoSpec";
 import { renderPostPng, warmPostBundle } from "./postRenderer";
+import { listMusicTracks, renderPostReel } from "./postReel";
 
 const app = express();
 app.use(cors());
@@ -335,12 +336,43 @@ app.post("/api/posts/warm", (_req, res) => {
 
 app.post("/api/posts/render", async (req, res) => {
   try {
-    const { templateId, fields, colors } = req.body ?? {};
+    const { templateId, fields, lists, colors } = req.body ?? {};
     if (typeof templateId !== "string") return res.status(400).json({ error: "templateId is required" });
-    const { png, savedPath } = await renderPostPng({ templateId, fields: fields ?? {}, colors: colors ?? {} });
+    const { png, savedPath } = await renderPostPng({ templateId, fields: fields ?? {}, lists: lists ?? {}, colors: colors ?? {} });
     res.setHeader("Content-Type", "image/png");
     res.setHeader("X-Saved-Path", relative(process.cwd(), savedPath).replace(/\\/g, "/"));
     res.send(png);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// Background tracks in assets/music - the Post Creator's reel export picks
+// one by file name (the GUI previews them straight from Vite's /music/ path).
+app.get("/api/music", (_req, res) => {
+  res.json(listMusicTracks());
+});
+
+// Static-image reel: the post PNG looped for N seconds over a chosen music
+// track, encoded to MP4 by ffmpeg (server/postReel.ts). Saved next to the PNG
+// under output/posts/ and returned as the response body.
+app.post("/api/posts/reel", async (req, res) => {
+  try {
+    const { templateId, fields, lists, colors, reel } = req.body ?? {};
+    if (typeof templateId !== "string") return res.status(400).json({ error: "templateId is required" });
+    const { mp4Path } = await renderPostReel(
+      { templateId, fields: fields ?? {}, lists: lists ?? {}, colors: colors ?? {} },
+      {
+        durationSeconds: reel?.durationSeconds,
+        musicFile: typeof reel?.musicFile === "string" && reel.musicFile ? reel.musicFile : null,
+        musicStartSeconds: reel?.musicStartSeconds,
+        musicVolume: reel?.musicVolume,
+        frame: reel?.frame === "original" ? "original" : "reel",
+      },
+    );
+    res.setHeader("X-Saved-Path", relative(process.cwd(), mp4Path).replace(/\\/g, "/"));
+    res.sendFile(mp4Path);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });

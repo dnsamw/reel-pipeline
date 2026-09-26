@@ -164,9 +164,18 @@ downloads it, and keeps a copy in `output/posts/`. The first export after a code
 bundle (~20-30s); later ones take a few seconds. Your in-progress post for each template is remembered in the
 browser.
 
+**Export reel (MP4)** turns the same post into a still-image video: pick a background track from
+`assets/music/` (▶ previews it from your chosen start point), set the length (3-90s), start offset and volume,
+then export. Square posts are centred on a 9:16 canvas filled with the post's background colour, or kept at
+their original size if you prefer. Music loops if it's shorter than the reel and fades in/out. The MP4 is
+H.264/AAC at 30fps, downloaded and saved next to the PNG in `output/posts/`. It uses ffmpeg on `PATH`, falling
+back to the copy bundled with Remotion.
+
 To add a new post design: drop the HTML mock into `post-templates/`, port it to
 `src/posts/templates/<Name>.tsx` exporting a `PostTemplateDef` (fields, color slots, defaults, and how to map a
-reel palette onto its colors), and append it to `src/posts/registry.ts`. The page, the dropdown and the PNG
+reel palette onto its colors), and append it to `src/posts/registry.ts`. Repeating content (like the list story's
+numbered items) is a `type: "list"` field. The Content panel then gets add/remove/reorder controls for it, and
+the template sizes itself to however many items there are. The page, the dropdown and the PNG
 export pick it up automatically.
 
 | Flag | Meaning |

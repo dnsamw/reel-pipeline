@@ -19,7 +19,7 @@ export function loadPostFonts(): Promise<unknown> {
   loaded ??= Promise.all([
     loadBricolage("normal", { weights: ["600", "700", "800"], subsets: ["latin"] }).waitUntilDone(),
     loadFigtree("normal", { weights: ["500", "600"], subsets: ["latin"] }).waitUntilDone(),
-    loadNotoSinhala("normal", { weights: ["500", "600"], subsets: ["sinhala"] }).waitUntilDone(),
+    loadNotoSinhala("normal", { weights: ["400", "500", "600"], subsets: ["sinhala"] }).waitUntilDone(),
   ]);
   return loaded;
 }

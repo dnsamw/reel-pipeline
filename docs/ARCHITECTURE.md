@@ -495,8 +495,16 @@ can't drift apart. Things worth knowing:
   and a photo uploaded after the bundle was built would otherwise 404.
 - **Async work goes through `usePostHold()`**, not `delayRender` directly. That covers fonts, image decode and
   the headline fit. In the render it maps to `delayRender`/`continueRender`; in the GUI it's a no-op.
+- **List fields** (`type: "list"`, e.g. the list story's items) hold arrays of sub-field objects in a separate
+  `lists` prop, so `fields` stays plain strings. Templates size variable-length content with `useShrinkToFit`
+  (a CSS scale variable) instead of assuming a fixed count.
 - **Reel palettes feed posts via `colorsFromPalette`.** Each template maps a reel template's `Palette` (light or
   dark) onto its own color slots, so post colors don't have to mirror `Palette`'s shape.
+- **Reel export skips Remotion's video pipeline.** `POST /api/posts/reel` (`server/postReel.ts`) renders the PNG
+  as above, then has ffmpeg loop that single frame (`-loop 1 -tune stillimage`) over the chosen
+  `assets/music/` track (`-stream_loop -1 -ss <start>`, volume + fades). That takes seconds, where
+  `renderMedia` would screenshot every frame. With no track it muxes `anullsrc` so the MP4 still has an audio
+  stream. `GET /api/music` lists the tracks, with durations from ffprobe.
 
 ## Known limitations & gotchas
 

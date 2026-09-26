@@ -3,7 +3,7 @@ import { extname, join, resolve, sep } from "node:path";
 import { bundle } from "@remotion/bundler";
 import { renderStill, selectComposition } from "@remotion/renderer";
 import { getPostTemplate } from "../src/posts/registry";
-import type { PostColors, PostFields } from "../src/posts/types";
+import type { PostColors, PostFields, PostLists } from "../src/posts/types";
 
 const ROOT = process.cwd();
 const SRC_DIR = join(ROOT, "src");
@@ -73,13 +73,14 @@ function inlineAssetImages(templateId: string, fields: PostFields): PostFields {
   return out;
 }
 
-export async function renderPostPng(input: { templateId: string; fields: PostFields; colors: PostColors }): Promise<{ png: Buffer; savedPath: string }> {
+export async function renderPostPng(input: { templateId: string; fields: PostFields; lists: PostLists; colors: PostColors }): Promise<{ png: Buffer; savedPath: string; width: number; height: number }> {
   const def = getPostTemplate(input.templateId);
   if (!def) throw new Error(`Unknown post template "${input.templateId}"`);
 
   const inputProps = {
     templateId: def.id,
     fields: inlineAssetImages(def.id, { ...def.defaultFields, ...input.fields }),
+    lists: { ...def.defaultLists, ...input.lists },
     colors: { ...def.defaultColors, ...input.colors },
   };
 
@@ -92,5 +93,5 @@ export async function renderPostPng(input: { templateId: string; fields: PostFie
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const savedPath = join(POSTS_OUTPUT_DIR, `${def.id}-${stamp}.png`);
   writeFileSync(savedPath, buffer);
-  return { png: buffer, savedPath };
+  return { png: buffer, savedPath, width: composition.width, height: composition.height };
 }

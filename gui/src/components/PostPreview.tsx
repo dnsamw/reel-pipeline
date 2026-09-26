@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { PostColors, PostFields, PostTemplateDef } from "../../../src/posts/types";
+import type { PostColors, PostFields, PostLists, PostTemplateDef } from "../../../src/posts/types";
 
 /**
  * Renders a post template's real component (the same one renderStill
@@ -12,11 +12,13 @@ import type { PostColors, PostFields, PostTemplateDef } from "../../../src/posts
 export function PostPreview({
   def,
   fields,
+  lists,
   colors,
   width,
 }: {
   def: PostTemplateDef;
   fields: PostFields;
+  lists?: PostLists;
   colors: PostColors;
   width?: number;
 }) {
@@ -54,7 +56,7 @@ export function PostPreview({
     >
       {fontsReady && w > 0 ? (
         <div style={{ width: def.width, height: def.height, transform: `scale(${scale})`, transformOrigin: "top left" }}>
-          <Component fields={{ ...def.defaultFields, ...fields }} colors={{ ...def.defaultColors, ...colors }} />
+          <Component fields={{ ...def.defaultFields, ...fields }} lists={{ ...def.defaultLists, ...lists }} colors={{ ...def.defaultColors, ...colors }} />
         </div>
       ) : (
         <div className="post-preview-loading">

@@ -131,9 +131,29 @@ export const api = {
   publish: (body: { batchId: string; template: string; caption?: string }) =>
     request<Publication>("/publish", { method: "POST", body: JSON.stringify(body) }),
 
+  musicTracks: () => request<{ file: string; durationSeconds: number | null }[]>("/music"),
+  // Not through request() - the success response is the MP4 itself.
+  renderPostReel: async (body: {
+    templateId: string;
+    fields: Record<string, string>;
+    lists: Record<string, Record<string, string>[]>;
+    colors: Record<string, string>;
+    reel: { durationSeconds: number; musicFile: string | null; musicStartSeconds: number; musicVolume: number; frame: "reel" | "original" };
+  }) => {
+    const res = await fetch("/api/posts/reel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error ?? `${res.status} ${res.statusText}`);
+    }
+    return { blob: await res.blob(), savedPath: res.headers.get("X-Saved-Path") ?? "" };
+  },
   warmPostRenderer: () => request<void>("/posts/warm", { method: "POST" }),
   // Not through request() - the success response is the PNG itself, not JSON.
-  renderPost: async (body: { templateId: string; fields: Record<string, string>; colors: Record<string, string> }) => {
+  renderPost: async (body: { templateId: string; fields: Record<string, string>; lists: Record<string, Record<string, string>[]>; colors: Record<string, string> }) => {
     const res = await fetch("/api/posts/render", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
+import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { api } from "../api";
 import { ColorField } from "../components/ReelConfigFields";
 import { PostPreview } from "../components/PostPreview";
+import { PostReelPanel } from "../components/PostReelPanel";
 import { PostTemplatePicker } from "../components/PostTemplatePicker";
 import { TemplatePicker } from "../components/TemplatePicker";
 import { getPostTemplate, postTemplates } from "../../../src/posts/registry";
-import type { PostColors, PostFieldDef, PostFields } from "../../../src/posts/types";
+import type { PostColors, PostFields, PostListFieldDef, PostListItem, PostLists, PostScalarFieldDef } from "../../../src/posts/types";
 import type { ReelTheme, TemplateRecord } from "../types";
 
 const LAST_TEMPLATE_KEY = "studypal-reels:post-creator:last-template";
@@ -13,6 +15,7 @@ const draftKey = (templateId: string) => `studypal-reels:post-creator:draft:${te
 
 interface Draft {
   fields: PostFields;
+  lists: PostLists;
   colors: PostColors;
   reelTemplateId: string;
   variant: "light" | "dark";
@@ -52,6 +55,7 @@ function loadDraft(templateId: string): Draft {
   const saved = readStorage<Partial<Draft>>(draftKey(templateId));
   return {
     fields: { ...def.defaultFields, ...saved?.fields },
+    lists: { ...def.defaultLists, ...saved?.lists },
     colors: { ...def.defaultColors, ...saved?.colors },
     reelTemplateId: saved?.reelTemplateId ?? "",
     variant: saved?.variant ?? "light",
@@ -96,6 +100,10 @@ export function PostCreator() {
     setDraft((d) => ({ ...d, fields: { ...d.fields, [key]: value } }));
   }
 
+  function setList(key: string, items: PostListItem[]) {
+    setDraft((d) => ({ ...d, lists: { ...d.lists, [key]: items } }));
+  }
+
   function setColor(key: string, value: string) {
     setDraft((d) => ({ ...d, colors: { ...d.colors, [key]: value } }));
   }
@@ -124,14 +132,14 @@ export function PostCreator() {
   }
 
   function resetContent() {
-    setDraft((d) => ({ ...d, fields: { ...def.defaultFields } }));
+    setDraft((d) => ({ ...d, fields: { ...def.defaultFields }, lists: { ...def.defaultLists } }));
   }
 
   async function onExport() {
     setError(null);
     setExporting(true);
     try {
-      const { blob, savedPath } = await api.renderPost({ templateId, fields: draft.fields, colors: draft.colors });
+      const { blob, savedPath } = await api.renderPost({ templateId, fields: draft.fields, lists: draft.lists, colors: draft.colors });
       const url = URL.createObjectURL(blob);
       const filename = savedPath.split("/").pop() || `${templateId}.png`;
       setLastExport({ url, savedPath, filename });
@@ -166,9 +174,13 @@ export function PostCreator() {
               </button>
             </div>
             <div className="grid">
-              {def.fields.map((f) => (
-                <PostFieldInput key={`${templateId}-${f.key}`} def={f} value={draft.fields[f.key] ?? ""} onChange={(v) => setField(f.key, v)} onError={setError} />
-              ))}
+              {def.fields.map((f) =>
+                f.type === "list" ? (
+                  <PostListInput key={`${templateId}-${f.key}`} def={f} items={draft.lists[f.key] ?? []} onChange={(items) => setList(f.key, items)} />
+                ) : (
+                  <PostFieldInput key={`${templateId}-${f.key}`} def={f} value={draft.fields[f.key] ?? ""} onChange={(v) => setField(f.key, v)} onError={setError} />
+                ),
+              )}
             </div>
           </div>
 
@@ -215,12 +227,17 @@ export function PostCreator() {
               ))}
             </div>
           </div>
+
+          <PostReelPanel def={def} fields={draft.fields} lists={draft.lists} colors={draft.colors} onError={setError} />
         </div>
 
         <div className="editor-preview post-creator-preview">
           <div className="card preview-card">
             <h2>Preview</h2>
-            <PostPreview def={def} fields={draft.fields} colors={draft.colors} />
+            {/* Tall formats (stories) are capped by viewport height, not just column width */}
+            <div style={{ width: `min(100%, calc(72vh * ${def.width / def.height}))`, margin: "0 auto" }}>
+              <PostPreview def={def} fields={draft.fields} lists={draft.lists} colors={draft.colors} />
+            </div>
             <p className="hint" style={{ marginTop: 8 }}>
               {def.width}×{def.height} PNG
             </p>
@@ -250,7 +267,7 @@ function PostFieldInput({
   onChange,
   onError,
 }: {
-  def: PostFieldDef;
+  def: PostScalarFieldDef;
   value: string;
   onChange: (value: string) => void;
   onError: (message: string) => void;
@@ -291,6 +308,78 @@ function PostFieldInput({
           )}
         </div>
       )}
+      {def.hint && <span className="hint">{def.hint}</span>}
+    </div>
+  );
+}
+
+/** Editor for a "list" field: one card per item (its sub-fields), with reorder/remove and an add button. */
+function PostListInput({ def, items, onChange }: { def: PostListFieldDef; items: PostListItem[]; onChange: (items: PostListItem[]) => void }) {
+  const min = def.minItems ?? 0;
+  const max = def.maxItems ?? Infinity;
+
+  function update(index: number, key: string, value: string) {
+    onChange(items.map((it, i) => (i === index ? { ...it, [key]: value } : it)));
+  }
+
+  function move(index: number, delta: number) {
+    const next = [...items];
+    const [moved] = next.splice(index, 1);
+    next.splice(index + delta, 0, moved);
+    onChange(next);
+  }
+
+  function add() {
+    onChange([...items, Object.fromEntries(def.itemFields.map((f) => [f.key, ""]))]);
+  }
+
+  return (
+    <div className="field" style={{ gridColumn: "1 / -1" }}>
+      <label>
+        {def.label} ({items.length})
+      </label>
+      <div className="post-list-items">
+        {items.map((item, i) => (
+          <div className="post-list-item" key={i}>
+            <div className="post-list-item-header">
+              <span className="post-list-item-num">{i + 1}</span>
+              <span className="post-list-item-title">{item[def.itemFields[0].key] || `${def.itemLabel} ${i + 1}`}</span>
+              <button type="button" className="icon-button" title="Move up" disabled={i === 0} onClick={() => move(i, -1)}>
+                <ArrowUp size={14} />
+              </button>
+              <button type="button" className="icon-button" title="Move down" disabled={i === items.length - 1} onClick={() => move(i, 1)}>
+                <ArrowDown size={14} />
+              </button>
+              <button
+                type="button"
+                className="icon-button danger"
+                title={`Remove ${def.itemLabel.toLowerCase()}`}
+                disabled={items.length <= min}
+                onClick={() => onChange(items.filter((_, j) => j !== i))}
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+            <div className="post-list-item-fields">
+              {def.itemFields.map((f) => (
+                <div className="field" key={f.key}>
+                  <label>{f.label}</label>
+                  {f.type === "textarea" ? (
+                    <textarea rows={2} lang={f.lang} value={item[f.key] ?? ""} onChange={(e) => update(i, f.key, e.target.value)} />
+                  ) : (
+                    <input type="text" lang={f.lang} value={item[f.key] ?? ""} onChange={(e) => update(i, f.key, e.target.value)} />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div>
+        <button type="button" className="secondary small post-list-add" disabled={items.length >= max} onClick={add}>
+          <Plus size={14} /> Add {def.itemLabel.toLowerCase()}
+        </button>
+      </div>
       {def.hint && <span className="hint">{def.hint}</span>}
     </div>
   );

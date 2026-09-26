@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, type CSSProperties } from "react";
 import { hexToRgba, mixHex, resolvePostAsset, usePostHold } from "../PostReady";
 import { useFitFontSize } from "../useFitFontSize";
 import { loadPostFonts, postFonts } from "../fonts";
+import { StudyPalLogo } from "../StudyPalLogo";
 import type { PostTemplateDef, PostTemplateProps } from "../types";
 
 /**
@@ -65,12 +66,7 @@ function StudyPalQuote({ fields, colors }: PostTemplateProps) {
 
       {/* Brand bar */}
       <div style={{ position: "absolute", top: 64, left: pad, right: pad, display: "flex", alignItems: "center", gap: 18, zIndex: 2 }}>
-        <svg viewBox="0 0 300 300" style={{ width: 68, height: 68, flex: "none" }} role="img" aria-label="StudyPal logo">
-          <rect width="300" height="300" rx="64" fill={c.accent} />
-          <g fill={c.background} transform="matrix(2.3512290156904005,0,0,2.3512290156904005,31.75624218697046,30.09)">
-            <path d="M87.787 36.736a20.05 20.05 0 0 0-14.263-5.912 20.05 20.05 0 0 0-14.264 5.912L36.034 59.962a12.59 12.59 0 0 1-8.962 3.707 12.55 12.55 0 0 1-8.952-3.717A12.53 12.53 0 0 1 14.404 51c0-3.378 1.314-6.56 3.716-8.962a12.58 12.58 0 0 1 8.952-3.707 12.58 12.58 0 0 1 8.962 3.707l5.463 5.464 4.961-.46.342-4.842-5.464-5.464a20.05 20.05 0 0 0-14.264-5.912 20.05 20.05 0 0 0-14.264 5.912C8.998 40.546 6.896 45.613 6.896 51s2.102 10.452 5.912 14.265a20.05 20.05 0 0 0 14.264 5.911 20.05 20.05 0 0 0 14.264-5.911l23.226-23.227a12.59 12.59 0 0 1 8.963-3.707c3.378 0 6.56 1.313 8.952 3.707 4.944 4.945 4.944 12.979 0 17.924a12.58 12.58 0 0 1-8.952 3.707 12.59 12.59 0 0 1-8.963-3.707L58.301 53.7l-.342 4.842-4.961.46-.045-.045v.001l6.308 6.307a20.05 20.05 0 0 0 14.264 5.911 20.05 20.05 0 0 0 14.263-5.911c7.862-7.866 7.862-20.665-.001-28.529" />
-          </g>
-        </svg>
+        <StudyPalLogo size={68} tile={c.accent} ink={c.background} />
         <span style={{ fontFamily: postFonts.display, fontWeight: 700, fontSize: 38, letterSpacing: "-0.01em", color: c.text }}>
           {fields.brand}
         </span>
