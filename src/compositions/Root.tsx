@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Composition, registerRoot } from "remotion";
+import { Composition, Still, registerRoot } from "remotion";
 import { registerFonts } from "../theme/fonts";
 import { reelDefaultProps, sampleBatches } from "./reelProps";
 import { makeCompositionFromRecipe, CompositionFromRecipeDynamic, calculateMetadataForRecipeDynamic, reelPropsWithRecipeSchema } from "./recipe/CompositionFromRecipe";
@@ -9,6 +9,7 @@ import { phraseSchema } from "../data/phrase";
 import { LayerRenderer } from "./recipe/layers/LayerRenderer";
 import { customBeatSchema } from "./recipe/layers/schema";
 import { pocBeat } from "./recipe/layers/poc";
+import { PostStill, calculatePostMetadata, postStillDefaultProps } from "../posts/PostStill";
 
 // Fires once when the bundle loads; loadFont/loadCustomFont each call
 // Remotion's delayRender/continueRender internally, so this blocks any
@@ -64,6 +65,19 @@ function RemotionRoot() {
       />
 
       <SampleReels />
+
+      {/* Static image posts (gui /post-creator) - one still for every post
+          template; templateId/fields/colors arrive as inputProps and
+          calculateMetadata sizes it per template. Rendered to PNG by
+          server/postRenderer.ts. See src/posts/registry.ts. */}
+      <Still
+        id="Post"
+        component={PostStill}
+        calculateMetadata={calculatePostMetadata}
+        width={1080}
+        height={1080}
+        defaultProps={postStillDefaultProps}
+      />
 
       {/* Phase 1 proof of docs/COMPOSITION_DESIGNER.md's draft layer schema
           (recipe/layers/) - a generic LayerRenderer interpreting a

@@ -156,6 +156,19 @@ recorded, so Monitor always shows what's been generated vs. what's actually live
 it's up. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#gui-batch-monitor--template-library) for the OAuth
 setup steps and how the Page token is stored.
 
+**Post Creator page** (`/post-creator`) — static 1080×1080 image posts. Pick a post template from the
+dropdown (each option has a small live preview), edit its text fields and optional background photo, then set
+its colors directly or load them from any reel template on the Templates page (light or dark palette). **Export
+PNG** renders the exact same React component through Remotion's `renderStill`, so the PNG matches the preview,
+downloads it, and keeps a copy in `output/posts/`. The first export after a code change waits for a Remotion
+bundle (~20-30s); later ones take a few seconds. Your in-progress post for each template is remembered in the
+browser.
+
+To add a new post design: drop the HTML mock into `post-templates/`, port it to
+`src/posts/templates/<Name>.tsx` exporting a `PostTemplateDef` (fields, color slots, defaults, and how to map a
+reel palette onto its colors), and append it to `src/posts/registry.ts`. The page, the dropdown and the PNG
+export pick it up automatically.
+
 | Flag | Meaning |
 |---|---|
 | `--chapters=0-2` | Chapter range to render, by `BookChapter.order` (counts from 0) |
@@ -187,6 +200,7 @@ src/
   config/          All tunable durations/volumes/text/theme/TTS rate, as a Zod schema
   audio/           Music/sfx/voice/TTS selection + ffmpeg availability check (Node-only)
   compositions/    Composition recipes (recipe/) + beat-kind scene components - see docs/COMPOSITION_DESIGNER.md
+  posts/           Post Creator image templates (React) + registry, rendered to PNG via the "Post" still
   render/          The batch runner (renderBatch.ts), manifest tracking, and sidechain ducking post-process
 server/            Express API for the GUI - template + recipe libraries (SQLite + git export), global
                    settings, Facebook OAuth + publishing, render orchestration, chapter/book lookups
@@ -198,7 +212,8 @@ data/              SQLite db for the GUI's own state - template + recipe librari
                    Facebook Page token, publish history (gitignored - templates/*.json and recipes/*.json are
                    the only parts with a git export)
 assets/            fonts, music, sfx, voice-over, and generated TTS audio
-output/            Rendered videos + manifest.json (gitignored)
+post-templates/    Original HTML mocks for post designs - the source each src/posts/templates/*.tsx is ported from
+output/            Rendered videos + manifest.json, and output/posts/ PNG exports (gitignored)
 ```
 
 ## Notes

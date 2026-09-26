@@ -130,4 +130,19 @@ export const api = {
   publications: () => request<Publication[]>("/publications"),
   publish: (body: { batchId: string; template: string; caption?: string }) =>
     request<Publication>("/publish", { method: "POST", body: JSON.stringify(body) }),
+
+  warmPostRenderer: () => request<void>("/posts/warm", { method: "POST" }),
+  // Not through request() - the success response is the PNG itself, not JSON.
+  renderPost: async (body: { templateId: string; fields: Record<string, string>; colors: Record<string, string> }) => {
+    const res = await fetch("/api/posts/render", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error ?? `${res.status} ${res.statusText}`);
+    }
+    return { blob: await res.blob(), savedPath: res.headers.get("X-Saved-Path") ?? "" };
+  },
 };

@@ -26,6 +26,9 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: row;
+  /* Room for the fixed sidebar below */
+  padding-left: var(--sidebar-width, 220px);
+  transition: padding-left 0.15s ease;
 }
 
 .app-sidebar {
@@ -37,8 +40,13 @@ body {
   padding: 20px 16px;
   background: var(--primary);
   color: white;
-  position: sticky;
+  /* Fixed, not sticky: a sticky sidebar stops at the bottom of .app, so
+     anything absolutely positioned that overflows it (an open dropdown,
+     a floating panel) let the page scroll past the sidebar's end. */
+  position: fixed;
   top: 0;
+  left: 0;
+  z-index: 30;
   height: 100vh;
   overflow-y: auto;
   transition: width 0.15s ease;
@@ -130,6 +138,7 @@ body {
 @media (max-width: 720px) {
   .app {
     flex-direction: column;
+    padding-left: 0;
   }
 
   .app-sidebar {
@@ -1183,4 +1192,90 @@ th {
   min-height: 0;
   padding: 10px;
   overflow: auto;
+}
+
+/* --- Post Creator (pages/PostCreator.tsx) --- */
+
+.post-creator-preview {
+  width: 440px;
+}
+
+@media (max-width: 860px) {
+  .post-creator-preview {
+    width: 100%;
+  }
+}
+
+.post-preview {
+  position: relative;
+  flex: none;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #1a1024;
+}
+
+.post-preview-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.card-heading-row h2 {
+  margin: 0;
+}
+
+button.small {
+  font-size: 12px;
+  padding: 5px 10px;
+}
+
+.segmented {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  width: max-content;
+}
+
+.segmented button {
+  border: none;
+  border-radius: 0;
+  background: white;
+  color: var(--fg);
+  padding: 7px 16px;
+}
+
+.segmented button + button {
+  border-left: 1px solid var(--border);
+}
+
+.segmented button.active {
+  background: var(--primary);
+  color: white;
+}
+
+.post-image-field {
+  display: flex;
+  gap: 6px;
+}
+
+.post-image-field input[type="text"] {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Flipped by lib/dropdownDirection.ts when there's no room below the trigger */
+.template-picker-menu.up {
+  top: auto;
+  bottom: calc(100% + 4px);
 }

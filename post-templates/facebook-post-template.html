@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StudyPal post</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@500;600&family=Noto+Sans+Sinhala:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --purple: #591F82;
+    --purple-deep: #3B1259;
+    --purple-light: #6E2A9E;
+    --gold: #F9B200;
+    --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --font-body: "Figtree", "Segoe UI", system-ui, sans-serif;
+    --font-si: "Noto Sans Sinhala", "Iskoola Pota", "Nirmala UI", sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: #1A1024;
+    font-family: var(--font-body);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    padding: 24px 12px;
+  }
+
+  /* Preview scaling wrapper (removed in render mode) */
+  .stage { width: min(540px, 100%); aspect-ratio: 1; position: relative; }
+  .stage .post { position: absolute; top: 0; left: 0; transform-origin: top left; }
+
+  /* ================= POST: exactly 1080 × 1080 ================= */
+  .post {
+    width: 1080px;
+    height: 1080px;
+    position: relative;
+    overflow: hidden;
+    background: var(--purple);
+    color: var(--gold);
+  }
+
+  .post-photo, .post-shade { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .post-photo { object-fit: cover; display: none; }
+  .post-shade {
+    display: none;
+    background:
+      linear-gradient(180deg, rgba(59,18,89,.75) 0%, rgba(59,18,89,0) 22%),
+      linear-gradient(180deg, rgba(59,18,89,0) 35%, rgba(59,18,89,.82) 68%, rgba(59,18,89,.97) 100%);
+  }
+  .post.has-image .post-photo,
+  .post.has-image .post-shade { display: block; }
+
+  /* Brand bar */
+  .post-brand {
+    position: absolute;
+    top: 64px; left: 72px; right: 72px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    z-index: 2;
+  }
+  .post-brand svg { width: 68px; height: 68px; flex: none; }
+  .post-brand-name {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 38px;
+    letter-spacing: -0.01em;
+    color: #fff;
+  }
+  .post-kicker {
+    margin-left: auto;
+    padding: 12px 26px;
+    border-radius: 99px;
+    background: var(--gold);
+    color: var(--purple-deep);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 28px;
+  }
+  .post-kicker:empty { display: none; }
+
+  /* Text block */
+  .post-text {
+    position: absolute;
+    left: 72px; right: 72px;
+    top: 190px; bottom: 150px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    z-index: 2;
+  }
+  .post.has-image .post-text { top: 480px; bottom: 140px; justify-content: flex-end; }
+
+  .post-headline {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 132px;              /* start size; JS shrinks to fit */
+    line-height: 1.02;
+    letter-spacing: -0.035em;
+    color: var(--gold);
+    text-wrap: balance;
+    overflow-wrap: break-word;
+  }
+  .post-si {
+    margin: 28px 0 0;
+    font-family: var(--font-si);
+    font-weight: 600;
+    font-size: 44px;
+    line-height: 1.45;
+    color: #fff;
+  }
+  .post-si:empty { display: none; }
+
+  /* Footer */
+  .post-foot {
+    position: absolute;
+    left: 72px; right: 72px; bottom: 62px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    z-index: 2;
+    font-size: 30px;
+    font-weight: 600;
+    color: rgba(255,255,255,.85);
+  }
+  .post-foot::before {
+    content: "";
+    width: 64px; height: 8px;
+    border-radius: 4px;
+    background: var(--gold);
+  }
+  .post-foot:empty { display: none; }
+
+  /* Controls (hidden in render mode) */
+  .controls { display: flex; gap: 8px; }
+  .controls button {
+    padding: 10px 18px;
+    border-radius: 99px;
+    border: 1px solid rgba(255,255,255,.2);
+    background: transparent;
+    color: #fff;
+    font: 600 14px var(--font-body);
+    cursor: pointer;
+  }
+  .controls button[aria-pressed="true"] { background: var(--gold); color: var(--purple-deep); border-color: var(--gold); }
+  .controls button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  /* ?render=1 → bare 1080×1080 post for screenshotting */
+  body.render { padding: 0; background: none; display: block; min-height: 0; }
+  body.render .controls { display: none; }
+  body.render .stage { width: 1080px; }
+  body.render .stage .post { position: static; transform: none !important; }
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage">
+  <article class="post" id="post">
+
+    <img class="post-photo" id="photo" alt="">
+    <div class="post-shade"></div>
+
+    <div class="post-brand">
+      <svg viewBox="0 0 300 300" role="img" aria-label="StudyPal logo">
+        <rect width="300" height="300" rx="64" fill="#F9B200"/>
+        <g fill="#591F82" transform="matrix(2.3512290156904005,0,0,2.3512290156904005,31.75624218697046,30.09)">
+          <path d="M87.787 36.736a20.05 20.05 0 0 0-14.263-5.912 20.05 20.05 0 0 0-14.264 5.912L36.034 59.962a12.59 12.59 0 0 1-8.962 3.707 12.55 12.55 0 0 1-8.952-3.717A12.53 12.53 0 0 1 14.404 51c0-3.378 1.314-6.56 3.716-8.962a12.58 12.58 0 0 1 8.952-3.707 12.58 12.58 0 0 1 8.962 3.707l5.463 5.464 4.961-.46.342-4.842-5.464-5.464a20.05 20.05 0 0 0-14.264-5.912 20.05 20.05 0 0 0-14.264 5.912C8.998 40.546 6.896 45.613 6.896 51s2.102 10.452 5.912 14.265a20.05 20.05 0 0 0 14.264 5.911 20.05 20.05 0 0 0 14.264-5.911l23.226-23.227a12.59 12.59 0 0 1 8.963-3.707c3.378 0 6.56 1.313 8.952 3.707 4.944 4.945 4.944 12.979 0 17.924a12.58 12.58 0 0 1-8.952 3.707 12.59 12.59 0 0 1-8.963-3.707L58.301 53.7l-.342 4.842-4.961.46-.045-.045v.001l6.308 6.307a20.05 20.05 0 0 0 14.264 5.911 20.05 20.05 0 0 0 14.263-5.911c7.862-7.866 7.862-20.665-.001-28.529"/>
+        </g>
+      </svg>
+      <span class="post-brand-name">StudyPal</span>
+      <span class="post-kicker" id="kicker"></span>
+    </div>
+
+    <div class="post-text" id="textbox">
+      <h1 class="post-headline" id="headline"></h1>
+      <p class="post-si" id="si" lang="si"></p>
+    </div>
+
+    <div class="post-foot" id="foot"></div>
+  </article>
+</div>
+
+<div class="controls" id="controls">
+  <button type="button" data-mode="text" aria-pressed="true">Text only</button>
+  <button type="button" data-mode="image" aria-pressed="false">With image</button>
+</div>
+
+<script>
+  /* ================== EDIT PER POST ==================
+     Or override any field with URL params:
+     post.html?text=...&si=...&kicker=...&img=photo.jpg&foot=...&render=1   */
+  const POST = {
+    kicker: "Word of the day",
+    text:   "Don't just learn English. Start speaking it.",
+    si:     "ඉංග්‍රීසි ඉගෙනගන්න විතරක් නෙවෙයි, කතා කරන්නත් පටන් ගන්න.",
+    img:    "",                  // image URL or data: URI; empty = text-only design
+    foot:   "Follow StudyPal for daily English"
+  };
+  /* =================================================== */
+
+  const q = new URLSearchParams(location.search);
+  for (const k of Object.keys(POST)) if (q.has(k)) POST[k] = q.get(k);
+  const renderMode = q.get("render") === "1";
+  if (renderMode) document.body.classList.add("render");
+
+  const $ = id => document.getElementById(id);
+  const post = $("post"), photo = $("photo"), head = $("headline"), box = $("textbox");
+
+  // Demo photo so "With image" can be previewed without a real file
+  const DEMO_IMG = "data:image/svg+xml," + encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1080 1080'>
+      <defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
+        <stop offset='0' stop-color='#F6C27A'/><stop offset='.55' stop-color='#C9748F'/><stop offset='1' stop-color='#5E3A8C'/>
+      </linearGradient></defs>
+      <rect width='1080' height='1080' fill='url(#g)'/>
+      <circle cx='760' cy='330' r='170' fill='#FFE3A8' opacity='.8'/>
+      <path d='M0 760 C240 640 420 700 600 760 S900 820 1080 700 V1080 H0z' fill='#3E2A6B' opacity='.7'/>
+      <path d='M0 860 C260 780 520 840 760 880 S980 900 1080 860 V1080 H0z' fill='#2A1B4D'/>
+    </svg>`);
+
+  function fit() {
+    // shrink headline until the text block fits
+    const max = post.classList.contains("has-image") ? 104 : 132;
+    let size = max;
+    head.style.fontSize = size + "px";
+    while (box.scrollHeight > box.clientHeight && size > 44) {
+      size -= 2;
+      head.style.fontSize = size + "px";
+    }
+  }
+
+  function apply(useImage) {
+    $("kicker").textContent = POST.kicker || "";
+    head.textContent = POST.text || "";
+    $("si").textContent = POST.si || "";
+    $("foot").textContent = POST.foot || "";
+    const src = useImage ? (POST.img || DEMO_IMG) : "";
+    post.classList.toggle("has-image", !!src);
+    if (src) {
+      photo.src = src;
+      photo.decode ? photo.decode().then(fit, fit) : (photo.onload = fit);
+    }
+    fit();
+    document.querySelectorAll("#controls button").forEach(b =>
+      b.setAttribute("aria-pressed", (b.dataset.mode === "image") === !!src));
+  }
+
+  function scale() {
+    if (renderMode) return;
+    const w = $("stage").clientWidth;
+    post.style.transform = `scale(${w / 1080})`;
+  }
+
+  document.querySelectorAll("#controls button").forEach(b =>
+    b.addEventListener("click", () => apply(b.dataset.mode === "image")));
+  addEventListener("resize", scale);
+
+  document.fonts.ready.then(() => {
+    apply(!!POST.img);
+    scale();
+    window.__POST_READY__ = true;   // headless renderers can wait for this
+  });
+  scale();
+</script>
+</body>
+</html>

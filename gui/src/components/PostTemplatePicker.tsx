@@ -1,27 +1,21 @@
 import { useEffect, useRef, useState } from "react";
-import { ThemePreviewPair } from "./ThemeThumbnail";
-import type { ReelTheme, TemplateRecord } from "../types";
+import { PostPreview } from "./PostPreview";
+import type { PostTemplateDef } from "../../../src/posts/types";
 import { shouldOpenUp } from "../lib/dropdownDirection";
 
 /**
- * A native <select> can't render anything but plain text inside <option> -
- * showing a color thumbnail per template needs a custom dropdown instead.
- * Kept intentionally simple (click-to-toggle, click-outside-to-close) rather
- * than a full combobox with keyboard navigation, matching the scope of what
- * this picker needs to do.
+ * Same custom-dropdown pattern (and CSS) as TemplatePicker.tsx, but each
+ * option's thumbnail is a small live render of the post template with its
+ * default content rather than static color swatches.
  */
-export function TemplatePicker({
+export function PostTemplatePicker({
   templates,
   value,
   onChange,
-  defaultTheme,
-  noneLabel = "None - use defaultConfig",
 }: {
-  templates: TemplateRecord[];
+  templates: PostTemplateDef[];
   value: string;
   onChange: (id: string) => void;
-  defaultTheme: ReelTheme | null;
-  noneLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [openUp, setOpenUp] = useState(false);
@@ -52,20 +46,17 @@ export function TemplatePicker({
       <button type="button" className="template-picker-trigger" onClick={toggle}>
         {selected ? (
           <>
-            {(selected.config.theme ?? defaultTheme) && <ThemePreviewPair theme={selected.config.theme ?? defaultTheme!} />}
+            <PostPreview def={selected} fields={selected.defaultFields} colors={selected.defaultColors} width={56} />
             <span className="template-picker-trigger-text">{selected.name}</span>
           </>
         ) : (
-          <span className="template-picker-trigger-text hint">{noneLabel}</span>
+          <span className="template-picker-trigger-text hint">Pick a post template</span>
         )}
         <span className="template-picker-caret">{open ? "▴" : "▾"}</span>
       </button>
 
       {open && (
         <div className={`template-picker-menu${openUp ? " up" : ""}`}>
-          <button type="button" className="template-picker-option" onClick={() => pick("")}>
-            <span className="template-picker-option-text hint">{noneLabel}</span>
-          </button>
           {templates.map((t) => (
             <button
               key={t.id}
@@ -73,10 +64,10 @@ export function TemplatePicker({
               className={`template-picker-option${t.id === value ? " selected" : ""}`}
               onClick={() => pick(t.id)}
             >
-              {(t.config.theme ?? defaultTheme) && <ThemePreviewPair theme={t.config.theme ?? defaultTheme!} />}
+              <PostPreview def={t} fields={t.defaultFields} colors={t.defaultColors} width={72} />
               <span className="template-picker-option-text">
                 <strong>{t.name}</strong>
-                <span className="hint">{t.description || "No description"}</span>
+                <span className="hint">{t.description}</span>
               </span>
             </button>
           ))}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
-import { ChevronLeft, ChevronRight, Clapperboard, FileText, ListChecks, Monitor, Palette, PlayCircle, Settings as SettingsIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clapperboard, FileText, ImagePlus, ListChecks, Monitor, Palette, PlayCircle, Settings as SettingsIcon } from "lucide-react";
 import { Dashboard } from "./pages/Dashboard";
 import { StartRender } from "./pages/StartRender";
 import { ReviewQueue } from "./pages/ReviewQueue";
@@ -10,6 +10,7 @@ import { Recipes } from "./pages/Recipes";
 import { RecipeEditor } from "./pages/RecipeEditor";
 import { VideoSpecPage } from "./pages/VideoSpecPage";
 import { Settings } from "./pages/Settings";
+import { PostCreator } from "./pages/PostCreator";
 
 const SIDEBAR_COLLAPSED_KEY = "studypal-reels:sidebar-collapsed";
 
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
   { to: "/render", end: false, icon: PlayCircle, label: "Batch Render" },
   { to: "/templates", end: false, icon: Palette, label: "Templates" },
   { to: "/recipes", end: false, icon: Clapperboard, label: "Recipes" },
+  { to: "/post-creator", end: false, icon: ImagePlus, label: "Post Creator" },
   { to: "/video-spec", end: false, icon: FileText, label: "Video Spec" },
   { to: "/settings", end: false, icon: SettingsIcon, label: "Settings" },
 ] as const;
@@ -76,6 +78,7 @@ export function App() {
           <Route path="/templates/new" element={<TemplateEditor />} />
           <Route path="/templates/:id" element={<TemplateEditor />} />
           <Route path="/recipes" element={<Recipes />} />
+          <Route path="/post-creator" element={<PostCreator />} />
           <Route path="/recipes/new" element={<RecipeEditor />} />
           <Route path="/recipes/:id" element={<RecipeEditor />} />
           <Route path="/video-spec" element={<VideoSpecPage />} />

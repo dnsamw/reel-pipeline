@@ -29,6 +29,7 @@ import {
 import { listPublications, createPublication, markPublished, markError } from "./publications";
 import { startRender, getRun, listRuns, cancelRun } from "./renderRunner";
 import { introOutroVideoSpec } from "./videoSpec";
+import { renderPostPng, warmPostBundle } from "./postRenderer";
 
 const app = express();
 app.use(cors());
@@ -318,6 +319,31 @@ app.post("/api/assets/images", express.raw({ type: () => true, limit: "15mb" }),
     res.json({ path: `images/${filename}` });
   } catch (err) {
     res.status(500).json({ error: String(err) });
+  }
+});
+
+// --- Post Creator (gui /post-creator): static image posts rendered to PNG ---
+// Renders the "Post" still (src/posts/PostStill.tsx) with renderStill - same
+// React template the GUI previews, so the PNG matches it exactly. Also saves
+// a copy under output/posts/.
+// Called when the Post Creator page opens - starts the (slow) Remotion bundle
+// in the background so the first export doesn't wait on it.
+app.post("/api/posts/warm", (_req, res) => {
+  warmPostBundle();
+  res.status(204).end();
+});
+
+app.post("/api/posts/render", async (req, res) => {
+  try {
+    const { templateId, fields, colors } = req.body ?? {};
+    if (typeof templateId !== "string") return res.status(400).json({ error: "templateId is required" });
+    const { png, savedPath } = await renderPostPng({ templateId, fields: fields ?? {}, colors: colors ?? {} });
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("X-Saved-Path", relative(process.cwd(), savedPath).replace(/\\/g, "/"));
+    res.send(png);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
