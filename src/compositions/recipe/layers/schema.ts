@@ -80,6 +80,10 @@ const animationStepSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("fade"), durationInFrames: z.number() }),
   z.object({ type: z.literal("slide"), from: z.enum(["top", "bottom", "left", "right"]), durationInFrames: z.number() }),
   z.object({ type: z.literal("scaleSpring"), fromScale: z.number().default(0.8) }),
+  // Text-only (see LayerRenderer.tsx) - reveals the resolved string one
+  // character at a time over durationInFrames, instead of animating the
+  // whole layer's opacity/transform like every other step here does.
+  z.object({ type: z.literal("typewriter"), durationInFrames: z.number() }),
 ]);
 
 const animationSchema = z.object({

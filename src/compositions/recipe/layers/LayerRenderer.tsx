@@ -135,6 +135,12 @@ function LayerView({
   };
 
   if (layer.kind === "text") {
+    const resolvedText = resolveText(layer.text, phrase, config);
+    // Typewriter reveals the resolved string itself frame-by-frame instead
+    // of animating opacity/transform on the whole block (the generic
+    // handling above), so it's applied here rather than folded into that
+    // opacity/extraTransform computation.
+    const displayText = animation.enter.type === "typewriter" ? resolvedText.slice(0, Math.round(resolvedText.length * enter.fraction)) : resolvedText;
     return (
       <div
         style={{
@@ -147,7 +153,7 @@ function LayerView({
           whiteSpace: "pre-wrap",
         }}
       >
-        {resolveText(layer.text, phrase, config)}
+        {displayText}
       </div>
     );
   }

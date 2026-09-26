@@ -21,6 +21,7 @@ import {
   Sparkles,
   Square,
   Star,
+  TextCursor,
   Trash2,
   Triangle,
   Type,
@@ -88,7 +89,15 @@ function ColorControl({ label, value, onChange, onClear }: { label: string; valu
   );
 }
 
-function AnimationControl({ label, step, onChange }: { label: string; step: AnimationStep; onChange: (s: AnimationStep) => void }) {
+function AnimationControl({ label, step, onChange, allowTypewriter }: { label: string; step: AnimationStep; onChange: (s: AnimationStep) => void; allowTypewriter?: boolean }) {
+  const options: { value: AnimationStep["type"]; label: string; icon: React.ReactNode }[] = [
+    { value: "none", label: `${label}: none`, icon: <Ban size={14} /> },
+    { value: "fade", label: `${label}: fade`, icon: <Zap size={14} /> },
+    { value: "slide", label: `${label}: slide`, icon: <MoveRight size={14} /> },
+    { value: "scaleSpring", label: `${label}: scale (spring)`, icon: <Sparkles size={14} /> },
+  ];
+  if (allowTypewriter) options.push({ value: "typewriter", label: `${label}: typewriter`, icon: <TextCursor size={14} /> });
+
   return (
     <div>
       <div className="node-property-row">
@@ -98,16 +107,12 @@ function AnimationControl({ label, step, onChange }: { label: string; step: Anim
             if (type === "none") onChange({ type });
             else if (type === "fade") onChange({ type, durationInFrames: 15 });
             else if (type === "slide") onChange({ type, from: "bottom", durationInFrames: 20 });
-            else onChange({ type, fromScale: 0.8 });
+            else if (type === "scaleSpring") onChange({ type, fromScale: 0.8 });
+            else onChange({ type, durationInFrames: 30 });
           }}
-          options={[
-            { value: "none", label: `${label}: none`, icon: <Ban size={14} /> },
-            { value: "fade", label: `${label}: fade`, icon: <Zap size={14} /> },
-            { value: "slide", label: `${label}: slide`, icon: <MoveRight size={14} /> },
-            { value: "scaleSpring", label: `${label}: scale (spring)`, icon: <Sparkles size={14} /> },
-          ]}
+          options={options}
         />
-        {(step.type === "fade" || step.type === "slide") && (
+        {(step.type === "fade" || step.type === "slide" || step.type === "typewriter") && (
           <Knob label="frames" value={step.durationInFrames} min={1} max={90} onChange={(v) => onChange({ ...step, durationInFrames: Math.round(v) })} />
         )}
         {step.type === "scaleSpring" && <Knob label="from" value={step.fromScale} min={0} max={1} step={0.05} sensitivity={0.3} format={(v) => v.toFixed(2)} onChange={(v) => onChange({ ...step, fromScale: v })} />}
@@ -293,7 +298,12 @@ export function LayerPropertyPanel({
         <div className="hint" style={{ marginBottom: 2 }}>
           Enter
         </div>
-        <AnimationControl label="Enter" step={layer.animation.enter} onChange={(enter) => onChange({ ...layer, animation: { ...layer.animation, enter } } as Layer)} />
+        <AnimationControl
+          label="Enter"
+          step={layer.animation.enter}
+          allowTypewriter={layer.kind === "text"}
+          onChange={(enter) => onChange({ ...layer, animation: { ...layer.animation, enter } } as Layer)}
+        />
       </div>
       <div>
         <div className="hint" style={{ marginBottom: 2 }}>

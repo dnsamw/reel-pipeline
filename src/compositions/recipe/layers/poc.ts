@@ -34,7 +34,7 @@ export const pocBeat: CustomBeat = {
       fontWeight: 700,
       color: { source: "theme", token: "foreground" },
       align: "center",
-      animation: { enter: { type: "slide", from: "bottom", durationInFrames: 20 }, exit: { type: "fade", durationInFrames: 15 }, delayFrames: 10 },
+      animation: { enter: { type: "typewriter", durationInFrames: 30 }, exit: { type: "fade", durationInFrames: 15 }, delayFrames: 10 },
     },
     {
       kind: "text",

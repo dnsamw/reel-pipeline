@@ -136,7 +136,8 @@ export type AnimationStep =
   | { type: "none" }
   | { type: "fade"; durationInFrames: number }
   | { type: "slide"; from: "top" | "bottom" | "left" | "right"; durationInFrames: number }
-  | { type: "scaleSpring"; fromScale: number };
+  | { type: "scaleSpring"; fromScale: number }
+  | { type: "typewriter"; durationInFrames: number };
 
 export interface AnimationSpec {
   enter: AnimationStep;
