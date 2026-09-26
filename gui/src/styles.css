@@ -352,6 +352,30 @@ th {
   font-size: 13px;
 }
 
+.draft-banner {
+  background: #fef3d9;
+  color: #8a6d1d;
+  padding: 10px 14px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.draft-banner-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.draft-banner-actions button {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
 .spec-list dt {
   font-weight: 700;
   color: var(--primary);

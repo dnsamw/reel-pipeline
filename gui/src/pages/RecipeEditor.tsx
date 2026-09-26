@@ -12,6 +12,16 @@ import type { CompositionRecipe, DataSourceDescriptor, IntroBeat, OutroBeat, Per
 const DEFAULT_INTRO: IntroBeat = { kind: "intro", theme: "light", text: { source: "config.introText" }, introVoiceKeyword: "sinhala" };
 const DEFAULT_OUTRO: OutroBeat = { kind: "outro", theme: "dark" };
 
+interface RecipeDraft {
+  name: string;
+  description: string;
+  dataSourceId: string;
+  intro: IntroBeat;
+  perPhraseBeats: PerPhraseBeat[];
+  outro: OutroBeat;
+  savedAt: number;
+}
+
 /**
  * Full-bleed workspace, DAW/NLE-style: the Graph (or Inspector, when
  * there's no `custom` beat to show) fills the whole area beside the
@@ -46,6 +56,10 @@ export function RecipeEditor() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(isNew ? null : id ?? null);
+  const [loaded, setLoaded] = useState(false);
+  const [draftAvailable, setDraftAvailable] = useState<number | null>(null); // the draft's savedAt, or null if none/dismissed
+  const skipNextAutosave = useRef(false);
+  const draftKey = `recipe-draft-${isNew ? "new" : id}`;
   const [saving, setSaving] = useState(false);
   const [pushing, setPushing] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(true);
@@ -82,6 +96,24 @@ export function RecipeEditor() {
   useEffect(() => {
     api.defaults().then(setDefaults).catch(() => {});
     api.dataSources().then(setDataSourceList).catch(() => {});
+
+    function finishLoading() {
+      // A draft left over from an interrupted session (refresh, crash,
+      // closed tab) before it was ever saved - offered, never auto-applied,
+      // so it can't silently clobber whatever was just loaded from the
+      // server. Skipped for builtin recipes: they can't be saved back, so
+      // there's nothing meaningful to recover into.
+      try {
+        const raw = localStorage.getItem(draftKey);
+        const draft: RecipeDraft | null = raw ? JSON.parse(raw) : null;
+        setDraftAvailable(draft ? draft.savedAt : null);
+      } catch {
+        setDraftAvailable(null);
+      }
+      skipNextAutosave.current = true;
+      setLoaded(true);
+    }
+
     if (!isNew) {
       api
         .recipe(id!)
@@ -90,16 +122,71 @@ export function RecipeEditor() {
           setBuiltin(r.builtin);
           setSavedId(r.id);
         })
-        .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+        .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+        .finally(finishLoading);
       return;
     }
     if (cloneFrom) {
       api
         .recipe(cloneFrom)
         .then((r) => applyRecord({ ...r, name: `${r.name} copy` }))
-        .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+        .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+        .finally(finishLoading);
+      return;
     }
-  }, [id, isNew, cloneFrom]);
+    finishLoading();
+  }, [id, isNew, cloneFrom, draftKey]);
+
+  // Autosaves the in-progress recipe to localStorage so a refresh or closed
+  // tab doesn't lose it - the actual "current state" of a beat/layer design
+  // lives only in memory until Save is clicked. Debounced, and skips the
+  // very first run after a load so simply opening an unedited recipe never
+  // manufactures a "you have unsaved changes" draft for itself.
+  useEffect(() => {
+    if (!loaded || builtin) return;
+    if (skipNextAutosave.current) {
+      skipNextAutosave.current = false;
+      return;
+    }
+    const t = setTimeout(() => {
+      try {
+        const draft: RecipeDraft = { name, description, dataSourceId, intro, perPhraseBeats, outro, savedAt: Date.now() };
+        localStorage.setItem(draftKey, JSON.stringify(draft));
+      } catch {
+        // ignore (e.g. storage full/blocked) - autosave is a convenience, not a guarantee
+      }
+    }, 800);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, builtin, draftKey, name, description, dataSourceId, intro, perPhraseBeats, outro]);
+
+  function restoreDraft() {
+    try {
+      const raw = localStorage.getItem(draftKey);
+      const draft: RecipeDraft | null = raw ? JSON.parse(raw) : null;
+      if (draft) {
+        setName(draft.name);
+        setDescription(draft.description);
+        setDataSourceId(draft.dataSourceId);
+        setIntro(draft.intro);
+        setPerPhraseBeats(draft.perPhraseBeats);
+        setOutro(draft.outro);
+        setSelection({ beatIndex: null, layerId: null });
+      }
+    } catch {
+      // ignore
+    }
+    setDraftAvailable(null);
+  }
+
+  function discardDraft() {
+    try {
+      localStorage.removeItem(draftKey);
+    } catch {
+      // ignore
+    }
+    setDraftAvailable(null);
+  }
 
   function updateBeat(index: number, beat: PerPhraseBeat) {
     setPerPhraseBeats((cur) => cur.map((b, i) => (i === index ? beat : b)));
@@ -138,6 +225,11 @@ export function RecipeEditor() {
       const record = savedId ? await api.updateRecipe(savedId, payload) : await api.createRecipe(payload);
       setSavedId(record.id);
       setStatus("Saved to SQLite and exported to recipes/" + record.id + ".json");
+      try {
+        localStorage.removeItem(draftKey);
+      } catch {
+        // ignore
+      }
       if (isNew) navigate(`/recipes/${record.id}`, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -232,6 +324,19 @@ export function RecipeEditor() {
 
       {error && <div className="error-banner">{error}</div>}
       {status && <div className="success-banner">{status}</div>}
+      {draftAvailable && (
+        <div className="draft-banner">
+          <span>You have unsaved changes from a previous session ({new Date(draftAvailable).toLocaleString()}).</span>
+          <div className="draft-banner-actions">
+            <button type="button" onClick={restoreDraft}>
+              Restore
+            </button>
+            <button type="button" className="secondary" onClick={discardDraft}>
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="recipe-editor-workspace">
         <div className="recipe-editor-workspace-base">
