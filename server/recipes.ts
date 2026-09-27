@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { db } from "./db";
 import { compositionRecipeSchema, type CompositionRecipe } from "../src/compositions/recipe/schema";
 import { builtInRecipes } from "../src/compositions/recipe/recipes";
+import { defaultDataSourceId } from "../src/data/dataSources";
 
 const execFileAsync = promisify(execFile);
 
@@ -17,7 +18,7 @@ const RECIPES_DIR = join(process.cwd(), "recipes");
 export type RecipeInput = Omit<CompositionRecipe, "id">;
 
 /** What actually lives in the `recipe_json` column - deliberately excludes name/description/id, which are their own columns (see saveRecipe/rowToRecord). */
-type RecipeBody = Pick<CompositionRecipe, "intro" | "perPhraseBeats" | "outro" | "transition">;
+type RecipeBody = Pick<CompositionRecipe, "dataSourceId" | "intro" | "perPhraseBeats" | "outro" | "transition">;
 
 export interface RecipeRecord extends CompositionRecipe {
   /** True for the 3 code-defined recipes (template-{1,2,3}.json) - read-only, never in the `recipes` SQLite table. */
@@ -50,6 +51,11 @@ function rowToRecord(row: RecipeRow): RecipeRecord {
     name: row.name,
     description: row.description,
     ...body,
+    // Defensive fallback for a row saved before dataSourceId existed - not
+    // expected in practice (see docs/COMPOSITION_DESIGNER.md), but rowToRecord
+    // doesn't re-validate through compositionRecipeSchema's own .default(),
+    // so a genuinely missing field wouldn't otherwise get one.
+    dataSourceId: body.dataSourceId ?? defaultDataSourceId,
     builtin: false,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -103,6 +109,7 @@ export function saveRecipe(input: RecipeInput, id?: string): RecipeRecord {
     name: record.name,
     description: record.description,
     recipeJson: JSON.stringify({
+      dataSourceId: record.dataSourceId,
       intro: record.intro,
       perPhraseBeats: record.perPhraseBeats,
       outro: record.outro,

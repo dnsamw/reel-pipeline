@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StudyPal list story</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@500;600&family=Noto+Sans+Sinhala:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --purple: #591F82;
+    --purple-deep: #3B1259;
+    --gold: #F9B200;
+    --lilac: #D3BDE6;
+    --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --font-body: "Figtree", "Segoe UI", system-ui, sans-serif;
+    --font-si: "Noto Sans Sinhala", "Iskoola Pota", "Nirmala UI", sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: #1A1024;
+    font-family: var(--font-body);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 24px 12px;
+  }
+
+  /* Preview scaling wrapper */
+  .stage { width: min(400px, 100%); aspect-ratio: 9 / 16; position: relative; }
+  .stage .story { position: absolute; top: 0; left: 0; transform-origin: top left; }
+
+  /* ================= STORY: exactly 1080 × 1920 ================= */
+  .story {
+    --s: 1;                               /* item scale, set by JS to fit */
+    width: 1080px;
+    height: 1920px;
+    background: var(--purple);
+    color: #fff;
+    padding: 110px 80px 100px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Brand */
+  .brand { display: flex; align-items: center; gap: 20px; }
+  .brand svg { width: 76px; height: 76px; flex: none; }
+  .brand-name {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 42px;
+    letter-spacing: -0.01em;
+  }
+  .kicker {
+    margin-left: auto;
+    padding: 14px 30px;
+    border-radius: 99px;
+    background: var(--gold);
+    color: var(--purple-deep);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 30px;
+  }
+  .kicker:empty { display: none; }
+
+  /* Heading */
+  .heading { margin-top: 90px; }
+  .title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 96px;
+    line-height: 1.02;
+    letter-spacing: -0.035em;
+    color: var(--gold);
+    text-wrap: balance;
+  }
+  .title-si {
+    margin: 22px 0 0;
+    font-family: var(--font-si);
+    font-weight: 600;
+    font-size: 42px;
+    line-height: 1.45;
+  }
+  .title-si:empty { display: none; }
+
+  /* List */
+  .list {
+    list-style: none;
+    margin: 70px 0 0;
+    padding: 0;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+  }
+  .item {
+    display: grid;
+    grid-template-columns: calc(84px * var(--s)) 1fr;
+    column-gap: calc(34px * var(--s));
+    align-items: start;
+    padding: calc(26px * var(--s)) 0;
+  }
+  .item + .item { border-top: 2px solid rgba(255,255,255,.12); }
+
+  .num {
+    width: calc(84px * var(--s));
+    height: calc(84px * var(--s));
+    display: grid;
+    place-items: center;
+    border-radius: calc(22px * var(--s));
+    background: var(--gold);
+    color: var(--purple-deep);
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: calc(44px * var(--s));
+    font-variant-numeric: tabular-nums;
+  }
+  .phrase {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: calc(64px * var(--s));
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    color: var(--gold);
+    padding-top: calc(4px * var(--s));
+  }
+  .meaning {
+    margin-top: calc(12px * var(--s));
+    font-family: var(--font-si);
+    font-weight: 500;
+    font-size: calc(42px * var(--s));
+    line-height: 1.45;
+    color: #fff;
+  }
+  .pron {
+    margin-top: calc(6px * var(--s));
+    font-family: var(--font-si);
+    font-style: italic;
+    font-size: calc(34px * var(--s));
+    line-height: 1.45;
+    color: var(--lilac);
+  }
+  .pron::before { content: "("; }
+  .pron::after  { content: ")"; }
+  .meaning:empty, .pron:empty { display: none; }
+
+  /* Footer */
+  .foot {
+    margin-top: 50px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 34px;
+    font-weight: 600;
+    color: rgba(255,255,255,.85);
+  }
+  .foot::before {
+    content: "";
+    width: 72px; height: 9px;
+    border-radius: 5px;
+    background: var(--gold);
+  }
+  .foot:empty { display: none; }
+
+  /* ?render=1 → bare 1080×1920 story */
+  body.render { padding: 0; background: none; display: block; min-height: 0; }
+  body.render .stage { width: 1080px; }
+  body.render .stage .story { position: static; transform: none !important; }
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage">
+  <article class="story" id="story">
+    <div class="brand">
+      <svg viewBox="0 0 300 300" role="img" aria-label="StudyPal logo">
+        <rect width="300" height="300" rx="64" fill="#F9B200"/>
+        <g fill="#591F82" transform="matrix(2.3512290156904005,0,0,2.3512290156904005,31.75624218697046,30.09)">
+          <path d="M87.787 36.736a20.05 20.05 0 0 0-14.263-5.912 20.05 20.05 0 0 0-14.264 5.912L36.034 59.962a12.59 12.59 0 0 1-8.962 3.707 12.55 12.55 0 0 1-8.952-3.717A12.53 12.53 0 0 1 14.404 51c0-3.378 1.314-6.56 3.716-8.962a12.58 12.58 0 0 1 8.952-3.707 12.58 12.58 0 0 1 8.962 3.707l5.463 5.464 4.961-.46.342-4.842-5.464-5.464a20.05 20.05 0 0 0-14.264-5.912 20.05 20.05 0 0 0-14.264 5.912C8.998 40.546 6.896 45.613 6.896 51s2.102 10.452 5.912 14.265a20.05 20.05 0 0 0 14.264 5.911 20.05 20.05 0 0 0 14.264-5.911l23.226-23.227a12.59 12.59 0 0 1 8.963-3.707c3.378 0 6.56 1.313 8.952 3.707 4.944 4.945 4.944 12.979 0 17.924a12.58 12.58 0 0 1-8.952 3.707 12.59 12.59 0 0 1-8.963-3.707L58.301 53.7l-.342 4.842-4.961.46-.045-.045v.001l6.308 6.307a20.05 20.05 0 0 0 14.264 5.911 20.05 20.05 0 0 0 14.263-5.911c7.862-7.866 7.862-20.665-.001-28.529"/>
+        </g>
+      </svg>
+      <span class="brand-name">StudyPal</span>
+      <span class="kicker" id="kicker"></span>
+    </div>
+
+    <div class="heading">
+      <h1 class="title" id="title"></h1>
+      <p class="title-si" id="title-si" lang="si"></p>
+    </div>
+
+    <ol class="list" id="list"></ol>
+
+    <div class="foot" id="foot"></div>
+  </article>
+</div>
+
+<script>
+  /* ================== EDIT PER STORY ==================
+     URL override: ?data=<URL-encoded JSON of this object>&render=1 */
+  const STORY = {
+    kicker: "Idioms",
+    title: "5 English idioms you should know",
+    titleSi: "දැනගත යුතුම ඉංග්‍රීසි යෙදුම් 5ක්",
+    items: [
+      { phrase: "Break a leg",         meaning: "සුභ පැතුම්! / ජය වේවා!",                       pron: "බ්‍රේක් අ ලෙග්" },
+      { phrase: "Piece of cake",       meaning: "හරිම ලේසි දෙයක්",                              pron: "පීස් ඔෆ් කේක්" },
+      { phrase: "Hit the sack",        meaning: "නිදාගන්න යනවා",                                pron: "හිට් ද සැක්" },
+      { phrase: "Once in a blue moon", meaning: "ඉතා කලාතුරකින් / කලාතුරකින් සිදුවන දෙයක්",     pron: "වන්ස් ඉන් අ බ්ලූ මූන්" },
+      { phrase: "Under the weather",   meaning: "අසනීපයෙන් / සනීප නැතිව",                       pron: "අන්ඩර් ද වෙදර්" }
+    ],
+    foot: "Follow StudyPal for daily English"
+  };
+  /* ==================================================== */
+
+  const q = new URLSearchParams(location.search);
+  if (q.has("data")) { try { Object.assign(STORY, JSON.parse(q.get("data"))); } catch (e) { console.error(e); } }
+  const renderMode = q.get("render") === "1";
+  if (renderMode) document.body.classList.add("render");
+
+  const $ = id => document.getElementById(id);
+  const story = $("story"), list = $("list");
+
+  $("kicker").textContent = STORY.kicker || "";
+  $("title").textContent = STORY.title || "";
+  $("title-si").textContent = STORY.titleSi || "";
+  $("foot").textContent = STORY.foot || "";
+
+  STORY.items.forEach((it, i) => {
+    const li = document.createElement("li");
+    li.className = "item";
+    li.innerHTML = '<span class="num"></span><div><div class="phrase"></div><div class="meaning" lang="si"></div><div class="pron" lang="si"></div></div>';
+    li.querySelector(".num").textContent = i + 1;
+    li.querySelector(".phrase").textContent = it.phrase || "";
+    li.querySelector(".meaning").textContent = it.meaning || "";
+    li.querySelector(".pron").textContent = it.pron || "";
+    list.appendChild(li);
+  });
+
+  function fit() {
+    // grow items for short lists, shrink for long ones, until the list fits
+    let s = 1.25;
+    story.style.setProperty("--s", s);
+    while (list.scrollHeight > list.clientHeight && s > 0.5) {
+      s -= 0.02;
+      story.style.setProperty("--s", s.toFixed(2));
+    }
+  }
+
+  function scale() {
+    if (renderMode) return;
+    story.style.transform = `scale(${$("stage").clientWidth / 1080})`;
+  }
+  addEventListener("resize", scale);
+  scale();
+
+  document.fonts.ready.then(() => {
+    fit();
+    scale();
+    window.__STORY_READY__ = true;
+  });
+</script>
+</body>
+</html>

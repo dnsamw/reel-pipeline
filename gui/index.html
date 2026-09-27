@@ -3,7 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>StudyPal Reel Studio</title>
+    <title>StudyPal Studio</title>
+    <meta name="description" content="Create, render and publish StudyPal reels and posts." />
+    <!-- The StudyPal mark (src/posts/StudyPalLogo.tsx), inlined so no extra asset file is needed. -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20300%20300%22%3E%3Crect%20width%3D%22300%22%20height%3D%22300%22%20rx%3D%2264%22%20fill%3D%22%23F9B200%22%2F%3E%3Cg%20fill%3D%22%23591F82%22%20transform%3D%22matrix(2.3512290156904005%2C0%2C0%2C2.3512290156904005%2C31.75624218697046%2C30.09)%22%3E%3Cpath%20d%3D%22M87.787%2036.736a20.05%2020.05%200%200%200-14.263-5.912%2020.05%2020.05%200%200%200-14.264%205.912L36.034%2059.962a12.59%2012.59%200%200%201-8.962%203.707%2012.55%2012.55%200%200%201-8.952-3.717A12.53%2012.53%200%200%201%2014.404%2051c0-3.378%201.314-6.56%203.716-8.962a12.58%2012.58%200%200%201%208.952-3.707%2012.58%2012.58%200%200%201%208.962%203.707l5.463%205.464%204.961-.46.342-4.842-5.464-5.464a20.05%2020.05%200%200%200-14.264-5.912%2020.05%2020.05%200%200%200-14.264%205.912C8.998%2040.546%206.896%2045.613%206.896%2051s2.102%2010.452%205.912%2014.265a20.05%2020.05%200%200%200%2014.264%205.911%2020.05%2020.05%200%200%200%2014.264-5.911l23.226-23.227a12.59%2012.59%200%200%201%208.963-3.707c3.378%200%206.56%201.313%208.952%203.707%204.944%204.945%204.944%2012.979%200%2017.924a12.58%2012.58%200%200%201-8.952%203.707%2012.59%2012.59%200%200%201-8.963-3.707L58.301%2053.7l-.342%204.842-4.961.46-.045-.045v.001l6.308%206.307a20.05%2020.05%200%200%200%2014.264%205.911%2020.05%2020.05%200%200%200%2014.263-5.911c7.862-7.866%207.862-20.665-.001-28.529%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <script>
+      // Apply the saved theme before first paint (see src/lib/theme.ts) - avoids a light flash in dark mode.
+      try {
+        var t = localStorage.getItem("studypal-studio:theme");
+        if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

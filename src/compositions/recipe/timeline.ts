@@ -1,5 +1,6 @@
 import type { ReelConfig } from "../../config/config";
 import type { CompositionRecipe, Beat } from "./schema";
+import type { CustomBeat } from "./layers/schema";
 
 export type RecipeTimelineItem =
   | { type: "intro"; durationInFrames: number }
@@ -16,6 +17,7 @@ export type RecipeTimelineItem =
       prompt: "phrase" | "translationSi";
       answer: "phrase" | "translationSi";
     }
+  | { type: "custom"; phraseIndex: number; durationInFrames: number; beat: CustomBeat }
   | { type: "outro"; durationInFrames: number };
 
 function beatDurationFrames(beat: Beat, config: ReelConfig): number {
@@ -29,6 +31,9 @@ function beatDurationFrames(beat: Beat, config: ReelConfig): number {
       return frames(config.revealSeconds);
     case "guessReveal":
       return frames(config.phraseSeconds) + frames(config.countdownSeconds) + frames(config.revealSeconds);
+    case "custom":
+      // Data-driven, not config-derived - the one beat kind whose duration is authored directly on the beat itself.
+      return beat.durationInFrames;
     default:
       // intro/outro durations are handled directly in buildTimelineFromRecipe (config.introSeconds/outroSeconds) -
       // this branch only exists so TS flags it if a new per-phrase beat kind is ever added without updating this function.
@@ -60,6 +65,8 @@ export function buildTimelineFromRecipe(recipe: CompositionRecipe, batchSize: nu
           prompt: beat.prompt,
           answer: beat.answer,
         });
+      } else if (beat.kind === "custom") {
+        items.push({ type: "custom", phraseIndex, durationInFrames, beat });
       } else {
         items.push({ type: beat.kind, phraseIndex, durationInFrames });
       }

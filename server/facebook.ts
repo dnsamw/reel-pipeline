@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { db } from "./db";
 
-const GRAPH = "https://graph.facebook.com/v21.0";
+export const GRAPH = "https://graph.facebook.com/v21.0";
 const GRAPH_VIDEO = "https://graph-video.facebook.com/v21.0";
 
 function requireEnv(name: string): string {
@@ -51,7 +51,11 @@ export function buildAuthUrl(state: string): string {
   if (configId) {
     params.set("config_id", configId);
   } else {
-    params.set("scope", "pages_show_list,pages_read_engagement,pages_manage_posts");
+    // read_insights / instagram_manage_insights: views and watch time for the Insights page.
+    params.set(
+      "scope",
+      "pages_show_list,pages_read_engagement,pages_manage_posts,read_insights,instagram_basic,instagram_content_publish,instagram_manage_insights",
+    );
   }
 
   return `https://www.facebook.com/v21.0/dialog/oauth?${params.toString()}`;
@@ -113,7 +117,7 @@ export function selectPendingPage(pageId: string): { id: string; name: string } 
   return { id: page.id, name: page.name };
 }
 
-interface PageRow {
+export interface PageRow {
   id: string;
   name: string;
   access_token: string;
@@ -139,12 +143,85 @@ export function getConnectedPage(): { id: string; name: string; connectedAt: str
   return row ?? null;
 }
 
-function getConnectedPageWithToken(): PageRow | null {
+export function getConnectedPageWithToken(): PageRow | null {
   return (db.prepare("SELECT * FROM facebook_page LIMIT 1").get() as PageRow | undefined) ?? null;
 }
 
 export function disconnectPage(): void {
   db.prepare("DELETE FROM facebook_page").run();
+}
+
+/** Image post - POST /{page-id}/photos with the file as multipart `source` and the caption as `message`. */
+export async function publishPhotoToConnectedPage(
+  filePath: string,
+  caption: string,
+): Promise<{ pageId: string; pageName: string; id: string; permalink: string }> {
+  const page = getConnectedPageWithToken();
+  if (!page) throw new Error("No Facebook Page connected - connect one in Settings first");
+
+  const form = new FormData();
+  form.set("access_token", page.access_token);
+  form.set("message", caption);
+  form.set("source", new Blob([await readFile(filePath)], { type: "image/png" }), "post.png");
+
+  const res = await fetch(`${GRAPH}/${page.id}/photos`, { method: "POST", body: form });
+  const body = await res.json();
+  if (!res.ok || !body.id) throw new Error(body?.error?.message ?? `Facebook photo upload failed (${res.status})`);
+
+  // post_id ("<page>_<post>") links to the feed post itself; fall back to the photo.
+  const permalink = body.post_id ? `https://www.facebook.com/${body.post_id}` : `https://www.facebook.com/photo/?fbid=${body.id}`;
+  return { pageId: page.id, pageName: page.name, id: body.id as string, permalink };
+}
+
+/**
+ * Publishes as a Facebook Reel (not a regular Page video) via the three-step
+ * video_reels flow: START opens an upload session, the bytes go to the
+ * returned rupload URL, FINISH with video_state=PUBLISHED posts it. Reels must
+ * be 9:16 and 3-90s - server/index.ts checks that before choosing this over
+ * publishVideoToConnectedPage. Facebook keeps processing after FINISH returns,
+ * so the reel can take a minute or two to appear on the Page.
+ */
+export async function publishReelToConnectedPage(
+  filePath: string,
+  caption: string,
+): Promise<{ pageId: string; pageName: string; videoId: string; permalink: string }> {
+  const page = getConnectedPageWithToken();
+  if (!page) throw new Error("No Facebook Page connected - connect one in Settings first");
+
+  const start = await fetch(`${GRAPH}/${page.id}/video_reels`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ upload_phase: "start", access_token: page.access_token }),
+  });
+  const startBody = await start.json();
+  if (!start.ok || !startBody.video_id) throw new Error(startBody?.error?.message ?? `Reel upload start failed (${start.status})`);
+  const videoId = startBody.video_id as string;
+  const uploadUrl = (startBody.upload_url as string | undefined) ?? `https://rupload.facebook.com/video-upload/v21.0/${videoId}`;
+
+  const fileBuffer = await readFile(filePath);
+  const upload = await fetch(uploadUrl, {
+    method: "POST",
+    headers: { Authorization: `OAuth ${page.access_token}`, offset: "0", file_size: String(fileBuffer.length) },
+    body: fileBuffer,
+  });
+  const uploadBody = await upload.json().catch(() => ({}));
+  if (!upload.ok || uploadBody.success === false) throw new Error(uploadBody?.debug_info?.message ?? uploadBody?.error?.message ?? `Reel upload failed (${upload.status})`);
+
+  const finish = await fetch(`${GRAPH}/${page.id}/video_reels`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      upload_phase: "finish",
+      video_id: videoId,
+      video_state: "PUBLISHED",
+      description: caption,
+      access_token: page.access_token,
+    }),
+  });
+  const finishBody = await finish.json();
+  if (!finish.ok || finishBody.success === false) throw new Error(finishBody?.error?.message ?? `Reel publish failed (${finish.status})`);
+
+  return { pageId: page.id, pageName: page.name, videoId, permalink: `https://www.facebook.com/reel/${videoId}` };
 }
 
 export async function publishVideoToConnectedPage(

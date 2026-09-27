@@ -79,3 +79,37 @@ db.exec(`
     updated_at TEXT NOT NULL
   );
 `);
+
+// Platforms beyond the Facebook Page (Instagram now; YouTube/TikTok next) -
+// one row per connected platform. Instagram reuses the Facebook Page token,
+// so its access_token/refresh_token stay null; OAuth platforms fill them.
+// Same trust boundary as facebook_page: never sent to the frontend.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS social_accounts (
+    platform TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
+    account_name TEXT NOT NULL,
+    access_token TEXT,
+    refresh_token TEXT,
+    expires_at TEXT,
+    extra_json TEXT NOT NULL DEFAULT '{}',
+    connected_at TEXT NOT NULL
+  );
+`);
+
+// Additive migrations for tables created before a column existed -
+// CREATE TABLE IF NOT EXISTS above never alters an existing table.
+function addColumnIfMissing(table: string, column: string, ddl: string): void {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+}
+
+// publications predates multi-platform publishing: existing rows are all
+// Facebook. `stage` is the live progress text of a background publish job.
+addColumnIfMissing("publications", "platform", "platform TEXT NOT NULL DEFAULT 'facebook'");
+addColumnIfMissing("publications", "stage", "stage TEXT");
+// JSON CaptionMeta (src/captions/types.ts): how the caption was made, so
+// post performance can later be compared by engine/tone/hook.
+addColumnIfMissing("publications", "caption_meta", "caption_meta TEXT");
+// What a successful publish actually produced: live post, TikTok draft, private/unlisted YouTube upload.
+addColumnIfMissing("publications", "outcome", "outcome TEXT");

@@ -63,6 +63,8 @@ function parseArgs(argv: string[]) {
     limit: typeof args.limit === "string" ? parseInt(args.limit, 10) : null,
     force: args.force === true,
     tts: args.tts === "true" ? true : args.tts === "false" ? false : null,
+    ttsEn: args.ttsEn === "true" ? true : args.ttsEn === "false" ? false : null,
+    ttsSi: args.ttsSi === "true" ? true : args.ttsSi === "false" ? false : null,
     template,
     book: typeof args.book === "string" ? args.book : null,
     sidechain: args.sidechain === "true",
@@ -117,7 +119,7 @@ function manifestKey(batch: ReelBatch, template: string): string {
 }
 
 async function main() {
-  const { chapters, limit, force, tts, template, book, sidechain, presetFile, phraseIds, recipeFile } = parseArgs(process.argv.slice(2));
+  const { chapters, limit, force, tts, ttsEn, ttsSi, template, book, sidechain, presetFile, phraseIds, recipeFile } = parseArgs(process.argv.slice(2));
 
   // --recipeFile (a custom, GUI-authored CompositionRecipe) takes over
   // composition/intro-voice/manifest-tag selection entirely; --template's 3
@@ -162,6 +164,8 @@ async function main() {
     config.chapterOrderRange = [min, max];
   }
   if (tts != null) config.ttsEnabled = tts;
+  if (ttsEn != null) config.ttsEnglish = ttsEn;
+  if (ttsSi != null) config.ttsSinhala = ttsSi;
   if (book) config.bookId = book;
 
   // --phraseIds bypasses the normal chapter-range scan entirely - it's an
@@ -230,25 +234,26 @@ async function main() {
     { musicFile: string | null; musicStartFrame: number; introVoiceFile: string | null; ttsPhraseFiles: (string | null)[]; ttsRevealFiles: (string | null)[] }
   >();
 
-  if (toRender.length > 0 && config.ttsEnabled) {
-    console.log(`Synthesizing TTS audio for ${toRender.length} batch(es) (cached by content hash - reruns won't re-pay)...`);
+  // Each language is independently switchable - a language that's off just
+  // gets null files, which the compositions already treat as "no voice here".
+  // Older presets/settings without these fields default to both on.
+  const voiceEnglish = config.ttsEnabled && config.ttsEnglish !== false;
+  const voiceSinhala = config.ttsEnabled && config.ttsSinhala !== false;
+  if (toRender.length > 0 && (voiceEnglish || voiceSinhala)) {
+    const langs = [voiceEnglish && "English", voiceSinhala && "Sinhala"].filter(Boolean).join(" + ");
+    console.log(`Synthesizing ${langs} TTS audio for ${toRender.length} batch(es) (cached by content hash - reruns won't re-pay)...`);
+  } else if (toRender.length > 0 && config.ttsEnabled) {
+    console.log("TTS is on but both English and Sinhala voices are switched off - rendering without narration.");
   }
   for (const { batch, rotationSeed } of toRender) {
     const voicePair = VOICE_PAIRS[rotationSeed % VOICE_PAIRS.length];
     const ttsPhraseFiles: (string | null)[] = [];
     const ttsRevealFiles: (string | null)[] = [];
-    if (config.ttsEnabled) {
-      for (const phrase of batch.phrases) {
-        ttsPhraseFiles.push(await synthesizeSpeech(phrase.phrase, voicePair.en, config.ttsDir, config.ttsRate));
-        ttsRevealFiles.push(
-          await synthesizeSpeech(phrase.translationSi ?? phrase.phrase, voicePair.si, config.ttsDir, config.ttsRate),
-        );
-      }
-    } else {
-      batch.phrases.forEach(() => {
-        ttsPhraseFiles.push(null);
-        ttsRevealFiles.push(null);
-      });
+    for (const phrase of batch.phrases) {
+      ttsPhraseFiles.push(voiceEnglish ? await synthesizeSpeech(phrase.phrase, voicePair.en, config.ttsDir, config.ttsRate) : null);
+      ttsRevealFiles.push(
+        voiceSinhala ? await synthesizeSpeech(phrase.translationSi ?? phrase.phrase, voicePair.si, config.ttsDir, config.ttsRate) : null,
+      );
     }
     audioPlan.set(batch.id, {
       musicFile: pickMusicTrack(config.musicDir, rotationSeed),

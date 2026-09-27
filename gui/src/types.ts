@@ -36,6 +36,8 @@ export interface ReelConfig {
   chapterOrderRange: [number, number] | null;
   bookId: string | null;
   ttsEnabled: boolean;
+  ttsEnglish: boolean;
+  ttsSinhala: boolean;
   ttsRate: number;
   theme: ReelTheme | null;
   musicVolume: number;
@@ -96,13 +98,113 @@ export interface OutroBeat {
   kind: "outro";
   theme: ThemeVariant;
 }
-export type PerPhraseBeat = PhraseBeat | CountdownBeat | RevealBeat | GuessRevealBeat;
-export const PER_PHRASE_BEAT_KINDS = ["phrase", "countdown", "reveal", "guessReveal"] as const;
+
+// Mirrors src/compositions/recipe/layers/schema.ts field-for-field - the
+// `custom` beat kind, whose visual content is a Layer[] interpreted
+// generically by LayerRenderer.tsx instead of a fixed scene component. See
+// docs/COMPOSITION_DESIGNER.md's "A concrete design for the true visual
+// designer".
+export type Anchor = "top-left" | "top-center" | "top-right" | "center-left" | "center" | "center-right" | "bottom-left" | "bottom-center" | "bottom-right";
+
+export interface LayerBox {
+  position: { xPct: number; yPct: number };
+  anchor: Anchor;
+  widthPct?: number;
+  heightPct?: number;
+  rotationDeg: number;
+  zIndex: number;
+}
+
+export type ColorRef = { source: "literal"; hex: string } | { source: "theme"; token: keyof Palette } | { source: "oppositeThemeToken"; token: "primary" | "brand2" | "gold" };
+
+// Mirrors src/data/dataSources.ts field-for-field - the registry of record
+// shapes a recipe's dataField text bindings can point at. Only "BookPhrase"
+// exists today; more get added there as more Prisma models come online, see
+// docs/COMPOSITION_DESIGNER.md's data-binding design.
+export interface DataSourceField {
+  key: string;
+  label: string;
+  type: "text";
+}
+export interface DataSourceDescriptor {
+  id: string;
+  label: string;
+  fields: DataSourceField[];
+}
+
+export type TextRef = { source: "literal"; value: string } | { source: "config"; path: "introText" } | { source: "dataField"; field: string };
+
+export type AnimationStep =
+  | { type: "none" }
+  | { type: "fade"; durationInFrames: number }
+  | { type: "slide"; from: "top" | "bottom" | "left" | "right"; durationInFrames: number }
+  | { type: "scaleSpring"; fromScale: number }
+  | { type: "typewriter"; durationInFrames: number };
+
+export interface AnimationSpec {
+  enter: AnimationStep;
+  exit: AnimationStep;
+  delayFrames: number;
+}
+
+/** A layer's own trim within its parent beat - omitted means "the whole beat" (see LayerRenderer.tsx). What Timeline.tsx's per-layer track drags. */
+export interface LayerTiming {
+  startFrame: number;
+  durationFrames?: number;
+}
+
+export interface TextLayer {
+  kind: "text";
+  id: string;
+  box: LayerBox;
+  text: TextRef;
+  font: "sans" | "sinhala";
+  fontSizePx: number;
+  fontWeight: number;
+  color: ColorRef;
+  align: "left" | "center" | "right";
+  animation: AnimationSpec;
+  timing?: LayerTiming;
+}
+export interface ImageLayer {
+  kind: "image";
+  id: string;
+  box: LayerBox;
+  src: { source: "asset"; path: string } | { source: "sceneFrameChrome" };
+  animation: AnimationSpec;
+  timing?: LayerTiming;
+}
+export interface ShapeLayer {
+  kind: "shape";
+  id: string;
+  box: LayerBox;
+  shape: "rect" | "circle" | "ring" | "triangle" | "star" | "line";
+  fill?: ColorRef;
+  stroke?: ColorRef;
+  strokeWidthPx?: number;
+  cornerRadiusPx?: number;
+  progress?: { source: "countdownProgress" };
+  animation: AnimationSpec;
+  timing?: LayerTiming;
+}
+export type Layer = TextLayer | ImageLayer | ShapeLayer;
+
+export interface CustomBeat {
+  kind: "custom";
+  theme: ThemeVariant;
+  durationInFrames: number;
+  layers: Layer[];
+}
+
+export type PerPhraseBeat = PhraseBeat | CountdownBeat | RevealBeat | GuessRevealBeat | CustomBeat;
+export const PER_PHRASE_BEAT_KINDS = ["phrase", "countdown", "reveal", "guessReveal", "custom"] as const;
 
 export interface CompositionRecipe {
   id: string;
   name: string;
   description: string;
+  /** Which data/dataSources.ts registry entry (mirrored below as DataSourceDescriptor) perPhraseBeats' dataField text bindings resolve against - see docs/COMPOSITION_DESIGNER.md. */
+  dataSourceId: string;
   intro: IntroBeat;
   perPhraseBeats: PerPhraseBeat[];
   outro: OutroBeat;
@@ -137,6 +239,9 @@ export interface ManifestEntry {
   chapterTitle: string;
   phraseIds: string[];
   ttsEnabled: boolean;
+  /** Per phrase - null where that language wasn't voiced. Used to show which TTS languages a reel has. */
+  ttsPhraseFiles?: (string | null)[];
+  ttsRevealFiles?: (string | null)[];
   sidechain: boolean;
   outputPath: string;
   renderedAt: string;
@@ -202,8 +307,36 @@ export interface FacebookStatus {
   pendingPages: { id: string; name: string }[] | null;
 }
 
+export type PublishPlatform = "facebook" | "instagram" | "youtube" | "tiktok";
+
+/** Mirrors server/distribution/types.ts's PlatformStatus. */
+export interface PlatformStatus {
+  platform: PublishPlatform;
+  label: string;
+  connected: boolean;
+  accountName: string | null;
+  setupHint: string | null;
+  /** False for platforms not built yet ("coming soon"). */
+  available: boolean;
+  /** False when the server lacks this platform's app credentials in .env. */
+  configured?: boolean;
+}
+
+export interface PublishTargetOption extends PlatformStatus {
+  /** Why this file can't go to this platform right now; null = ready. */
+  unavailableReason: string | null;
+}
+
+/** What's being published - a Post Creator export or a batch reel from the manifest. */
+export type PublishSource = { type: "post"; savedPath: string } | { type: "batch"; batchId: string; template: string };
+
 export interface Publication {
   id: string;
+  platform: PublishPlatform;
+  /** Live progress text while status is "uploading". */
+  stage: string | null;
+  /** For a successful publish: live post, TikTok draft, or private/unlisted YouTube upload (null = live). */
+  outcome: "live" | "draft" | "private" | "unlisted" | null;
   batchId: string;
   template: string;
   outputPath: string;
@@ -214,8 +347,39 @@ export interface Publication {
   status: "uploading" | "published" | "error";
   error: string | null;
   caption: string;
+  captionMeta: CaptionMeta | null;
   createdAt: string;
   publishedAt: string | null;
+}
+
+export type { CaptionContext, CaptionMeta, CaptionPlatform, CaptionSuggestion, CaptionTone } from "../../src/captions/types";
+import type { CaptionMeta } from "../../src/captions/types";
+
+export type {
+  AiContentIdea,
+  AiReport,
+  AiReportRecord,
+  BaselinePrediction,
+  BuiltinSuggestion,
+  Comparison,
+  ContentPiece,
+  InsightsOverview,
+  PlatformResult,
+  PostMetrics,
+  StatsAccess,
+} from "../../src/analytics/types";
+
+export interface TikTokVideoOption {
+  id: string;
+  createTime: string;
+  description: string;
+  durationSeconds: number | null;
+  shareUrl: string | null;
+}
+
+export interface AiStatus {
+  available: boolean;
+  model: string | null;
 }
 
 export interface VideoSpec {
@@ -227,4 +391,26 @@ export interface VideoSpec {
   audio: string;
   duration: string;
   namingConvention: string;
+}
+
+// Media Library (gui /library) - mirrors server/library.ts.
+export type LibraryKind = "reel" | "post" | "image";
+
+export interface LibraryItem {
+  id: string;
+  kind: LibraryKind;
+  name: string;
+  path: string;
+  url: string;
+  mediaType: "video" | "image";
+  sizeBytes: number;
+  modifiedAt: string;
+  manifest?: { key: string; chapterTitle: string; template: string; renderedAt: string } | null;
+  published?: boolean;
+  usedBy?: string[];
+}
+
+export interface LibraryListing {
+  items: LibraryItem[];
+  manifest: { entries: number; missingFiles: number };
 }

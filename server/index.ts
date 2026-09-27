@@ -1,9 +1,11 @@
 import express from "express";
 import cors from "cors";
-import { join, relative } from "node:path";
+import { join, relative, extname, basename } from "node:path";
 import { tmpdir } from "node:os";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { defaultConfig } from "../src/config/config";
 import { colors as lightPalette, darkColors as darkPalette } from "../src/theme/tokens";
+import { dataSources } from "../src/data/dataSources";
 import { getPhrases, listBooks, listChapters, updatePhrase, disconnect } from "../src/data/getPhrases";
 import { batchPhrases } from "../src/data/batch";
 import { loadManifest, isRendered } from "../src/render/manifest";
@@ -22,11 +24,21 @@ import {
   saveConnectedPage,
   getConnectedPage,
   disconnectPage,
-  publishVideoToConnectedPage,
 } from "./facebook";
-import { listPublications, createPublication, markPublished, markError } from "./publications";
+import { listPublications, getPublication, failInterruptedPublications } from "./publications";
+import { platformStatuses, targetsFor, startPublishing, type PublishTarget } from "./distribution";
+import type { PublishSource } from "./distribution/media";
+import { connectInstagram, disconnectInstagram } from "./distribution/instagramAdapter";
+import { buildYouTubeAuthUrl, completeYouTubeLogin, disconnectYouTube } from "./distribution/youtubeAdapter";
+import { buildTikTokAuthUrl, completeTikTokLogin, disconnectTikTok } from "./distribution/tiktokAdapter";
 import { startRender, getRun, listRuns, cancelRun } from "./renderRunner";
 import { introOutroVideoSpec } from "./videoSpec";
+import { renderPostPng, warmPostBundle } from "./postRenderer";
+import { listMusicTracks, renderPostReel } from "./postReel";
+import { listLibrary, deleteLibraryItems, resetManifest, pruneManifest } from "./library";
+import { aiStatus, suggestCaptions } from "./captions";
+import { askAi, getOverview, getReport, linkTikTok, listReports, recentTikTokVideos, refreshStats, startAiReport, startInsightsScheduler } from "./analytics";
+import type { CaptionContext, CaptionMeta, CaptionPlatform, CaptionTone } from "../src/captions/types";
 
 const app = express();
 app.use(cors());
@@ -174,6 +186,13 @@ app.get("/api/theme/default", (_req, res) => {
   res.json({ light: lightPalette, dark: darkPalette });
 });
 
+// The data-binding registry (src/data/dataSources.ts) - which record shapes
+// a recipe's custom-beat text layers can bind against. See
+// docs/COMPOSITION_DESIGNER.md's data-binding design.
+app.get("/api/data-sources", (_req, res) => {
+  res.json(Object.values(dataSources));
+});
+
 // --- Template library ---
 
 app.get("/api/templates", (_req, res) => {
@@ -286,11 +305,136 @@ app.post("/api/recipes/:id/push", async (req, res) => {
   }
 });
 
+// Uploads an image for a `custom` beat's image layer (LayerEditor.tsx) -
+// saved under assets/images/ (Config.setPublicDir("assets") in
+// remotion.config.ts, so staticFile("images/<file>") resolves it the same
+// way at render time as at edit time). Raw body, not multipart - the GUI
+// sends the File object directly as the request body - so this route gets
+// its own express.raw() instead of relying on the global express.json().
+const ALLOWED_IMAGE_EXT = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"];
+app.post("/api/assets/images", express.raw({ type: () => true, limit: "15mb" }), (req, res) => {
+  try {
+    const rawName = typeof req.query.filename === "string" ? req.query.filename : "upload";
+    const ext = extname(rawName).toLowerCase();
+    if (!ALLOWED_IMAGE_EXT.includes(ext)) {
+      return res.status(400).json({ error: `Unsupported image type "${ext || "(none)"}" - use ${ALLOWED_IMAGE_EXT.join(", ")}` });
+    }
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: "Empty upload" });
+    const safeBase = basename(rawName, ext).replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 60) || "image";
+    const filename = `${Date.now()}-${safeBase}${ext}`;
+    const dir = join(process.cwd(), "assets", "images");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, filename), req.body);
+    res.json({ path: `images/${filename}` });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// --- Post Creator (gui /post-creator): static image posts rendered to PNG ---
+// Renders the "Post" still (src/posts/PostStill.tsx) with renderStill - same
+// React template the GUI previews, so the PNG matches it exactly. Also saves
+// a copy under output/posts/.
+// Called when the Post Creator page opens - starts the (slow) Remotion bundle
+// in the background so the first export doesn't wait on it.
+app.post("/api/posts/warm", (_req, res) => {
+  warmPostBundle();
+  res.status(204).end();
+});
+
+app.post("/api/posts/render", async (req, res) => {
+  try {
+    const { templateId, fields, lists, colors, safeZones } = req.body ?? {};
+    if (typeof templateId !== "string") return res.status(400).json({ error: "templateId is required" });
+    const { png, savedPath } = await renderPostPng({ templateId, fields: fields ?? {}, lists: lists ?? {}, colors: colors ?? {}, safeZones: !!safeZones });
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("X-Saved-Path", relative(process.cwd(), savedPath).replace(/\\/g, "/"));
+    res.send(png);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// Background tracks in assets/music - the Post Creator's reel export picks
+// one by file name (the GUI previews them straight from Vite's /music/ path).
+app.get("/api/music", (_req, res) => {
+  res.json(listMusicTracks());
+});
+
+// Static-image reel: the post PNG looped for N seconds over a chosen music
+// track, encoded to MP4 by ffmpeg (server/postReel.ts). Saved next to the PNG
+// under output/posts/ and returned as the response body.
+app.post("/api/posts/reel", async (req, res) => {
+  try {
+    const { templateId, fields, lists, colors, safeZones, reel } = req.body ?? {};
+    if (typeof templateId !== "string") return res.status(400).json({ error: "templateId is required" });
+    const { mp4Path } = await renderPostReel(
+      { templateId, fields: fields ?? {}, lists: lists ?? {}, colors: colors ?? {}, safeZones: !!safeZones },
+      {
+        durationSeconds: reel?.durationSeconds,
+        musicFile: typeof reel?.musicFile === "string" && reel.musicFile ? reel.musicFile : null,
+        musicStartSeconds: reel?.musicStartSeconds,
+        musicVolume: reel?.musicVolume,
+        frame: reel?.frame === "original" ? "original" : "reel",
+      },
+    );
+    res.setHeader("X-Saved-Path", relative(process.cwd(), mp4Path).replace(/\\/g, "/"));
+    res.sendFile(mp4Path);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// --- Media Library (gui /library): browse + delete generated/uploaded media, reset the manifest ---
+// See server/library.ts. Errors carrying a `status` (409 while a render is running) keep it.
+function libraryError(res: express.Response, err: unknown) {
+  const status = (err as { status?: number })?.status ?? 400;
+  res.status(status).json({ error: err instanceof Error ? err.message : String(err) });
+}
+
+app.get("/api/library", (_req, res) => {
+  try {
+    res.json(listLibrary());
+  } catch (err) {
+    libraryError(res, err);
+  }
+});
+
+app.post("/api/library/delete", (req, res) => {
+  try {
+    const { ids } = req.body ?? {};
+    if (!Array.isArray(ids) || ids.length === 0 || !ids.every((id) => typeof id === "string")) {
+      return res.status(400).json({ error: "ids must be a non-empty array of media ids" });
+    }
+    res.json(deleteLibraryItems(ids));
+  } catch (err) {
+    libraryError(res, err);
+  }
+});
+
+app.post("/api/library/manifest/reset", (_req, res) => {
+  try {
+    res.json(resetManifest());
+  } catch (err) {
+    libraryError(res, err);
+  }
+});
+
+app.post("/api/library/manifest/prune", (_req, res) => {
+  try {
+    res.json(pruneManifest());
+  } catch (err) {
+    libraryError(res, err);
+  }
+});
+
 // --- Batch render orchestration (wraps `npm run render:batch`, doesn't replace it) ---
 
 app.post("/api/render/start", (req, res) => {
   try {
-    const { chapters, limit, force, tts, template, book, sidechain, templateId, phraseIds, recipeId } = req.body ?? {};
+    const { chapters, limit, force, tts, ttsEnglish, ttsSinhala, template, book, sidechain, templateId, phraseIds, recipeId } = req.body ?? {};
     const args: string[] = [];
 
     // phraseIds targets one exact reel (the Queue Render page's Render Queue
@@ -318,6 +462,8 @@ app.post("/api/render/start", (req, res) => {
     }
     if (!usingPhraseIds && force) args.push("--force");
     if (tts != null) args.push(`--tts=${tts === true || tts === "true"}`);
+    if (ttsEnglish != null) args.push(`--ttsEn=${ttsEnglish === true || ttsEnglish === "true"}`);
+    if (ttsSinhala != null) args.push(`--ttsSi=${ttsSinhala === true || ttsSinhala === "true"}`);
     if (sidechain) args.push("--sidechain=true");
     if (!usingPhraseIds && book != null) {
       if (typeof book !== "string" || !book.trim()) return res.status(400).json({ error: "book must be a non-empty string" });
@@ -479,7 +625,10 @@ app.post("/api/facebook/disconnect", (_req, res) => {
   res.status(204).end();
 });
 
-// --- Publishing a rendered reel to the connected Facebook Page (Monitor page) ---
+// --- Publishing (distribution): Facebook, Instagram - YouTube/TikTok next ---
+// server/distribution/. One flow for Post Creator exports and Monitor's batch
+// reels: the GUI asks which platforms a file can go to, then starts a
+// background publish per platform and polls the publication rows.
 
 app.get("/api/publications", (_req, res) => {
   try {
@@ -489,38 +638,227 @@ app.get("/api/publications", (_req, res) => {
   }
 });
 
-app.post("/api/publish", async (req, res) => {
-  try {
-    const { batchId, template, caption } = req.body ?? {};
-    if (typeof batchId !== "string" || !batchId.trim()) return res.status(400).json({ error: "batchId is required" });
-    const templateStr = typeof template === "string" ? template : "1";
+app.get("/api/publications/:id", (req, res) => {
+  const record = getPublication(req.params.id);
+  if (!record) return res.status(404).json({ error: "Publication not found" });
+  res.json(record);
+});
 
-    const page = getConnectedPage();
-    if (!page) return res.status(400).json({ error: "No Facebook Page connected - connect one in Settings first" });
-
-    const manifest = loadManifest(defaultConfig.manifestPath);
-    const key = manifestKey(batchId, templateStr);
-    if (!isRendered(manifest, key)) return res.status(404).json({ error: "This reel hasn't been rendered yet" });
-    const entry = manifest[key];
-
-    const record = createPublication({
-      batchId,
-      template: templateStr,
-      outputPath: entry.outputPath,
-      pageId: page.id,
-      pageName: page.name,
-      caption: typeof caption === "string" && caption.trim() ? caption : entry.suggestedCaption,
-    });
-
-    try {
-      const result = await publishVideoToConnectedPage(entry.outputPath, record.caption);
-      res.json(markPublished(record.id, result.videoId, result.permalink));
-    } catch (err) {
-      res.status(502).json(markError(record.id, err instanceof Error ? err.message : String(err)));
-    }
-  } catch (err) {
-    res.status(400).json({ error: String(err) });
+function parsePublishSource(raw: unknown): PublishSource {
+  const src = raw as Record<string, unknown> | null;
+  if (src?.type === "post" && typeof src.savedPath === "string" && src.savedPath) return { type: "post", savedPath: src.savedPath };
+  if (src?.type === "batch" && typeof src.batchId === "string" && src.batchId && typeof src.template === "string") {
+    return { type: "batch", batchId: src.batchId, template: src.template };
   }
+  throw new Error("source must be {type:'post', savedPath} or {type:'batch', batchId, template}");
+}
+
+app.get("/api/distribution/platforms", (_req, res) => {
+  res.json(platformStatuses());
+});
+
+app.post("/api/distribution/targets", (req, res) => {
+  try {
+    res.json(targetsFor(parsePublishSource(req.body?.source)));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.post("/api/distribution/publish", (req, res) => {
+  try {
+    const source = parsePublishSource(req.body?.source);
+    const rawTargets = req.body?.targets;
+    if (!Array.isArray(rawTargets)) return res.status(400).json({ error: "targets must be an array" });
+    const targets: PublishTarget[] = rawTargets.map((t: Record<string, unknown>) => ({
+      platform: String(t?.platform) as PublishTarget["platform"],
+      caption: typeof t?.caption === "string" ? t.caption : "",
+      title: typeof t?.title === "string" ? t.title : undefined,
+      privacy: t?.privacy === "public" || t?.privacy === "unlisted" ? t.privacy : "private",
+      captionMeta: parseCaptionMeta(t?.captionMeta),
+    }));
+    res.json(startPublishing(source, targets));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+function parseCaptionMeta(raw: unknown): CaptionMeta | null {
+  const m = raw as Record<string, unknown> | null;
+  if (!m || !["builtin", "ai", "manual"].includes(String(m.engine))) return null;
+  return {
+    engine: m.engine as CaptionMeta["engine"],
+    tone: TONES.includes(m.tone as CaptionTone) ? (m.tone as CaptionTone) : undefined,
+    hookId: typeof m.hookId === "string" ? m.hookId.slice(0, 60) : undefined,
+    edited: m.edited === true,
+  };
+}
+
+// --- Captions: built-in engine always, AI (NVIDIA_API_KEY) optional ---
+
+const TONES: CaptionTone[] = ["friendly", "challenge", "teacher"];
+const CAPTION_PLATFORMS: CaptionPlatform[] = ["facebook", "instagram", "youtube", "tiktok"];
+
+app.get("/api/ai/status", (_req, res) => {
+  res.json(aiStatus());
+});
+
+app.post("/api/captions/suggest", async (req, res) => {
+  try {
+    const body = req.body ?? {};
+    const platforms = (Array.isArray(body.platforms) ? body.platforms : []).filter((p: unknown): p is CaptionPlatform =>
+      CAPTION_PLATFORMS.includes(p as CaptionPlatform),
+    );
+    if (platforms.length === 0) return res.status(400).json({ error: "platforms must list at least one platform" });
+    res.json(
+      await suggestCaptions({
+        source: parsePublishSource(body.source),
+        context: body.context as CaptionContext | undefined,
+        platforms,
+        options: {
+          tone: TONES.includes(body.tone) ? body.tone : "friendly",
+          variant: Number.isInteger(body.variant) ? body.variant : 0,
+        },
+        engine: body.engine === "ai" ? "ai" : "builtin",
+      }),
+    );
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.post("/api/instagram/connect", async (_req, res) => {
+  try {
+    res.json(await connectInstagram());
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// --- Insights: post stats from every platform, built-in analysis, optional Kimi analysis ---
+
+app.get("/api/insights", async (_req, res) => {
+  try {
+    res.json(await getOverview());
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+/** Waits for the refresh (a few seconds per platform) and returns the new overview. */
+app.post("/api/insights/refresh", async (_req, res) => {
+  try {
+    await refreshStats();
+    res.json(await getOverview());
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.get("/api/insights/tiktok-videos", (_req, res) => {
+  res.json(recentTikTokVideos());
+});
+
+app.post("/api/insights/link-tiktok", (req, res) => {
+  try {
+    const { publicationId, videoId } = req.body ?? {};
+    if (typeof publicationId !== "string") return res.status(400).json({ error: "publicationId is required" });
+    linkTikTok(publicationId, typeof videoId === "string" && videoId ? videoId : null);
+    res.status(204).end();
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.get("/api/insights/reports", (_req, res) => {
+  res.json(listReports());
+});
+
+app.get("/api/insights/reports/:id", (req, res) => {
+  const r = getReport(req.params.id);
+  if (!r) return res.status(404).json({ error: "Report not found" });
+  res.json(r);
+});
+
+app.post("/api/insights/reports", (req, res) => {
+  try {
+    const focus = typeof req.body?.focus === "string" && req.body.focus.trim() ? req.body.focus.trim().slice(0, 500) : null;
+    res.json(startAiReport(focus));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.post("/api/insights/ask", async (req, res) => {
+  try {
+    const question = typeof req.body?.question === "string" ? req.body.question.trim().slice(0, 1000) : "";
+    if (!question) return res.status(400).json({ error: "Ask a question" });
+    res.json({ answer: await askAi(question) });
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// YouTube: Google OAuth for desktop apps. The callback is a loopback URL on
+// this API server itself (not the Vite origin), which Google allows for
+// "Desktop app" OAuth clients - see server/distribution/youtubeAdapter.ts.
+app.get("/api/youtube/connect", (_req, res) => {
+  try {
+    res.redirect(buildYouTubeAuthUrl(PORT));
+  } catch (err) {
+    res.redirect(`${GUI_ORIGIN}/settings?ytError=${encodeURIComponent(err instanceof Error ? err.message : String(err))}`);
+  }
+});
+
+app.get("/api/youtube/callback", async (req, res) => {
+  const { code, state, error } = req.query;
+  if (error) return res.redirect(`${GUI_ORIGIN}/settings?ytError=${encodeURIComponent(String(error))}`);
+  try {
+    if (typeof code !== "string" || typeof state !== "string") throw new Error("Google didn't return a login code - try connecting again");
+    const { channel } = await completeYouTubeLogin(code, state);
+    res.redirect(`${GUI_ORIGIN}/settings?ytConnected=${encodeURIComponent(channel)}`);
+  } catch (err) {
+    res.redirect(`${GUI_ORIGIN}/settings?ytError=${encodeURIComponent(err instanceof Error ? err.message : String(err))}`);
+  }
+});
+
+// TikTok: Login Kit for Desktop (localhost redirect + PKCE) - see server/distribution/tiktokAdapter.ts.
+// The registered redirect ends in "/" (TikTok matches it exactly); Express's
+// non-strict routing serves the callback with or without it.
+app.get("/api/tiktok/connect", (req, res) => {
+  try {
+    // ?stats=1 also asks for video.list (Insights page) - opt-in, see TIKTOK_STATS_SCOPE.
+    res.redirect(buildTikTokAuthUrl(PORT, req.query.stats === "1"));
+  } catch (err) {
+    res.redirect(`${GUI_ORIGIN}/settings?ttError=${encodeURIComponent(err instanceof Error ? err.message : String(err))}`);
+  }
+});
+
+app.get("/api/tiktok/callback", async (req, res) => {
+  const { code, state, error, error_description } = req.query;
+  if (error) return res.redirect(`${GUI_ORIGIN}/settings?ttError=${encodeURIComponent(String(error_description ?? error))}`);
+  try {
+    if (typeof code !== "string" || typeof state !== "string") throw new Error("TikTok didn't return a login code - try connecting again");
+    const { name } = await completeTikTokLogin(code, state);
+    res.redirect(`${GUI_ORIGIN}/settings?ttConnected=${encodeURIComponent(name)}`);
+  } catch (err) {
+    res.redirect(`${GUI_ORIGIN}/settings?ttError=${encodeURIComponent(err instanceof Error ? err.message : String(err))}`);
+  }
+});
+
+app.post("/api/tiktok/disconnect", async (_req, res) => {
+  await disconnectTikTok();
+  res.status(204).end();
+});
+
+app.post("/api/youtube/disconnect", (_req, res) => {
+  disconnectYouTube();
+  res.status(204).end();
+});
+
+app.post("/api/instagram/disconnect", (_req, res) => {
+  disconnectInstagram();
+  res.status(204).end();
 });
 
 // Last-resort safety net - catches anything that slips past a route's own
@@ -535,6 +873,8 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 });
 
 const PORT = process.env.GUI_SERVER_PORT ? Number(process.env.GUI_SERVER_PORT) : 4300;
+failInterruptedPublications();
+startInsightsScheduler();
 const server = app.listen(PORT, () => {
   console.log(`Reel GUI server listening on http://localhost:${PORT}`);
 });

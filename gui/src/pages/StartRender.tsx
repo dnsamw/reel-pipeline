@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
+import { TtsLanguageSelects, type TriState, triStateValue } from "../components/TtsLanguageSelects";
 import { TemplatePicker } from "../components/TemplatePicker";
 import { RecipePicker } from "../components/RecipePicker";
 import type { Book, Chapter, ReelConfig, ReelTheme, RecipeRecord, TemplateRecord } from "../types";
@@ -20,6 +21,8 @@ export function StartRender() {
   const [limit, setLimit] = useState<number | "">("");
   const [force, setForce] = useState(false);
   const [tts, setTts] = useState<"default" | "true" | "false">("default");
+  const [ttsEnglish, setTtsEnglish] = useState<TriState>("default");
+  const [ttsSinhala, setTtsSinhala] = useState<TriState>("default");
   const [recipeId, setRecipeId] = useState<string>("1");
   const [sidechain, setSidechain] = useState(false);
   const [templateId, setTemplateId] = useState<string>("");
@@ -97,6 +100,8 @@ export function StartRender() {
         limit: limit === "" ? undefined : limit,
         force: force || undefined,
         tts: tts === "default" ? undefined : tts === "true",
+        ttsEnglish: triStateValue(ttsEnglish),
+        ttsSinhala: triStateValue(ttsSinhala),
         book: book || undefined,
         sidechain: sidechain || undefined,
         templateId: templateId || undefined,
@@ -214,6 +219,7 @@ export function StartRender() {
                 <option value="false">Off</option>
               </select>
             </div>
+            <TtsLanguageSelects english={ttsEnglish} sinhala={ttsSinhala} onEnglish={setTtsEnglish} onSinhala={setTtsSinhala} disabled={tts === "false"} />
             <div className="field checkbox">
               <input id="sidechain" type="checkbox" checked={sidechain} onChange={(e) => setSidechain(e.target.checked)} />
               <label htmlFor="sidechain">Duck music under dialogue/sfx (--sidechain)</label>

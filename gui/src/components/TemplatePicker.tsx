@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ThemePreviewPair } from "./ThemeThumbnail";
 import type { ReelTheme, TemplateRecord } from "../types";
+import { shouldOpenUp } from "../lib/dropdownDirection";
 
 /**
  * A native <select> can't render anything but plain text inside <option> -
@@ -14,13 +15,16 @@ export function TemplatePicker({
   value,
   onChange,
   defaultTheme,
+  noneLabel = "None - use defaultConfig",
 }: {
   templates: TemplateRecord[];
   value: string;
   onChange: (id: string) => void;
   defaultTheme: ReelTheme | null;
+  noneLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [openUp, setOpenUp] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -33,6 +37,11 @@ export function TemplatePicker({
 
   const selected = templates.find((t) => t.id === value) ?? null;
 
+  function toggle() {
+    if (!open) setOpenUp(shouldOpenUp(rootRef.current));
+    setOpen(!open);
+  }
+
   function pick(id: string) {
     onChange(id);
     setOpen(false);
@@ -40,22 +49,22 @@ export function TemplatePicker({
 
   return (
     <div className="template-picker" ref={rootRef}>
-      <button type="button" className="template-picker-trigger" onClick={() => setOpen((o) => !o)}>
+      <button type="button" className="template-picker-trigger" onClick={toggle}>
         {selected ? (
           <>
             {(selected.config.theme ?? defaultTheme) && <ThemePreviewPair theme={selected.config.theme ?? defaultTheme!} />}
             <span className="template-picker-trigger-text">{selected.name}</span>
           </>
         ) : (
-          <span className="template-picker-trigger-text hint">None - use defaultConfig</span>
+          <span className="template-picker-trigger-text hint">{noneLabel}</span>
         )}
         <span className="template-picker-caret">{open ? "▴" : "▾"}</span>
       </button>
 
       {open && (
-        <div className="template-picker-menu">
+        <div className={`template-picker-menu${openUp ? " up" : ""}`}>
           <button type="button" className="template-picker-option" onClick={() => pick("")}>
-            <span className="template-picker-option-text hint">None - use defaultConfig</span>
+            <span className="template-picker-option-text hint">{noneLabel}</span>
           </button>
           {templates.map((t) => (
             <button

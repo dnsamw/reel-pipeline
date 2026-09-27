@@ -213,9 +213,13 @@ the API (bypassing only the click-through, which was separately screenshot-verif
 
 Still not built:
 
-1. A new beat kind (a genuinely new visual layout) still requires writing a new scene component in
-   code and adding one match arm to `CompositionFromRecipe.tsx` - by design, see
-   [What this doesn't cover](#what-this-doesnt-cover-and-wont-without-more-work).
+1. ~~A new beat kind... requires writing a new scene component in code~~ **Mostly resolved** on
+   `feature/layer-designer`: the `custom` beat kind (a stack of positioned text/shape/image layers,
+   interpreted generically by `LayerRenderer.tsx`, authored via a drag/resize/rotate canvas in the
+   GUI) covers many new visual layouts as pure data now - see
+   [A concrete design for the true visual designer](#a-concrete-design-for-the-true-visual-designer).
+   What's still missing is a genuinely new *primitive* beyond text/image/shape (e.g. video-clip
+   support).
 2. The beat editor's "Direction" control only covers `guessReveal` beats (the only kind with a
    field choice today); `phrase`/`countdown`/`reveal` beats have nothing to configure yet since
    nothing about them varies - see [Coverage](#coverage-does-it-actually-cover-the-3-existing-templates).
@@ -228,3 +232,491 @@ Template 3 asks the *reverse* question ("how do you say this in English?") from 
 wrong-direction copy on screen by default, since the two questions aren't interchangeable text, they
 ask for different things. The GUI's Template Editor "Intro text" field now shows a hint when
 Composition 3 is selected, explaining it doesn't apply there, instead of silently doing nothing.
+
+## A concrete design for the true visual designer
+
+**Status: built, on `feature/layer-designer` (not yet merged).** [What this doesn't cover](#what-this-doesnt-cover-and-wont-without-more-work)
+called a real drag/resize designer "a much more elaborate data model... a separate, considerably
+larger project." Not *impossible* - the pattern is well-trodden (After Effects/Lottie-style layer
+graphs, Figma's scene model) - just a genuinely different system from the beat-recipe schema above,
+which only recombines existing *components*. A true designer needs each beat's *contents* to become
+data too.
+
+**Schema**: `src/compositions/recipe/layers/schema.ts`. Sketch (now real, wired in - see
+"What's actually built" below):
+
+- A `custom` beat kind (`layers: Layer[]`), sitting alongside the existing 6 in `beatSchema`'s union
+  rather than replacing them - existing compositions keep the hand-written, already-proven-
+  byte-identical scene components; `custom` is what a canvas editor would produce for a layout none
+  of the 6 cover.
+- Three layer kinds - `text`, `image`, `shape` - since every existing scene's visible content is one
+  of these three. Each has a `box` (position/anchor/size in *percent of canvas*, matching how every
+  scene already centers/offsets content, plus rotation/z-index), not pixel coordinates.
+- **Data binding is a closed union, not a free expression language**: a text layer's `text` is
+  `{source: "literal", value}` or `{source: "phraseField", field: "phrase"|"translationSi"|...}` or
+  `{source: "config", path: "introText"}` - a simple switch in the renderer, no `eval()`/template
+  parsing, every possible value stays grep-able. Same pattern for `color` (`literal` hex, or
+  `{source: "theme", token: "primary"|...}` mirroring `theme/tokens.ts`'s `Palette` keys exactly).
+- **Animation is a closed set of shapes** (`fade`/`slide`/`scaleSpring`/`none`, each with the same
+  frame-timing knobs every scene's `interpolate()`/`spring()` calls already use), not arbitrary
+  keyframes - a real curve editor is a separate problem this sketch doesn't attempt to solve.
+- Two things that are currently *hardcoded logic*, not data, get explicit escape hatches instead of
+  being silently unavailable to a custom beat: `SceneFrame`'s background-blob chrome becomes an
+  opt-in `{source: "sceneFrameChrome"}` image layer (today it's unconditional on every themed beat);
+  `OutroScene.tsx`'s cross-palette contrast rule (light mode borrows the dark palette's accent, and
+  vice versa) becomes a `{source: "oppositeThemeToken", token: "primary"|"gold"}` color ref.
+- `CountdownScene`'s ring fill is frame-driven, not a static prop - represented as a shape layer's
+  optional `progress: {source: "countdownProgress"}` binding rather than a new layer kind.
+
+**The build-out plan, in phases:**
+
+1. ~~**Generic renderer, Studio-only.**~~ **Done.** `LayerRenderer.tsx` walks a `Layer[]` and maps
+   each one to `interpolate()`/`spring()`-driven styles, the same way the 6 existing scenes already
+   do by hand. Proven with a hand-written `custom` beat (`recipe/layers/poc.ts`) as a standalone
+   Studio composition (`LayerDesignerPOC`) - frame-by-frame still checks at 6 points across its
+   timeline confirmed the progress binding, fade/slide/scaleSpring animations, and rotation all
+   behave correctly.
+2. ~~**Migrate the chrome/contrast escape hatches for real.**~~ **Done**, as part of step 1 -
+   `sceneFrameChrome` and `oppositeThemeToken` are real, working bindings in `LayerRenderer.tsx`
+   itself (not just schema shapes), exercised by the same POC beat.
+3. ~~**The canvas editor.**~~ **Done.** `LayerCanvas.tsx` renders a scaled-down 1080x1920 box where
+   each layer is a draggable div - a corner handle resizes, a top handle rotates - sharing the same
+   `Layer[]` state as `LayerEditor.tsx`'s form (below it, for the fields a mouse isn't a better
+   input for: text source, font, color, animation curves), so dragging and typing stay in sync. No
+   snapping/alignment guides yet - plain free-form drag.
+4. ~~**Wire `custom` into the real union.**~~ **Done.** `custom` is a real member of
+   `beatSchema`/`perPhraseBeatSchema` in `../schema.ts`, with matching support in `timeline.ts`
+   (duration comes from the beat's own `durationInFrames`, not `config`, unlike every other
+   per-phrase beat kind) and `CompositionFromRecipe.tsx`'s dispatch. Verified through the real
+   production path: a recipe mixing a `phrase` beat and a `custom` beat, rendered via the actual
+   `Reel-Custom` composition (not a side-channel), correct output. The 3 built-in compositions are
+   unaffected - `remotion compositions` lists identical ids/durations before and after.
+
+**What's actually built, end to end:** a recipe's `perPhraseBeats` can include a `custom` beat today,
+saved/loaded/rendered through the exact same paths as any other beat kind (`server/recipes.ts`'s
+real `compositionRecipeSchema.parse`, `renderBatch.ts`, `ReelPreview.tsx`). `RecipeEditor.tsx`'s beat
+kind picker has a "Custom (layers)" option; picking it shows `LayerCanvas.tsx` (drag/resize/rotate)
+plus `LayerEditor.tsx`'s form below it for everything else the schema supports (text source including
+phrase-field binding, color including theme/opposite-theme tokens, shape/fill/stroke/corner-radius,
+enter/exit animation) - clicking a layer on the canvas or in the form selects it in both. Verified via
+Playwright against the real dev server: dragging/resizing/rotating a layer and reading the values back
+from the form confirmed each interaction updates real state, and saving a custom-beat recipe through
+the actual `POST /api/recipes` (real Zod validation) worked with zero console/page errors.
+
+**UX polish, based on hands-on feedback after the above landed:** shape layers gained `triangle`,
+`star`, and `line` (on top of `rect`/`circle`/`ring`); image layers can be populated by uploading a
+file (`POST /api/assets/images`, saved to `assets/images/` - gitignored like `assets/music/` - and
+served via `staticFile()` the same way at edit time and render time) instead of typing an asset path
+by hand; a multi-layer beat's field form collapses every layer but the selected one to a one-line
+summary instead of stacking full forms (the vertical-scroll complaint); the canvas caps at 280px wide
+instead of filling the column; Intro/Outro are collapsed by default (a "Show" toggle) since editing a
+custom beat rarely touches them - and that Hide/Show state now drives `ReelPreview.tsx` too (its
+`showIntro`/`showOutro` props), so a hidden Intro/Outro is skipped in the preview's playable range
+(`inFrame`/`outFrame`) as well, not just hidden from the form while still looping in the player; and
+each per-phrase beat has a "Preview this beat" button that seeks the live preview `Player` to that
+beat's own frame range and loops just that, instead of scrubbing the whole recipe to find it.
+
+**What's still missing:** snapping/alignment guides on the canvas, and (unrelated to the canvas) a
+genuinely new visual *primitive* beyond text/image/shape - e.g. video-clip support, still requires
+code. The original 4-phase plan (renderer, chrome/contrast bindings, canvas, real schema wiring) is
+otherwise complete, on `feature/layer-designer`.
+
+## Data binding: a future-proof registry + a structured graph editor
+
+Real testers tried the branch and called it "too confusing, not user friendly" - specifically:
+picking a phrase field from a plain dropdown wasn't visual enough, and the whole editor needed a
+more drag-and-drop feel. They also flagged that more data models beyond `BookPhrase` are coming and
+asked for the binding system to not need a rewrite when that happens.
+
+**Registry, not a hardcoded enum**: `src/data/dataSources.ts` is a small, Prisma-free registry
+(same isolation discipline as `src/data/phrase.ts`) of `DataSourceDescriptor`s - today just
+`BookPhrase`'s 5 text fields. `compositionRecipeSchema` gained `dataSourceId` (defaults to
+`"BookPhrase"`), and `layers/schema.ts`'s `textRefSchema` renamed its `phraseField` variant to
+`dataField`, widening `field` from a closed 5-value enum to an open `string` - validated against the
+active recipe's registry entry in the GUI, resolved as a plain property lookup by
+`LayerRenderer.tsx` (functionally identical to before; `Phrase` is still the only shape ever passed
+in). `GET /api/data-sources` exposes the registry to the GUI. Adding a real second source later
+means one more registry entry plus that model's own Prisma-isolated fetch file - the recipe schema,
+`LayerRenderer.tsx`, and every GUI component that reads the registry stay unchanged.
+**Deliberately not built**: a generic multi-model fetch/batch/manifest pipeline - no second source
+exists yet, so there's nothing real to design that against. `renderBatch.ts`, `manifest.ts`,
+`batch.ts`, `getPhrases.ts` are untouched by this whole change (confirmed via an empty `git diff`)
+- rendering and rendered/not-rendered tracking work exactly as before.
+
+**`DataGraph.tsx`**: a *structured* node graph, not a free-form ComfyUI clone - beats stay in their
+existing fixed left-to-right array order (reordering is still the move-left/move-right buttons, not
+a wire, so render order can never be accidentally rewired by dragging the wrong connection). Only
+data bindings are free wires: drag a dot from the Data Source node's field list onto a text layer's
+input socket anywhere in the sequence to bind it; drag onto empty space inside a `custom` beat's
+column to create a new bound text layer there. Intro/Outro nodes get no input socket at all -
+`IntroScene`/`OutroScene` render once per whole reel, not once per phrase, so there's no single
+`phrase` in scope for them to bind to (already true before this: `introTextSchema` never offered a
+phrase-field option). Clicking any node selects/scrolls to the matching card in the existing
+per-beat form below and focuses the live preview on it (reusing "Preview this beat"); clicking
+Intro/Outro toggles their existing Show/Hide state. Sits above `LayerEditor.tsx`'s form and
+`LayerCanvas.tsx`'s spatial drag/resize/rotate surface - both untouched, since they answer a
+different question ("what data feeds this" vs. "what does this say" vs. "where is this on screen")
+and deliberately stay separate rather than merging drag-to-wire and drag-to-move into one crowded
+canvas.
+
+Verified via Playwright against the real dev server: dragged a field's socket onto an existing text
+layer (confirmed the form's text source updated to the binding), dragged a field onto empty
+custom-beat space (confirmed a new bound layer appeared), clicked a beat node (confirmed the
+"Preview this beat" state followed), clicked the Intro node (confirmed its Show/Hide button
+flipped), saved through the real `POST /api/recipes` - zero console errors. A real `remotion still`
+render via `Reel-Custom` with two `dataField`-bound layers (`explanation`, `pronunciationSi`)
+confirmed the renamed binding still resolves correctly in the actual production renderer, not just
+the browser preview.
+
+## The canvas-style rebuild: multi-track timeline + a real node-graph library
+
+The vertical stacked-card editor and the hand-rolled data-binding graph above were both real, working
+features - and both still got real user feedback that they were confusing, and that the graph
+specifically didn't read as "node-graph" at all. Rather than iterate blind a third time, two throwaway
+evaluation spikes were built and shown to the user before committing to a rebuild: one on
+`@xyflow/react` (React Flow - MIT, actively maintained; the library ComfyUI-style tools are actually
+built on) for the graph feel, one on plain pointer events (the same technique already proven in
+`LayerCanvas.tsx`) for a real timeline feel. Both were approved, and only then was the full page
+rebuilt around them - see the two "AskUserQuestion" decisions in the project history: **structured**
+graph/timeline (beats stay in their existing array order; only data bindings are free wires) over a
+true free-form ComfyUI clone, and **stay in this Vite+Express project** over a Next.js rewrite (the
+render pipeline/data layer were never the problem - library choice inside the editor was).
+
+**Per-layer timing, the data-model change that makes "multi-track" real:** `layers/schema.ts`'s three
+layer kinds gained an optional `timing: { startFrame, durationFrames }` - omitted means "spans the
+whole beat" (the only behavior that existed before), so nothing stored anywhere needed to change.
+`LayerRenderer.tsx`'s `LayerView` computes a layer-local frame/duration from this and returns `null`
+outside the window, feeding the local values into the existing enter/exit animation math. Verified
+with a real production still render at two frames: a layer trimmed to frames 45-89 of a 90-frame beat
+is absent before frame 45 and present after, in the actual `Reel-Custom` output.
+
+**`Timeline.tsx`** (new) - the primary navigation surface, replacing the old vertical beat-card list:
+- **Beats track**: one block per `perPhraseBeats[i]` plus fixed Intro/Outro end-caps, widths from the
+  real `buildTimelineFromRecipe` (the same function the actual renderer uses) with `batchSize=1`, so
+  the timeline never drifts from what actually renders. Drag to reorder (a real array splice, not
+  adjacent-swap), drag the right edge to resize - only `custom` beats have their own
+  `durationInFrames` to resize (others derive duration from shared config, the same constraint that
+  already existed).
+- **Layers track**: appears only under the selected `custom` beat, one row per layer, driven by its
+  new `timing` field - drag moves `startFrame`, drag the edge resizes `durationFrames`. A layer with
+  no room to move (its trim already spans the whole beat) correctly can't be dragged until it's been
+  shrunk first - not a bug, the same constraint a real video editor's full-width clip has.
+
+**`DataGraph.tsx`** rebuilt on real React Flow nodes/handles/edges instead of hand-rolled pointer/SVG
+math, and re-scoped to *only the selected beat's layers* (not the whole recipe at once, which
+`Timeline.tsx` already shows) - real pan/zoom/minimap, real connectable handles. Dragging a field's
+handle onto a text layer's handle binds it (`onConnect`); dropping on empty canvas creates a new bound
+layer there (`onConnectEnd`, checking `connectionState.isValid`).
+
+**`Inspector.tsx`** (new, absorbing `LayerEditor.tsx`'s retired form) - fields for exactly whatever the
+shared `selection` (`{ beatIndex: number | "intro" | "outro" | null, layerId }`) points at: one beat's
+kind-specific options, one layer's full field set, or Intro/Outro's own theme/voice/text fields (a real
+gap caught during the rebuild - the first draft dropped Intro/Outro editing entirely by only reusing
+the old per-phrase-beat card content). Exactly one thing's fields show at a time - no more scrolling
+past a growing stack of cards. `LayerCanvas.tsx` (spatial drag/resize/rotate, internals untouched)
+lives inside this panel, scoped to the selected beat.
+
+**Sidebar**: collapsible to an icon-only rail (`lucide-react`, ISC-licensed), state in `localStorage`
+(a per-viewer convenience, never authoritative - same discipline as every other browser-storage use in
+this GUI).
+
+**What this deliberately doesn't build yet** (flagged by the user as upcoming, not immediate): a
+richer animation-curve editor beyond the current fade/slide/scaleSpring set, sound FX bound to a
+transition, transition types beyond the current single fixed crossfade-before-outro. Nothing here
+blocks adding them later.
+
+Verified end-to-end via Playwright against the real dev server: sidebar collapse persists across a
+reload; adding and selecting a beat, switching its kind to Custom, shows the Layers track and scopes
+the Graph panel; resizing a beat block and (after first shrinking a layer to make room) moving a layer
+block both update real `durationInFrames`/`timing` state; a real React Flow drag-connect binds a field
+to a layer (confirmed via `Playwright`'s `dragTo`, after raw synthesized coordinates twice missed the
+handle's exact hit-area by a few pixels - a test-precision artifact, not a product bug, the same
+pattern hit twice earlier in this project's Playwright verifications); selecting Intro shows its real
+editable fields and the Show/Hide-in-preview toggle; saving through the real `POST /api/recipes`
+succeeds with zero console errors. `renderBatch.ts`/`manifest.ts`/`batch.ts`/`getPhrases.ts` are
+untouched (empty `git diff`) - rendering and rendered/not-rendered tracking work exactly as before.
+
+## Graph-centric editing: DAW/video-editor conventions instead of a web form
+
+Still more feedback after the Timeline/Graph/Inspector rebuild landed ("now that's more like it, but
+not exactly what I want"): reclaim horizontal space for the data-binding graph (clarified: "canvas" in
+this round of feedback means the graph - "the one that looks like ComfyUI" - not the spatial
+`LayerCanvas.tsx`, which wasn't part of this feedback and stayed untouched), replace labeled
+input-field rows with compact icon/knob controls, add layers from a toolbar instead of a button
+buried in a form, edit/delete a layer right where it lives instead of in a separate column, and float
+the live preview so it doesn't force scrolling to check it.
+
+**`Knob.tsx`** (new) - a DJ-console-style control: drag vertically to change a numeric value, an
+indicator line sweeps -135deg to +135deg across the value's range, a tooltip/drag-bubble shows the
+exact number. Plain pointer events, same technique as every other drag interaction in this project
+(`LayerCanvas.tsx`, `Timeline.tsx`, `DataGraph.tsx`'s wires) - no new dependency for something this
+simple. **`IconToggleGroup.tsx`** (new) - a row of icon buttons (one active, each with a tooltip),
+the compact replacement for a labeled `<select>` on enum fields (align, font, shape, color/text
+source, animation type). Both are generic/reusable, not specific to layers.
+
+**`DataGraph.tsx`** absorbed everything `Inspector.tsx` used to show for a `custom` beat's layers:
+- A toolbar (Text/Shape/Image icon buttons) at the top adds a new layer node directly, auto-selected.
+- The beat's own theme (icon-toggle Sun/Moon) and duration (a Knob, in seconds) sit next to the
+  toolbar - the whole "editing this custom beat" experience lives in one card now.
+- Clicking a layer node opens `LayerPropertyPanel.tsx` beside the canvas (docked to the graph card's
+  side, not trying to track the node's exact pan/zoom screen position - fragile, and not what was
+  asked for) - Knobs for `fontSizePx`/`fontWeight`/`strokeWidthPx`/`cornerRadiusPx`/animation
+  duration-delay-fromScale, `IconToggleGroup`s for `align`/`font`/shape/`text source`/`color
+  source`/animation type. A few fields genuinely can't be a knob or icon (literal text content, a hex
+  color, an uploaded file) and stay as a plain, unlabeled input with a tooltip - matching the "icons
+  and tooltips, not labeled rows" spirit without forcing a bad fit.
+- Deleting a layer happens in the graph itself - Delete/Backspace on a selected node (React Flow's
+  native `onNodesDelete`) or a trash icon in the property panel.
+
+**`Inspector.tsx`** shrank to only what has no layer/node metaphor: Intro/Outro (theme, voice,
+literal-text toggle - unchanged content) and non-`custom` beat kinds (`guessReveal`'s theme/
+direction, or nothing to configure). `RecipeEditor.tsx` doesn't even mount it when a `custom` beat is
+selected - instead it shows `DataGraph` and `LayerCanvas` side by side, full width, since both are
+now genuinely interactive canvases with nothing left for a form column to add. That's what actually
+reclaims the horizontal space - not the sidebar collapse alone.
+
+**Live preview** is now `position: fixed`, top-right, still toggled by the existing show/hide button
+- verified to hold its screen position through a 600px scroll rather than being pushed down the page.
+
+Verified via Playwright against the real dev server (with deliberately slow, multi-step pointer
+moves this round - single fast `mouse.move` jumps produced two false-negative "didn't move" readings
+earlier in this project, not real bugs): adding a Shape layer via the toolbar creates a second graph
+node and opens its property panel; dragging the beat-duration Knob changes the Timeline block's real
+width; dragging a Knob in the property panel doesn't crash; clicking a shape-type icon-toggle updates
+the field; the trash icon removes a layer node; selecting Intro shows Inspector (with the Graph
+toolbar correctly absent) instead of the Graph+LayerCanvas pair; saving through the real
+`POST /api/recipes` succeeds with zero console errors. `git diff --stat` on
+`src/render`/`LayerRenderer.tsx` is empty - this round touched only the GUI layout/interaction layer.
+
+## Full-bleed workspace: floating/draggable panels instead of a laid-out page
+
+"This is way better, but we need more refinements" - the graph-centric round still left a lot of
+unused horizontal space (the page was capped at `.app-main`'s standard 1400px max-width, centered,
+like every other GUI page), the live preview was small, and Timeline/Position permanently consumed
+layout space even when not the current focus. The ask: make this one page behave like a real
+DAW/NLE workspace - one large canvas, everything else floats over it and can be dragged out of the
+way or hidden.
+
+**`FloatingPanel.tsx`** (new, generic, reusable) - a draggable, closeable panel: a titlebar (plain
+pointer-drag, same technique as everywhere else in this project) repositions it, an optional `onClose`
+adds an X. Not tied to any one panel's content.
+
+**`RecipeEditor.tsx`'s root is now `position: fixed`**, offset by a `--sidebar-width` CSS custom
+property (set by `App.tsx` on the `.app` root, toggled alongside the sidebar's own collapse state) -
+this is what lets the page ignore `.app-main`'s max-width/padding entirely without a special case
+there: fixed-position elements are placed relative to the *viewport*, not their parent, so an ancestor's
+`max-width`/`padding` simply doesn't apply. Verified this actually reaches full-bleed: a real
+`getBoundingClientRect()` check showed the graph's own box filling exactly `(viewport - sidebar) x
+(viewport - topbar)` - not close, exact.
+
+- **`DataGraph.tsx`** is now the workspace's base layer - `position: absolute; inset: 0` filling
+  the whole area, `<ReactFlow>` itself sized to match. Its former toolbar (add-layer buttons, beat
+  theme/duration) and the `LayerPropertyPanel` both moved into `FloatingPanel`s laid over the canvas
+  instead of pushing it into a smaller box.
+- **Timeline, Live preview, and Position (`LayerCanvas`)** are now `FloatingPanel`s inside the
+  workspace instead of stacked/side-by-side cards. Live preview is bigger by default (340px vs. the
+  previous 220px) and, being just a normal floating panel now, fully draggable. Position only
+  renders when a layer is actually selected ("needed only when an element is selected") and
+  re-opens itself on a newly-selected layer even if it was closed for a previous one. Small toggle
+  buttons in the topbar reopen a closed Timeline/Preview; Position's own close (X) plus re-selecting
+  a layer is how it comes back.
+- Everything not part of the floating-panel workspace (the top name/data-source/Save/Push bar) stays
+  a normal, always-visible strip - not everything needed to float, just the tool palettes.
+
+Verified via Playwright against the real dev server: the page has no vertical scroll at all
+(`document.documentElement.scrollHeight` equals the viewport height exactly) - confirming the fixed,
+full-viewport model actually took effect, not just visually; the graph's bounding box measured
+exactly `(1800-220) x (1000-60)` px against an 1800x1000 viewport with the sidebar expanded; dragging
+the Timeline panel by its titlebar moved its real screen position; closing and reopening the Live
+preview panel via the topbar toggle worked; the Position and Layer-property panels both appeared on
+selecting a layer. Zero console errors throughout.
+
+## Fixed a real bug (nodes "disappearing"), docked Timeline/beat-tools, per-node summon buttons
+
+Reported: dragging a Knob in the layer property panel made every graph node - including the
+Data Source node - visually vanish; recovering required deselecting and reselecting the custom beat
+(which fully unmounts/remounts `DataGraph`).
+
+**Root cause**, confirmed with an instrumented Playwright repro (polling `.react-flow__node` count
+and reading `.react-flow__viewport`'s transform on every step of a slow, paced knob drag): node
+count never changed - nodes were never removed. `<ReactFlow>`'s `fitView` boolean prop was
+recalculating the pan/zoom transform on every rapid `setNodes`/`setEdges` call (the node-rebuilding
+`useEffect` re-running on every knob-drag tick), eventually panning/zooming the nodes out of the
+visible area even though they stayed in the DOM.
+
+**Fix**: removed the reactive `fitView` prop; replaced it with `onInit={(instance) =>
+instance.fitView({ padding: 0.3 })}` so the view auto-fits exactly once, when `<ReactFlow>` first
+mounts (switching between a non-custom and a custom beat unmounts/remounts it; `<Controls
+showInteractive={false}>` already has a manual fit-view button for the remaining case of switching
+directly between two different custom beats). Also switched the node-rebuilding effect to the
+functional `setNodes((current) => ...)` form, looking up each node's existing position before
+falling back to a computed default, so edits no longer reset every node's position on every change -
+one less source of churn. Re-ran the same repro after the fix: the viewport transform is now
+provably stable (identical, unchanging) at every single step of the drag, and a screenshot confirmed
+both nodes stayed rendered and visible throughout.
+
+**Per-node summon buttons** replace the old "select a node → its Position and Layer-properties
+panels force themselves open, often far from the node" behavior. `LayerNodeComponent` now renders
+two small circular icon buttons in its top-right corner: a purple crosshair (Position) and a gold
+gear (Layer properties) - colored via `--primary`/`--gold` so they read as distinct, meaningful
+toggles, each lighting up solid when its panel is open for that node. Clicking a node's body only
+selects/highlights it; clicking either icon button selects the node *and* opens that specific panel,
+anchored near the button's actual screen position (`getBoundingClientRect()` on the button, made
+relative to the graph's own wrapper `ref`, then clamped so the panel can't land partly off-screen).
+Closing a panel (its own X) just closes that panel - it no longer deselects the node. The Layer
+Properties panel lives in `DataGraph.tsx` (`propertiesFor` state); Position lives up in
+`RecipeEditor.tsx` since it renders `LayerCanvas` there, reached via a new `onRequestPosition`
+callback prop carrying the already-clamped anchor down from `DataGraph`.
+
+**Timeline is now docked to the bottom, full width** (`.timeline-dock` - `position: absolute; left:
+0; right: 0; bottom: 0`) instead of a freely-draggable `FloatingPanel`, with its own header/close
+button styled like a `FloatingPanel`'s but without the drag handle.
+
+**The "Custom beat" toolbar is now a docked vertical strip** (`.beat-tools-dock`, 60px wide) pinned
+to the graph's left edge - since the workspace itself already starts immediately right of the
+collapsible global sidebar, this strip lands exactly "next to the sidebar" as asked. Add
+Text/Shape/Image buttons, the theme `IconToggleGroup` (now supports a `direction="column"` prop),
+and the duration `Knob` all stack vertically; the previous descriptive hint paragraph became a
+single info-icon button carrying the same text as its tooltip, to keep the strip narrow.
+
+Verified via Playwright against the real dev server (slow, multi-step pointer moves throughout, per
+this project's established lesson about false-negative fast-jump readings): Timeline's box spans the
+full workspace width flush to the bottom; the beat-tools strip sits flush to the workspace's left
+edge; a plain click on a node opens neither panel; clicking the gear/crosshair icons opens Layer
+properties/Position near that node and clamped fully on-screen; dragging the delay Knob afterward
+keeps both nodes visible with a provably stable viewport transform throughout the drag; closing the
+properties panel leaves the node selected. `git diff --stat` on `src/render`/`LayerRenderer.tsx` is
+empty - this round touched only the GUI layout/interaction layer.
+
+## Finding the real cause of the disappearing nodes (the fitView fix wasn't the whole story)
+
+The user reported the "nodes disappear while dragging a Knob" bug again after the fitView fix above,
+this time from the beat-duration Knob specifically, screenshotted mid-drag with the graph canvas
+completely blank. The earlier fix (one-time `onInit` fitView) was real and necessary, but insufficient
+- it addressed one mechanism (the viewport panning/zooming itself out of the nodes) while a second,
+independent one was still live.
+
+Reproducing it needed a sharper instrument than before: node count and `.react-flow__viewport`'s
+transform (what the earlier repro checked) stayed perfectly normal throughout - the actual defect
+was each node's `visibility: hidden`, which doesn't zero out `getBoundingClientRect()` or change node
+count, so the earlier checks were blind to it. Caught it with an in-page `requestAnimationFrame` loop
+recording any frame where a `.react-flow__node` was zero-size, `display: none`, or `visibility:
+hidden` - polling *inside the page* every frame, not just at the points a Playwright script happens
+to sample between synthetic mouse moves. Against the pre-fix code this immediately caught **200
+consecutive frames of `visibility: hidden` on every node** during a single fast drag of the
+beat-duration Knob; the same instrumented drag against the three Layer-properties Knobs (size,
+weight, delay) showed none - isolating the bug to the specific case of a beat-level edit (duration,
+also theme) rather than a layer edit.
+
+**Root cause**: `DataGraph.tsx`'s node-rebuilding `useEffect` was keyed on the whole `customBeat`
+object, and on every edit it built entirely new node objects from scratch, copying over only
+`.position` from the previous ones. A beat-duration or theme edit replaces the beat object (so the
+effect re-ran) without touching `customBeat.layers` at all - work the effect didn't actually need to
+do. Worse, discarding each node's previous object wholesale - rather than updating it in place - also
+threw away React Flow's own internal bookkeeping on it (its measured width/height, set via
+`ResizeObserver` after first render). A node React Flow considers unmeasured renders with `visibility:
+hidden` until it's re-measured; rebuilding fresh, unmeasured-looking node objects many times a second
+during a fast Knob drag reproduced exactly that hidden state for a sustained run of frames.
+
+**Fix**, two parts in `DataGraph.tsx`:
+1. The effect is now keyed on `customBeat?.layers` instead of `customBeat` itself - a duration or
+   theme edit leaves the `layers` array reference untouched, so the rebuild simply doesn't run for
+   those edits anymore.
+2. When it does run (an actual layer add/remove/edit), each node is now built by spreading the
+   *existing* node object first (`{ ...existing, position, data }`) instead of constructing a bare
+   new one - preserving whatever internal fields React Flow had already attached to it, not just its
+   position.
+
+Verified with the same instrumented rAF monitor: 0 flicker frames across 8 rounds of a fast,
+unpaced beat-duration-Knob drag (previously 200), and 0 across the three Layer-properties Knobs.
+Confirmed the monitor itself wasn't just insensitive by re-running it against the pre-fix code via
+`git stash` - it reliably reproduced the 200-frame failure there, then 0 after `git stash pop`
+restored the fix. `git diff --stat` on `src/render`/`LayerRenderer.tsx` is empty.
+
+## Merged Position + Layer properties into one panel; fixed Timeline's scroll and made it resizable
+
+Two more refinements from the same feedback round:
+
+**Position and Layer properties are now one panel, one toggle.** Having two separate icon buttons
+(crosshair for Position, gear for Layer properties) on each node meant two separate floating panels
+to manage for what's really one editing task. `LayerNodeComponent` now has a single gear button;
+clicking it toggles one combined panel open/closed (click again on an already-open node's gear to
+close it - a real toggle, not just open). The panel now renders `LayerCanvas` (the spatial
+drag/resize/rotate surface, previously the separate "Position" panel owned by `RecipeEditor.tsx`)
+above `LayerPropertyPanel`'s knobs, inside `DataGraph.tsx`'s existing property `FloatingPanel` -
+`DataGraph` already had everything `LayerCanvas` needs (`customBeat`, `onSelectLayer`,
+`onChangeBeat`), so this also deleted the cross-component anchor-passing machinery
+(`onRequestPosition`, `positionLayerId`, the separate `positionFor` state and FloatingPanel in
+`RecipeEditor.tsx`) - one state (`propertiesFor`), one owner, one panel.
+
+**Timeline's scrollbar wasn't actually engaging** once enough layers were stacked in a beat to
+overflow the dock - a classic flexbox trap: `.timeline-dock-body` had `overflow: auto` but, as a
+flex item in `.timeline-dock`'s column layout, its default `min-height: auto` resolves to its
+*content's* height, not 0, so it never actually shrank enough to need its own scrollbar and just
+pushed the dock past its `max-height` instead. Fixed with `min-height: 0` (plus `flex: 1`) on
+`.timeline-dock-body`, letting the flex item actually shrink and its `overflow: auto` finally do its
+job.
+
+**Timeline is now resizable by dragging**, not just a fixed 40vh cap - a small handle
+(`.timeline-dock-resize-handle`) along the dock's top edge, plain pointer-drag (same technique as
+everywhere else), clamped between 140px and 75% of the viewport height, height held in
+`RecipeEditor.tsx`'s own `timelineHeight` state.
+
+Verified via Playwright: exactly one gear icon per node, zero crosshair icons; clicking it opens one
+panel containing both the Position drag-hint text and the property knobs; clicking it again closes
+it (count back to 0); after adding 8 layers to a beat, `.timeline-dock-body`'s `scrollHeight` (626px)
+exceeds its `clientHeight` (281px) - confirmed scrollable, not just overflowing; dragging the resize
+handle upward grew the dock's real bounding-box height. `git diff --stat` on
+`src/render`/`LayerRenderer.tsx` is empty - this round touched only the GUI layout/interaction layer.
+
+## Side-by-side layout, panel-follows-selection fix, matching Timeline labels, layer reorder
+
+Four more refinements from the same feedback round:
+
+**Position and Layer properties sit side by side** in the merged panel now (Position/`LayerCanvas`
+in a fixed 240px-wide left column with a border-right divider, property knobs filling the rest) -
+the earlier stacked layout made the single merged panel too tall; this matches the two-panel
+side-by-side arrangement from before the merge, just inside one panel/one gear toggle. The panel
+also grew from 320px to 620px wide to fit both comfortably, and the Position canvas itself is
+noticeably bigger (240px vs. the old 190px column).
+
+**Fixed: the merged panel used to disappear** when selecting a different layer while it was open -
+for example opening it via one node's gear icon, then clicking a *different* layer's box inside the
+Position canvas itself. Root cause: the panel's content was gated on `propertiesFor.layerId ===
+selectedLayer.id`, a specific remembered layer id set only when a gear icon was clicked - any other
+way of changing the selection (clicking a different element in the Position canvas, clicking a
+different node's body on the graph) left that remembered id stale, so the equality check failed and
+the panel's content vanished. Fixed by dropping the remembered id entirely: `propertiesFor` now only
+tracks whether the panel is open and where it's anchored; its content is always whichever layer is
+currently *selected*. Clicking a different node's gear while the panel is already open now retargets
+it in place (keeps the current anchor, just swaps content) rather than jumping to a new position;
+re-clicking the gear of the node it's *currently* showing is what closes it. This also generalized
+the fix to every other way selection can change (Timeline layer clicks, plain graph node clicks) -
+same underlying mismatch, same fix.
+
+**Timeline layer rows now show the same name as their Graph node** - `layerLabel(layer, index)` (`"1.
+text"`, `"2. shape"`, ...) moved out of `DataGraph.tsx` into `lib/layerDefaults.ts` so both consumers
+stay in sync automatically instead of duplicating the format. A layer bound to a data field also
+shows the field name in parentheses in the Timeline row (`"1. text (phrase)"`) via a new shared
+`boundDataField()` helper (also now used for the Graph node's own "← field" hint, replacing a third
+copy of the same source/field check).
+
+**Layers can be reordered by dragging**, DAW/NLE-style - a small grip handle
+(`GripVertical`) on the left edge of each Timeline layer row starts a vertical drag distinct from the
+existing horizontal move (which still works from anywhere else on the block); dropping re-splices
+`beat.layers` to the row currently under the cursor. This is a real reorder of the underlying array -
+it's also what the Graph numbers and z-index derive from, so dragging "2. shape" above "1. text" in
+the Timeline renumbers and re-stacks it in the Graph too. Implemented the same way the Beats track's
+own reorder already works - mapping the cursor's *absolute* position to a target row via the rows
+container's `getBoundingClientRect()`, not an incremental delta from the last swap. The delta approach
+was tried first and over-fired: a single drag motion arrives as several pointer-move events, and
+resetting the reference point after each swap meant more than one swap could trigger from what should
+have been a single one-row move (verified concretely: a 42px drag - just past one 38px row - moved a
+layer two rows instead of one, until switched to the absolute-position scheme).
+
+Verified via Playwright: clicking a different element in the Position canvas while the panel is open
+keeps it open and showing the new layer's properties (previously: panel count dropped to 0); Timeline
+labels read `"1. text"`, `"2. shape"`, `"3. image"` matching the Graph's own node titles; dragging
+layer 1's grip down past row 2 resulted in exactly one swap (`text, shape, image` →
+`shape, text, image`) confirmed both in the Timeline's labels and the Graph's node titles. `git diff
+--stat` on `src/render`/`LayerRenderer.tsx` is empty.

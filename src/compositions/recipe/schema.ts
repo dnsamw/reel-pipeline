@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { customBeatSchema } from "./layers/schema";
+import { defaultDataSourceId } from "../../data/dataSources";
 
 /**
  * A "composition recipe": data describing which of the existing scene
@@ -73,17 +75,27 @@ export const beatSchema = z.discriminatedUnion("kind", [
   revealBeatSchema,
   guessRevealBeatSchema,
   outroBeatSchema,
+  customBeatSchema,
 ]);
 
 export type Beat = z.infer<typeof beatSchema>;
 
-/** A beat that can repeat once per phrase in the batch - excludes intro/outro, which only ever appear once. */
-const perPhraseBeatSchema = z.discriminatedUnion("kind", [phraseBeatSchema, countdownBeatSchema, revealBeatSchema, guessRevealBeatSchema]);
+/**
+ * A beat that can repeat once per phrase in the batch - excludes intro/
+ * outro, which only ever appear once. `custom` (recipe/layers/schema.ts) is
+ * the one beat kind here whose visual content is itself data (a Layer[])
+ * instead of a fixed scene component - see CompositionFromRecipe.tsx's
+ * dispatch and timeline.ts's duration handling for the two places that
+ * treat it differently from the other 4.
+ */
+const perPhraseBeatSchema = z.discriminatedUnion("kind", [phraseBeatSchema, countdownBeatSchema, revealBeatSchema, guessRevealBeatSchema, customBeatSchema]);
 
 export const compositionRecipeSchema = z.object({
   id: z.string().describe('Matches the CLI/GUI "template" number today (1/2/3) for the built-ins; a free string for a new recipe'),
   name: z.string(),
   description: z.string().default(""),
+  /** Which data/dataSources.ts registry entry perPhraseBeats' `dataField` text bindings resolve field keys against - see docs/COMPOSITION_DESIGNER.md's data-binding design. Only "BookPhrase" exists today; defaulted so older recipes still parse once a second source is registered. */
+  dataSourceId: z.string().default(defaultDataSourceId),
   intro: introBeatSchema,
   /** The repeating unit between intro and outro, expanded once per phrase in the batch - e.g. [phrase, countdown, reveal] (Template 1) or [guessReveal] (Template 2/3). */
   perPhraseBeats: z.array(perPhraseBeatSchema).min(1),

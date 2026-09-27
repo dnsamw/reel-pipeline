@@ -25,7 +25,13 @@ export default defineConfig({
     proxy: {
       // The Express API (server/index.ts) - run separately via `npm run gui:server`,
       // or both together via `npm run gui`.
-      "/api": "http://localhost:4300",
+      // GUI_SERVER_PORT overrides both sides together (e.g. when Windows has
+      // reserved 4300 via `netsh ... excludedportrange`).
+      "/api": `http://localhost:${process.env.GUI_SERVER_PORT ?? 4300}`,
+      // Rendered reels (output/) - Express serves them at /media (server/index.ts).
+      // Without this, Vite's SPA fallback answers /media/*.mp4 with index.html
+      // and the Monitor page's <video> players never load.
+      "/media": `http://localhost:${process.env.GUI_SERVER_PORT ?? 4300}`,
     },
   },
   build: {

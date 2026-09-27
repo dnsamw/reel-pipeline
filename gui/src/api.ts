@@ -1,8 +1,22 @@
 import type {
+  AiReportRecord,
+  AiStatus,
+  InsightsOverview,
+  TikTokVideoOption,
   Book,
+  CaptionContext,
+  CaptionMeta,
+  CaptionSuggestion,
+  CaptionTone,
   Chapter,
   CompositionRecipe,
+  DataSourceDescriptor,
   FacebookStatus,
+  PlatformStatus,
+  PublishSource,
+  PublishTargetOption,
+  PublishPlatform,
+  LibraryListing,
   Manifest,
   Phrase,
   Publication,
@@ -32,6 +46,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   defaults: () => request<ReelConfig>("/config/defaults"),
   defaultTheme: () => request<ReelTheme>("/theme/default"),
+  dataSources: () => request<DataSourceDescriptor[]>("/data-sources"),
   books: () => request<Book[]>("/books"),
   chapters: (book?: string | null) => request<Chapter[]>(`/chapters${book ? `?book=${encodeURIComponent(book)}` : ""}`),
   previewBatches: (params: { book?: string | null; min?: number | null; max?: number | null; phrasesPerReel?: number }) => {
@@ -87,6 +102,9 @@ export const api = {
     limit?: number;
     force?: boolean;
     tts?: boolean;
+    /** Per-language narration overrides - omitted means use Settings. */
+    ttsEnglish?: boolean;
+    ttsSinhala?: boolean;
     template?: string;
     book?: string;
     sidechain?: boolean;
@@ -99,6 +117,21 @@ export const api = {
   getRun: (id: string) => request<RenderRun>(`/render/${encodeURIComponent(id)}`),
   cancelRun: (id: string) => request<{ cancelled: boolean }>(`/render/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
 
+  // Not through request() - this sends the raw File as the body, not JSON
+  // (matching server/index.ts's express.raw() route, not express.json()).
+  uploadImage: async (file: File) => {
+    const res = await fetch(`/api/assets/images?filename=${encodeURIComponent(file.name)}`, {
+      method: "POST",
+      headers: { "Content-Type": file.type || "application/octet-stream" },
+      body: file,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error ?? `${res.status} ${res.statusText}`);
+    }
+    return res.json() as Promise<{ path: string }>;
+  },
+
   settings: () => request<Settings>("/settings"),
   saveSettings: (input: Settings) => request<Settings>("/settings", { method: "PUT", body: JSON.stringify(input) }),
 
@@ -106,11 +139,92 @@ export const api = {
   // Full-page navigation (window.location.href), not fetch() - the OAuth
   // dialog is a real page Facebook needs to redirect the user's browser to.
   facebookConnectUrl: () => "/api/facebook/connect",
+  // Full-page navigation (Google's login), like facebookConnectUrl - not a fetch.
+  youtubeConnectUrl: () => "/api/youtube/connect",
+  youtubeDisconnect: () => request<void>("/youtube/disconnect", { method: "POST" }),
+  tiktokConnectUrl: () => "/api/tiktok/connect",
+  tiktokDisconnect: () => request<void>("/tiktok/disconnect", { method: "POST" }),
   facebookSelectPage: (pageId: string) =>
     request<{ id: string; name: string }>("/facebook/select-page", { method: "POST", body: JSON.stringify({ pageId }) }),
   facebookDisconnect: () => request<void>("/facebook/disconnect", { method: "POST" }),
 
   publications: () => request<Publication[]>("/publications"),
-  publish: (body: { batchId: string; template: string; caption?: string }) =>
-    request<Publication>("/publish", { method: "POST", body: JSON.stringify(body) }),
+  publication: (id: string) => request<Publication>(`/publications/${encodeURIComponent(id)}`),
+  platforms: () => request<PlatformStatus[]>("/distribution/platforms"),
+  publishTargets: (source: PublishSource) =>
+    request<{ media: { kind: "image" | "video"; width: number; height: number; durationSeconds: number | null }; targets: PublishTargetOption[] }>(
+      "/distribution/targets",
+      { method: "POST", body: JSON.stringify({ source }) },
+    ),
+  /** Starts one background publish per platform; poll publication(id) for progress. */
+  distribute: (
+    source: PublishSource,
+    targets: { platform: PublishPlatform; caption: string; title?: string; privacy?: "private" | "unlisted" | "public"; captionMeta?: CaptionMeta }[],
+  ) =>
+    request<Publication[]>("/distribution/publish", { method: "POST", body: JSON.stringify({ source, targets }) }),
+  aiStatus: () => request<AiStatus>("/ai/status"),
+  insights: () => request<InsightsOverview>("/insights"),
+  refreshInsights: () => request<InsightsOverview>("/insights/refresh", { method: "POST" }),
+  tiktokVideos: () => request<TikTokVideoOption[]>("/insights/tiktok-videos"),
+  linkTikTok: (publicationId: string, videoId: string | null) =>
+    request<void>("/insights/link-tiktok", { method: "POST", body: JSON.stringify({ publicationId, videoId }) }),
+  aiReports: () => request<AiReportRecord[]>("/insights/reports"),
+  aiReport: (id: string) => request<AiReportRecord>(`/insights/reports/${id}`),
+  startAiReport: (focus: string) => request<AiReportRecord>("/insights/reports", { method: "POST", body: JSON.stringify({ focus }) }),
+  askAi: (question: string) => request<{ answer: string }>("/insights/ask", { method: "POST", body: JSON.stringify({ question }) }),
+  tiktokStatsConnectUrl: () => "/api/tiktok/connect?stats=1",
+  suggestCaptions: (body: {
+    source: PublishSource;
+    context?: CaptionContext;
+    platforms: PublishPlatform[];
+    tone: CaptionTone;
+    variant: number;
+    engine: "builtin" | "ai";
+  }) => request<CaptionSuggestion>("/captions/suggest", { method: "POST", body: JSON.stringify(body) }),
+  instagramConnect: () => request<{ id: string; username: string }>("/instagram/connect", { method: "POST" }),
+  instagramDisconnect: () => request<void>("/instagram/disconnect", { method: "POST" }),
+
+  musicTracks: () => request<{ file: string; durationSeconds: number | null }[]>("/music"),
+  // Not through request() - the success response is the MP4 itself.
+  renderPostReel: async (body: {
+    templateId: string;
+    fields: Record<string, string>;
+    lists: Record<string, Record<string, string>[]>;
+    colors: Record<string, string>;
+    safeZones: boolean;
+    reel: { durationSeconds: number; musicFile: string | null; musicStartSeconds: number; musicVolume: number; frame: "reel" | "original" };
+  }) => {
+    const res = await fetch("/api/posts/reel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error ?? `${res.status} ${res.statusText}`);
+    }
+    return { blob: await res.blob(), savedPath: res.headers.get("X-Saved-Path") ?? "" };
+  },
+  library: () => request<LibraryListing>("/library"),
+  deleteLibraryItems: (ids: string[]) =>
+    request<{ deleted: string[]; manifestEntriesRemoved: number; errors: { id: string; error: string }[] }>("/library/delete", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    }),
+  resetManifest: () => request<{ cleared: number; backupPath: string | null }>("/library/manifest/reset", { method: "POST" }),
+  pruneManifest: () => request<{ removed: number }>("/library/manifest/prune", { method: "POST" }),
+  warmPostRenderer: () => request<void>("/posts/warm", { method: "POST" }),
+  // Not through request() - the success response is the PNG itself, not JSON.
+  renderPost: async (body: { templateId: string; fields: Record<string, string>; lists: Record<string, Record<string, string>[]>; colors: Record<string, string>; safeZones: boolean }) => {
+    const res = await fetch("/api/posts/render", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error ?? `${res.status} ${res.statusText}`);
+    }
+    return { blob: await res.blob(), savedPath: res.headers.get("X-Saved-Path") ?? "" };
+  },
 };
