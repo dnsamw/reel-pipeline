@@ -37,6 +37,7 @@ import { renderPostPng, warmPostBundle } from "./postRenderer";
 import { listMusicTracks, renderPostReel } from "./postReel";
 import { listLibrary, deleteLibraryItems, resetManifest, pruneManifest } from "./library";
 import { aiStatus, suggestCaptions } from "./captions";
+import { askAi, getOverview, getReport, linkTikTok, listReports, recentTikTokVideos, refreshStats, startAiReport, startInsightsScheduler } from "./analytics";
 import type { CaptionContext, CaptionMeta, CaptionPlatform, CaptionTone } from "../src/captions/types";
 
 const app = express();
@@ -734,6 +735,70 @@ app.post("/api/instagram/connect", async (_req, res) => {
   }
 });
 
+// --- Insights: post stats from every platform, built-in analysis, optional Kimi analysis ---
+
+app.get("/api/insights", async (_req, res) => {
+  try {
+    res.json(await getOverview());
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+/** Waits for the refresh (a few seconds per platform) and returns the new overview. */
+app.post("/api/insights/refresh", async (_req, res) => {
+  try {
+    await refreshStats();
+    res.json(await getOverview());
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.get("/api/insights/tiktok-videos", (_req, res) => {
+  res.json(recentTikTokVideos());
+});
+
+app.post("/api/insights/link-tiktok", (req, res) => {
+  try {
+    const { publicationId, videoId } = req.body ?? {};
+    if (typeof publicationId !== "string") return res.status(400).json({ error: "publicationId is required" });
+    linkTikTok(publicationId, typeof videoId === "string" && videoId ? videoId : null);
+    res.status(204).end();
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.get("/api/insights/reports", (_req, res) => {
+  res.json(listReports());
+});
+
+app.get("/api/insights/reports/:id", (req, res) => {
+  const r = getReport(req.params.id);
+  if (!r) return res.status(404).json({ error: "Report not found" });
+  res.json(r);
+});
+
+app.post("/api/insights/reports", (req, res) => {
+  try {
+    const focus = typeof req.body?.focus === "string" && req.body.focus.trim() ? req.body.focus.trim().slice(0, 500) : null;
+    res.json(startAiReport(focus));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.post("/api/insights/ask", async (req, res) => {
+  try {
+    const question = typeof req.body?.question === "string" ? req.body.question.trim().slice(0, 1000) : "";
+    if (!question) return res.status(400).json({ error: "Ask a question" });
+    res.json({ answer: await askAi(question) });
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // YouTube: Google OAuth for desktop apps. The callback is a loopback URL on
 // this API server itself (not the Vite origin), which Google allows for
 // "Desktop app" OAuth clients - see server/distribution/youtubeAdapter.ts.
@@ -760,9 +825,10 @@ app.get("/api/youtube/callback", async (req, res) => {
 // TikTok: Login Kit for Desktop (localhost redirect + PKCE) - see server/distribution/tiktokAdapter.ts.
 // The registered redirect ends in "/" (TikTok matches it exactly); Express's
 // non-strict routing serves the callback with or without it.
-app.get("/api/tiktok/connect", (_req, res) => {
+app.get("/api/tiktok/connect", (req, res) => {
   try {
-    res.redirect(buildTikTokAuthUrl(PORT));
+    // ?stats=1 also asks for video.list (Insights page) - opt-in, see TIKTOK_STATS_SCOPE.
+    res.redirect(buildTikTokAuthUrl(PORT, req.query.stats === "1"));
   } catch (err) {
     res.redirect(`${GUI_ORIGIN}/settings?ttError=${encodeURIComponent(err instanceof Error ? err.message : String(err))}`);
   }
@@ -808,6 +874,7 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 
 const PORT = process.env.GUI_SERVER_PORT ? Number(process.env.GUI_SERVER_PORT) : 4300;
 failInterruptedPublications();
+startInsightsScheduler();
 const server = app.listen(PORT, () => {
   console.log(`Reel GUI server listening on http://localhost:${PORT}`);
 });

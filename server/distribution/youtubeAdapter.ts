@@ -26,7 +26,14 @@ const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const API = "https://www.googleapis.com/youtube/v3";
 const UPLOAD = "https://www.googleapis.com/upload/youtube/v3/videos";
-const SCOPES = ["https://www.googleapis.com/auth/youtube.upload", "https://www.googleapis.com/auth/youtube.readonly"];
+// yt-analytics.readonly = watch time / % watched for the Insights page (server/analytics/). Connections made
+// before it was added lack it until reconnected - the Insights page says so.
+const SCOPES = [
+  "https://www.googleapis.com/auth/youtube.upload",
+  "https://www.googleapis.com/auth/youtube.readonly",
+  "https://www.googleapis.com/auth/yt-analytics.readonly",
+];
+export const YT_ANALYTICS_SCOPE = "https://www.googleapis.com/auth/yt-analytics.readonly";
 
 export type YouTubePrivacy = "private" | "unlisted" | "public";
 
@@ -69,6 +76,8 @@ interface TokenResponse {
   access_token: string;
   expires_in: number;
   refresh_token?: string;
+  /** Space-separated scopes actually granted. */
+  scope?: string;
   error?: string;
   error_description?: string;
 }
@@ -120,7 +129,7 @@ export async function completeYouTubeLogin(code: string, state: string): Promise
     accessToken: tokens.access_token,
     refreshToken: tokens.refresh_token,
     expiresAt: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
-    extra: { customUrl: channel.snippet?.customUrl ?? null },
+    extra: { customUrl: channel.snippet?.customUrl ?? null, scopes: tokens.scope?.split(" ") ?? [] },
   });
   return { channel: channel.snippet?.title ?? channel.id };
 }
@@ -129,7 +138,11 @@ export function disconnectYouTube(): void {
   deleteAccount("youtube");
 }
 
-/** A valid access token, refreshed when it's within a minute of expiring. */
+/** A valid access token, refreshed when it's within a minute of expiring. Also used by server/analytics/. */
+export async function youtubeAccessToken(): Promise<string> {
+  return accessToken();
+}
+
 async function accessToken(): Promise<string> {
   const acct = getAccount("youtube");
   if (!acct?.refreshToken) throw new Error("YouTube isn't connected - connect it in Settings");

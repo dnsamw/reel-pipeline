@@ -26,6 +26,13 @@ function aiModel(): string {
   return process.env.NVIDIA_MODEL?.trim() || DEFAULT_MODEL;
 }
 
+/** The answer was cut off by max_tokens (usually: all of it went on thinking). Callers may retry with less thinking. */
+export class AiLengthError extends Error {
+  constructor() {
+    super("AI ran out of room before finishing its answer");
+  }
+}
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
@@ -35,13 +42,31 @@ export interface ChatOptions {
   /** Off skips the model's thinking phase - fine for short writing tasks. Default on. */
   thinking?: boolean;
   /** How hard it thinks when thinking is on; higher is much slower. */
-  reasoningEffort?: "low" | "medium" | "high" | "max";
+  reasoningEffort?: "low" | "high" | "max"; // Kimi K3 accepts only these
   temperature?: number;
   maxTokens?: number;
   timeoutMs?: number;
 }
 
+/** Thrown when the API answered but with no text - NVIDIA's free tier does this now and then. */
+class AiEmptyError extends Error {
+  constructor() {
+    super("AI returned an empty answer - try again");
+  }
+}
+
+/** One chat completion; an empty reply is retried once, since it's usually a passing hiccup on the hosted API. */
 export async function chat(messages: ChatMessage[], options: ChatOptions = {}): Promise<string> {
+  try {
+    return await chatOnce(messages, options);
+  } catch (err) {
+    if (!(err instanceof AiEmptyError)) throw err;
+    console.warn("[ai] empty answer, retrying once");
+    return chatOnce(messages, options);
+  }
+}
+
+async function chatOnce(messages: ChatMessage[], options: ChatOptions): Promise<string> {
   const key = process.env.NVIDIA_API_KEY?.trim();
   if (!key) throw new Error("No AI key configured (NVIDIA_API_KEY in .env)");
 
@@ -69,9 +94,20 @@ export async function chat(messages: ChatMessage[], options: ChatOptions = {}): 
     if (res.status === 429) throw new Error("AI rate limit reached - try again in a minute");
     throw new Error(`AI request failed (HTTP ${res.status})${detail ? `: ${detail}` : ""}`);
   }
-  const body = (await res.json()) as { choices?: { message?: { content?: string | null } }[] };
-  const content = body.choices?.[0]?.message?.content?.trim();
-  if (!content) throw new Error("AI returned an empty answer");
+  const body = (await res.json()) as { choices?: { message?: Record<string, unknown> & { content?: string | null }; finish_reason?: string }[]; usage?: unknown };
+  const choice = body.choices?.[0];
+  const content = choice?.message?.content?.trim();
+  if (!content) {
+    // Shape only (no content) - enough to tell a cut-off from a refusal or an API change.
+    console.warn("[ai] empty answer:", {
+      finish_reason: choice?.finish_reason,
+      usage: body.usage,
+      messageFields: Object.fromEntries(Object.entries(choice?.message ?? {}).map(([k, v]) => [k, typeof v === "string" ? `${v.length} chars` : v])),
+    });
+    // Thinking models can spend the whole token budget reasoning and never write the answer.
+    if (choice?.finish_reason === "length") throw new AiLengthError();
+    throw new AiEmptyError();
+  }
   return content;
 }
 

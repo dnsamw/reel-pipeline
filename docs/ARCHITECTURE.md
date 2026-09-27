@@ -102,9 +102,11 @@ studypal-reels/
       renderBatch.ts           The batch runner (Node-only, the only place everything meets)
       manifest.ts              Manifest read/write/resumability types
       caption.ts                Plain caption stored in manifest.json per batch (the Publish panel's fallback)
+      sidechain.ts             --sidechain=true post-process: real ffmpeg sidechaincompress ducking (Node-only)
     captions/
       types.ts                 CaptionContext/CaptionMeta/... shared by server/captions, post templates and the GUI
-      sidechain.ts             --sidechain=true post-process: real ffmpeg sidechaincompress ducking (Node-only)
+    analytics/
+      types.ts                 PostMetrics/ContentPiece/AiReport/... shared by server/analytics and the Insights page
   assets/
     fonts/  music/  sfx/  voice/  tts/     Served via Remotion's staticFile() - see remotion.config.ts's publicDir
   output/                                   Rendered .mp4s + manifest.json (gitignored)
@@ -602,6 +604,61 @@ platform. Adding one means a new adapter file plus an entry in `distribution/ind
 - **Outcomes:** a successful publish records `outcome`: `live`, `draft` (TikTok), or `private`/`unlisted`
   (YouTube, taken from YouTube's response, so a forced-private upload from an unaudited project shows as
   private). Monitor's dots and the Media Library's "Published" badge count `live` only.
+
+### Insights (stats + Kimi analysis)
+
+`server/analytics/`, GUI page `/insights`. Two layers, and the first never depends on the second:
+
+- **Collecting** (`collectors.ts`) reuses the publishing tokens and lists **every post on each account**, not
+  only the ones this app published (most of a Page's history is usually posted by hand). Each collector returns
+  what its permissions allow and lowers that platform's access level (`full` / `partial` / `none`) with a plain
+  fix note, rather than failing the refresh:
+  - **Facebook**: `/{page}/video_reels` + `/{page}/videos` (the `views` field works without `read_insights`,
+    and matches Business Suite), plus `/{page}/posts` for photo/text posts (video, cover and profile items
+    skipped: they're counted through the video listings or aren't posts). `/{video}/video_insights` (avg watch
+    time, reach) needs `read_insights`. The Page token's real scopes are read with `debug_token` (app token from
+    `FACEBOOK_APP_ID|SECRET`), so the level is right even with no video to probe.
+  - **Instagram**: `/{ig-user}/media` with `like_count`/`comments_count`; `/{media}/insights` (views, reach, saved, shares,
+    `ig_reels_avg_watch_time`) needs `instagram_manage_insights`. Reels and images get different metric
+    lists, because one unsupported metric fails the whole call.
+  - **YouTube**: the channel's uploads playlist, then `videos.list` statistics (`youtube.readonly`); Shorts are
+    guessed by length (up to 3 min), since the API doesn't flag them; watch time and % watched from the YouTube
+    Analytics API (`yt-analytics.readonly`, now requested at connect; also needs "YouTube Analytics API"
+    enabled in the Cloud project; lags 1-2 days). Private videos are noted and left out of scoring.
+  - **TikTok**: `/v2/video/list/` (views/likes/comments/shares; no watch time in this API) needs `video.list`.
+    It's **opt-in** (`/api/tiktok/connect?stats=1`, "Reconnect TikTok with stats") because TikTok rejects the
+    whole login if the app lacks a requested scope. Uploads are drafts, so the posted video has a different
+    id: each draft is matched to the earliest unclaimed video posted after the upload with a similar length,
+    stored in `publications.stats_remote_id`, and can be re-linked by hand on the page.
+  - Per-post detail calls (insights) are capped at the newest 120 posts per platform per refresh.
+- **Storage** (`store.ts`): `platform_posts` holds every post found (a post missing from a complete listing was
+  deleted and is dropped), `metric_snapshots` keeps every refresh keyed `<platform>:<remote id>` (history for
+  later growth analysis),
+  `analytics_state` holds the last refresh time, access levels and per-post notes, `ai_reports` the Kimi reports.
+  Refresh: button on the page, on startup when older than 6h, then every 6h. Posts older than 90 days aren't refreshed.
+- **Content pieces** (`content.ts`): app publications grouped by `template:batchId` (the same reel on several
+  platforms) and matched to their account posts (Facebook photos via the stored permalink's post id, TikTok via
+  `stats_remote_id`), with format, chapter, phrases, video length (ffprobe), narration and caption
+  engine/tone/opening line. Every other account post is its own "posted directly" piece: type, caption, length,
+  time, caption language (share of Sinhala letters), and any book phrases its caption mentions. **Series** are
+  found without AI: posts whose caption opens with the same line once numbers, emoji and punctuation are
+  stripped ("English Phrases 5" and "English Phrases 6" match); a series needs 2+ posts.
+- **Built-in analysis** (`analysis.ts`, no AI): a post's score is its percentile among your own posts on the
+  same platform and measure (posts with views ranked together; posts with only interactions ranked separately),
+  counted once it's 6 hours old. A platform isn't ranked until one of its posts reaches 20 views, since
+  ranking a handful of near-zero posts is noise.
+  Comparisons average scores per attribute value, suggestions are rules with a confidence from the sample size
+  (low < 5, medium < 10, high), and forecasts add attribute effects shrunk by n/(n+3). Also chapter coverage.
+- **Kimi** (`ai.ts`): one request with thinking `high` (Kimi K3 accepts only low/high/max) gets a JSON report:
+  summary, insights with evidence, predictions, 4-6 ready-to-make next posts, experiments that vary one thing,
+  and warnings. The model sees up to 150 newest posts (caption text trimmed to 350 chars, plus the detected
+  series) as `c1..` and an unposted-phrase catalogue as `p1..`, and is told to infer the format of posts made
+  outside the app from their captions and to compare series. Ideas that continue a non-book series (e.g.
+  idioms) may carry no phrase ids. Next-post phrases are
+  mapped back to real phrase ids (unknown ids dropped), and those short ids are replaced with readable labels in
+  all text. It runs as a background job (the page polls; a server restart marks it failed) and takes 3-8
+  minutes with a full history on NVIDIA's free tier. `server/ai/client.ts` retries an empty reply once, and the
+  report retries on low thinking effort if the answer was cut off by the token budget. "Ask about your stats" sends a question plus the same dataset.
 
 ## Known limitations & gotchas
 

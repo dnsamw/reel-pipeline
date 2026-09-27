@@ -1,5 +1,8 @@
 import type {
+  AiReportRecord,
   AiStatus,
+  InsightsOverview,
+  TikTokVideoOption,
   Book,
   CaptionContext,
   CaptionMeta,
@@ -160,6 +163,16 @@ export const api = {
   ) =>
     request<Publication[]>("/distribution/publish", { method: "POST", body: JSON.stringify({ source, targets }) }),
   aiStatus: () => request<AiStatus>("/ai/status"),
+  insights: () => request<InsightsOverview>("/insights"),
+  refreshInsights: () => request<InsightsOverview>("/insights/refresh", { method: "POST" }),
+  tiktokVideos: () => request<TikTokVideoOption[]>("/insights/tiktok-videos"),
+  linkTikTok: (publicationId: string, videoId: string | null) =>
+    request<void>("/insights/link-tiktok", { method: "POST", body: JSON.stringify({ publicationId, videoId }) }),
+  aiReports: () => request<AiReportRecord[]>("/insights/reports"),
+  aiReport: (id: string) => request<AiReportRecord>(`/insights/reports/${id}`),
+  startAiReport: (focus: string) => request<AiReportRecord>("/insights/reports", { method: "POST", body: JSON.stringify({ focus }) }),
+  askAi: (question: string) => request<{ answer: string }>("/insights/ask", { method: "POST", body: JSON.stringify({ question }) }),
+  tiktokStatsConnectUrl: () => "/api/tiktok/connect?stats=1",
   suggestCaptions: (body: {
     source: PublishSource;
     context?: CaptionContext;

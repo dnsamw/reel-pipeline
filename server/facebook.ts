@@ -51,7 +51,11 @@ export function buildAuthUrl(state: string): string {
   if (configId) {
     params.set("config_id", configId);
   } else {
-    params.set("scope", "pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish");
+    // read_insights / instagram_manage_insights: views and watch time for the Insights page.
+    params.set(
+      "scope",
+      "pages_show_list,pages_read_engagement,pages_manage_posts,read_insights,instagram_basic,instagram_content_publish,instagram_manage_insights",
+    );
   }
 
   return `https://www.facebook.com/v21.0/dialog/oauth?${params.toString()}`;

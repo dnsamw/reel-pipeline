@@ -346,7 +346,8 @@ export function Settings() {
                           Link it to your Facebook Page: in Meta Business Suite or the Page's settings, under <em>Linked accounts → Instagram</em>.
                         </li>
                         <li>
-                          In your Meta app dashboard, add the <code>instagram_basic</code> and <code>instagram_content_publish</code> permissions
+                          In your Meta app dashboard, add the <code>instagram_basic</code> and <code>instagram_content_publish</code> permissions (plus{" "}
+                          <code>instagram_manage_insights</code> and <code>read_insights</code> for the Insights page)
                           (in the Facebook Login for Business configuration your <code>FACEBOOK_CONFIG_ID</code> points at, if you use one).
                         </li>
                         <li>Disconnect and reconnect Facebook above so the new permissions are granted.</li>
@@ -385,7 +386,7 @@ export function Settings() {
               <ol>
                 <li>
                   In <a href="https://console.cloud.google.com/" target="_blank" rel="noreferrer">Google Cloud Console</a>, create a project (or
-                  pick one) and enable <strong>YouTube Data API v3</strong> (APIs &amp; Services → Library).
+                  pick one) and enable <strong>YouTube Data API v3</strong> and <strong>YouTube Analytics API</strong> (the second is for the Insights page) under APIs &amp; Services → Library.
                 </li>
                 <li>
                   <em>APIs &amp; Services → OAuth consent screen</em>: user type <strong>External</strong>, fill in the app name and your email,

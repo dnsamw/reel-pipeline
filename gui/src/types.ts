@@ -355,6 +355,28 @@ export interface Publication {
 export type { CaptionContext, CaptionMeta, CaptionPlatform, CaptionSuggestion, CaptionTone } from "../../src/captions/types";
 import type { CaptionMeta } from "../../src/captions/types";
 
+export type {
+  AiContentIdea,
+  AiReport,
+  AiReportRecord,
+  BaselinePrediction,
+  BuiltinSuggestion,
+  Comparison,
+  ContentPiece,
+  InsightsOverview,
+  PlatformResult,
+  PostMetrics,
+  StatsAccess,
+} from "../../src/analytics/types";
+
+export interface TikTokVideoOption {
+  id: string;
+  createTime: string;
+  description: string;
+  durationSeconds: number | null;
+  shareUrl: string | null;
+}
+
 export interface AiStatus {
   available: boolean;
   model: string | null;

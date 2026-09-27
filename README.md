@@ -208,6 +208,28 @@ The Publish panel labels results honestly: **Published** (live), **Sent to draft
 (private/unlisted)** (YouTube, as reported back by YouTube). Monitor's "published" dots count live posts only.
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#publishing-distribution) for what each platform's API allows.
 
+**Insights page** (`/insights`) — how your posts are doing on every platform, and what to post next. It reads
+**every post on your connected accounts**, including ones you posted directly on Facebook, Instagram, YouTube or
+TikTok, not just the ones this app published.
+- **Kimi analysis** (needs `NVIDIA_API_KEY`): press **Analyse with Kimi**, optionally with a focus ("why is TikTok
+  behind?"). In a few minutes you get a report: a summary, what the data says (with the numbers behind it and a
+  confidence level), predictions, ready-to-make next posts built from phrases you haven't posted yet, experiments
+  that change one thing at a time, and gaps to fix. Reports are saved. **Ask about your stats** answers a
+  question directly.
+- **Built-in analysis** (always works, no AI): each post's score (0-100 against your own posts on the same
+  platform), what's working by series (posts whose captions open the same way, like "English Phrases 1, 2, 3"),
+  post type, caption language and length, hashtags, format, tone, time and length, suggestions, likely best next
+  posts, phrase coverage, and a table of every post with its numbers on each platform (sort by newest or top).
+- Stats refresh every 6 hours while the app runs, or with **Refresh stats**. The cards at the top say what
+  each platform lets the app measure and how to unlock the rest:
+  - **Facebook**: views are read without extra setup; for watch time add `read_insights` to your Login for
+    Business configuration, then reconnect Facebook.
+  - **Instagram**: add `instagram_manage_insights` the same way.
+  - **YouTube**: enable "YouTube Analytics API" in Google Cloud, then reconnect YouTube.
+  - **TikTok**: add the Display API (`video.list`) to your TikTok app, then **Reconnect TikTok with stats**.
+    TikTok uploads are drafts, so each is matched to the video you post from it; fix a wrong match with the
+    dropdown in the Posts table.
+
 **Post Creator page** (`/post-creator`) — static 1080×1080 image posts. Pick a post template from the
 dropdown (each option has a small live preview), edit its text fields and optional background photo, then set
 its colors directly or load them from any reel template on the Templates page (light or dark palette). **Export

@@ -7,6 +7,7 @@ import {
   FileText,
   FolderOpen,
   ImagePlus,
+  Lightbulb,
   LayoutDashboard,
   ListChecks,
   Monitor,
@@ -29,6 +30,7 @@ import { VideoSpecPage } from "./pages/VideoSpecPage";
 import { Settings } from "./pages/Settings";
 import { PostCreator } from "./pages/PostCreator";
 import { MediaLibrary } from "./pages/MediaLibrary";
+import { Insights } from "./pages/Insights";
 
 const SIDEBAR_COLLAPSED_KEY = "studypal-reels:sidebar-collapsed"; // key kept from the old name so the saved state survives the rename
 
@@ -54,6 +56,7 @@ const NAV_SECTIONS = [
     ],
   },
   { title: "Posts", items: [{ to: "/post-creator", end: false, icon: ImagePlus, label: "Post Creator" }] },
+  { title: "Grow", items: [{ to: "/insights", end: false, icon: Lightbulb, label: "Insights" }] },
   {
     title: "Manage",
     items: [
@@ -143,6 +146,7 @@ export function App() {
           <Route path="/recipes" element={<Recipes />} />
           <Route path="/post-creator" element={<PostCreator />} />
           <Route path="/library" element={<MediaLibrary />} />
+          <Route path="/insights" element={<Insights />} />
           <Route path="/recipes/new" element={<RecipeEditor />} />
           <Route path="/recipes/:id" element={<RecipeEditor />} />
           <Route path="/video-spec" element={<VideoSpecPage />} />

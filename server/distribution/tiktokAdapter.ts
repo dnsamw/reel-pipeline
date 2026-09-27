@@ -23,6 +23,11 @@ import type { PlatformAdapter } from "./types";
 const AUTH_URL = "https://www.tiktok.com/v2/auth/authorize/";
 const API = "https://open.tiktokapis.com/v2";
 const SCOPES = ["user.info.basic", "video.upload"];
+/**
+ * Only requested when connecting "with stats" (Insights page): TikTok rejects the whole login if the app
+ * hasn't been granted a scope, and video.list needs the Display API added to the app - so it's opt-in.
+ */
+export const TIKTOK_STATS_SCOPE = "video.list";
 
 // TikTok's FILE_UPLOAD chunk rules: 5-64MB per chunk (the last may be up to 128MB); under 5MB = one chunk.
 const MAX_SINGLE_CHUNK = 64 * 1024 * 1024;
@@ -41,7 +46,7 @@ function redirectUri(port: number): string {
 
 const pending = new Map<string, { verifier: string; port: number; expires: number }>();
 
-export function buildTikTokAuthUrl(port: number): string {
+export function buildTikTokAuthUrl(port: number, withStats = false): string {
   const creds = clientCreds();
   if (!creds) throw new Error("TIKTOK_CLIENT_KEY / TIKTOK_CLIENT_SECRET aren't set - add them to .env (see Settings → TikTok setup steps) and restart the server");
   const state = randomBytes(16).toString("hex");
@@ -51,7 +56,7 @@ export function buildTikTokAuthUrl(port: number): string {
   const params = new URLSearchParams({
     client_key: creds.key,
     response_type: "code",
-    scope: SCOPES.join(","),
+    scope: (withStats ? [...SCOPES, TIKTOK_STATS_SCOPE] : SCOPES).join(","),
     redirect_uri: redirectUri(port),
     state,
     code_challenge: createHash("sha256").update(verifier).digest("hex"),
@@ -130,7 +135,7 @@ export async function completeTikTokLogin(code: string, state: string): Promise<
     accessToken: t.access_token,
     refreshToken: t.refresh_token,
     expiresAt: new Date(Date.now() + t.expires_in * 1000).toISOString(),
-    extra: {},
+    extra: { scopes: t.scope?.split(",") ?? [] },
   });
   return { name };
 }
@@ -147,6 +152,11 @@ export async function disconnectTikTok(): Promise<void> {
     }).catch(() => {});
   }
   deleteAccount("tiktok");
+}
+
+/** Also used by server/analytics/ (video.list). */
+export async function tiktokAccessToken(): Promise<string> {
+  return accessToken();
 }
 
 async function accessToken(): Promise<string> {
