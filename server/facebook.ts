@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { db } from "./db";
 
-const GRAPH = "https://graph.facebook.com/v21.0";
+export const GRAPH = "https://graph.facebook.com/v21.0";
 const GRAPH_VIDEO = "https://graph-video.facebook.com/v21.0";
 
 function requireEnv(name: string): string {
@@ -51,7 +51,7 @@ export function buildAuthUrl(state: string): string {
   if (configId) {
     params.set("config_id", configId);
   } else {
-    params.set("scope", "pages_show_list,pages_read_engagement,pages_manage_posts");
+    params.set("scope", "pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish");
   }
 
   return `https://www.facebook.com/v21.0/dialog/oauth?${params.toString()}`;
@@ -113,7 +113,7 @@ export function selectPendingPage(pageId: string): { id: string; name: string } 
   return { id: page.id, name: page.name };
 }
 
-interface PageRow {
+export interface PageRow {
   id: string;
   name: string;
   access_token: string;
@@ -139,7 +139,7 @@ export function getConnectedPage(): { id: string; name: string; connectedAt: str
   return row ?? null;
 }
 
-function getConnectedPageWithToken(): PageRow | null {
+export function getConnectedPageWithToken(): PageRow | null {
   return (db.prepare("SELECT * FROM facebook_page LIMIT 1").get() as PageRow | undefined) ?? null;
 }
 

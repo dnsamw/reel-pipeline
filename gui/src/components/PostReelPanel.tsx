@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Pause, Play } from "lucide-react";
 import { api } from "../api";
-import { PostPublishBox } from "./PostPublishBox";
-import { suggestPostCaption } from "../lib/postCaption";
+import { PublishPanel } from "./PublishPanel";
+import { postCaptionContext, suggestPostCaption } from "../lib/postCaption";
+import type { CaptionContext } from "../types";
 import type { PostColors, PostFields, PostLists, PostTemplateDef } from "../../../src/posts/types";
 
 type Track = { file: string; durationSeconds: number | null };
@@ -58,7 +59,7 @@ export function PostReelPanel({
   const [settings, setSettings] = useState<ReelSettings>(readSettings);
   const [playing, setPlaying] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [result, setResult] = useState<{ url: string; savedPath: string; filename: string; snapshot: string; caption: string } | null>(null);
+  const [result, setResult] = useState<{ url: string; savedPath: string; filename: string; snapshot: string; caption: string; context: CaptionContext } | null>(null);
 
   // What the reel was made from (post content + reel settings) - compared to
   // warn that publishing would post an out-of-date file.
@@ -137,7 +138,7 @@ export function PostReelPanel({
       });
       const url = URL.createObjectURL(blob);
       const filename = savedPath.split("/").pop() || `${def.id}.mp4`;
-      setResult({ url, savedPath, filename, snapshot, caption: suggestPostCaption(def, fields, lists) });
+      setResult({ url, savedPath, filename, snapshot, caption: suggestPostCaption(def, fields, lists), context: postCaptionContext(def, fields, lists, "reel") });
       const a = document.createElement("a");
       a.href = url;
       a.download = filename;
@@ -227,7 +228,7 @@ export function PostReelPanel({
         <>
           <video className="post-reel-result" src={result.url} controls />
           <p className="hint saved-path">Saved to {result.savedPath}</p>
-          <PostPublishBox savedPath={result.savedPath} templateId={def.id} suggestedCaption={result.caption} kind="reel" stale={result.snapshot !== snapshot} previewUrl={result.url} />
+          <PublishPanel source={{ type: "post", savedPath: result.savedPath }} fallbackCaption={result.caption} captionContext={result.context} kind="reel" stale={result.snapshot !== snapshot} previewUrl={result.url} />
         </>
       )}
     </div>

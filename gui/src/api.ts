@@ -1,9 +1,18 @@
 import type {
+  AiStatus,
   Book,
+  CaptionContext,
+  CaptionMeta,
+  CaptionSuggestion,
+  CaptionTone,
   Chapter,
   CompositionRecipe,
   DataSourceDescriptor,
   FacebookStatus,
+  PlatformStatus,
+  PublishSource,
+  PublishTargetOption,
+  PublishPlatform,
   LibraryListing,
   Manifest,
   Phrase,
@@ -127,18 +136,41 @@ export const api = {
   // Full-page navigation (window.location.href), not fetch() - the OAuth
   // dialog is a real page Facebook needs to redirect the user's browser to.
   facebookConnectUrl: () => "/api/facebook/connect",
+  // Full-page navigation (Google's login), like facebookConnectUrl - not a fetch.
+  youtubeConnectUrl: () => "/api/youtube/connect",
+  youtubeDisconnect: () => request<void>("/youtube/disconnect", { method: "POST" }),
+  tiktokConnectUrl: () => "/api/tiktok/connect",
+  tiktokDisconnect: () => request<void>("/tiktok/disconnect", { method: "POST" }),
   facebookSelectPage: (pageId: string) =>
     request<{ id: string; name: string }>("/facebook/select-page", { method: "POST", body: JSON.stringify({ pageId }) }),
   facebookDisconnect: () => request<void>("/facebook/disconnect", { method: "POST" }),
 
   publications: () => request<Publication[]>("/publications"),
-  publish: (body: { batchId: string; template: string; caption?: string }) =>
-    request<Publication>("/publish", { method: "POST", body: JSON.stringify(body) }),
+  publication: (id: string) => request<Publication>(`/publications/${encodeURIComponent(id)}`),
+  platforms: () => request<PlatformStatus[]>("/distribution/platforms"),
+  publishTargets: (source: PublishSource) =>
+    request<{ media: { kind: "image" | "video"; width: number; height: number; durationSeconds: number | null }; targets: PublishTargetOption[] }>(
+      "/distribution/targets",
+      { method: "POST", body: JSON.stringify({ source }) },
+    ),
+  /** Starts one background publish per platform; poll publication(id) for progress. */
+  distribute: (
+    source: PublishSource,
+    targets: { platform: PublishPlatform; caption: string; title?: string; privacy?: "private" | "unlisted" | "public"; captionMeta?: CaptionMeta }[],
+  ) =>
+    request<Publication[]>("/distribution/publish", { method: "POST", body: JSON.stringify({ source, targets }) }),
+  aiStatus: () => request<AiStatus>("/ai/status"),
+  suggestCaptions: (body: {
+    source: PublishSource;
+    context?: CaptionContext;
+    platforms: PublishPlatform[];
+    tone: CaptionTone;
+    variant: number;
+    engine: "builtin" | "ai";
+  }) => request<CaptionSuggestion>("/captions/suggest", { method: "POST", body: JSON.stringify(body) }),
+  instagramConnect: () => request<{ id: string; username: string }>("/instagram/connect", { method: "POST" }),
+  instagramDisconnect: () => request<void>("/instagram/disconnect", { method: "POST" }),
 
-  // Publishes an exported Post Creator file; a failed upload comes back as a
-  // Publication with `error` set, which request() turns into a thrown Error.
-  publishPost: (body: { savedPath: string; caption: string; templateId: string }) =>
-    request<Publication & { format: "photo" | "reel" | "video" }>("/posts/publish", { method: "POST", body: JSON.stringify(body) }),
   musicTracks: () => request<{ file: string; durationSeconds: number | null }[]>("/music"),
   // Not through request() - the success response is the MP4 itself.
   renderPostReel: async (body: {

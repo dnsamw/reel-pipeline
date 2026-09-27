@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import type { FacebookStatus, Manifest, ManifestEntry, Publication, RenderRun } from "../types";
+import { PlatformDot, PublishPanel } from "../components/PublishPanel";
+import type { Manifest, ManifestEntry, Publication, PublishPlatform, RenderRun } from "../types";
 
 /** Which languages a rendered reel was actually voiced in, from its per-phrase TTS files (older entries only have ttsEnabled). */
 function ttsLabel(entry: ManifestEntry): string {
@@ -15,24 +16,17 @@ export function Dashboard() {
   const [manifest, setManifest] = useState<Manifest | null>(null);
   const [runs, setRuns] = useState<RenderRun[]>([]);
   const [publications, setPublications] = useState<Publication[]>([]);
-  const [fbStatus, setFbStatus] = useState<FacebookStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const [manifestRes, runsRes, publicationsRes, fbRes] = await Promise.all([
-          api.manifest(),
-          api.listRuns(),
-          api.publications(),
-          api.facebookStatus(),
-        ]);
+        const [manifestRes, runsRes, publicationsRes] = await Promise.all([api.manifest(), api.listRuns(), api.publications()]);
         if (cancelled) return;
         setManifest(manifestRes);
         setRuns(runsRes);
         setPublications(publicationsRes);
-        setFbStatus(fbRes);
         setError(null);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
@@ -50,12 +44,8 @@ export function Dashboard() {
 
   const entries = manifest ? Object.entries(manifest).sort((a, b) => b[1].renderedAt.localeCompare(a[1].renderedAt)) : [];
 
-  function latestPublicationFor(entry: ManifestEntry): Publication | null {
-    return publications.find((p) => p.batchId === entry.batchId && p.template === entry.template) ?? null;
-  }
-
-  function onPublished(record: Publication) {
-    setPublications((cur) => [record, ...cur.filter((p) => p.id !== record.id)]);
+  function publicationsFor(entry: ManifestEntry): Publication[] {
+    return publications.filter((p) => p.batchId === entry.batchId && p.template === entry.template);
   }
 
   return (
@@ -74,22 +64,11 @@ export function Dashboard() {
 
       <div className="card">
         <h2>Rendered batches ({entries.length})</h2>
-        {!fbStatus?.page && (
-          <p className="hint" style={{ marginTop: 0 }}>
-            No Facebook Page connected - publishing is disabled until you connect one in Settings.
-          </p>
-        )}
         {entries.length === 0 ? (
           <p className="hint">output/manifest.json is empty or missing - nothing rendered yet.</p>
         ) : (
           entries.map(([key, entry]) => (
-            <ManifestRow
-              key={key}
-              entry={entry}
-              publication={latestPublicationFor(entry)}
-              canPublish={fbStatus?.page != null}
-              onPublished={onPublished}
-            />
+            <ManifestRow key={key} entry={entry} publications={publicationsFor(entry)} />
           ))
         )}
       </div>
@@ -131,48 +110,31 @@ function RunRow({ run }: { run: RenderRun }) {
   );
 }
 
-function publishBadge(publication: Publication | null): { label: string; className: string } {
-  if (!publication) return { label: "Not published", className: "queued" };
-  if (publication.status === "published") return { label: "Published", className: "done" };
-  if (publication.status === "uploading") return { label: "Publishing...", className: "running" };
-  return { label: "Publish failed", className: "error" };
+/** The platforms a reel is live on (latest successful publish per platform), for the row header. */
+function publishedPlatforms(publications: Publication[]): PublishPlatform[] {
+  const out: PublishPlatform[] = [];
+  for (const p of publications) if (p.status === "published" && (p.outcome ?? "live") === "live" && !out.includes(p.platform)) out.push(p.platform);
+  return out;
 }
 
-function ManifestRow({
-  entry,
-  publication,
-  canPublish,
-  onPublished,
-}: {
-  entry: ManifestEntry;
-  publication: Publication | null;
-  canPublish: boolean;
-  onPublished: (record: Publication) => void;
-}) {
+function ManifestRow({ entry, publications }: { entry: ManifestEntry; publications: Publication[] }) {
   const [expanded, setExpanded] = useState(false);
-  const [caption, setCaption] = useState(publication?.caption ?? entry.suggestedCaption);
-  const [publishing, setPublishing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const badge = publishBadge(publication);
-
-  async function publish() {
-    setError(null);
-    setPublishing(true);
-    try {
-      const record = await api.publish({ batchId: entry.batchId, template: entry.template, caption });
-      onPublished(record);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setPublishing(false);
-    }
-  }
+  const live = publishedPlatforms(publications);
+  const uploading = publications.some((p) => p.status === "uploading");
 
   return (
     <div className="queue-row">
       <div className="queue-row-header" onClick={() => setExpanded((e) => !e)}>
         <span className="badge done">Rendered</span>
-        <span className={`badge ${badge.className}`}>{badge.label}</span>
+        {live.length > 0 ? (
+          <span className="badge done published-on" title={`Published on ${live.join(", ")}`}>
+            Published {live.map((p) => <PlatformDot key={p} platform={p} />)}
+          </span>
+        ) : uploading ? (
+          <span className="badge running">Publishing…</span>
+        ) : (
+          <span className="badge queued">Not published</span>
+        )}
         <span className="queue-row-title">
           Ch {entry.chapterOrder}: {entry.chapterTitle} (template {entry.template}) - {new Date(entry.renderedAt).toLocaleString()}
         </span>
@@ -181,32 +143,19 @@ function ManifestRow({
 
       {expanded && (
         <div className="queue-row-body">
-          {error && <div className="error-banner">{error}</div>}
           <div className="manifest-row-playback">
             <video className="manifest-row-video" src={entry.mediaUrl} controls preload="none" />
             <div className="manifest-row-details">
               <p className="hint" style={{ marginTop: 0 }}>
                 TTS {ttsLabel(entry)} - sidechain {entry.sidechain ? "on" : "off"} - {entry.outputPath}
               </p>
-              <div className="field">
-                <label>Facebook caption</label>
-                <textarea rows={3} value={caption} onChange={(e) => setCaption(e.target.value)} />
-              </div>
-              <div className="button-row">
-                <button type="button" disabled={!canPublish || publishing} onClick={publish}>
-                  {publishing ? "Publishing..." : publication?.status === "published" ? "Re-publish" : "Publish to Facebook"}
-                </button>
-                {publication?.status === "published" && publication.fbPermalink && (
-                  <button type="button" className="secondary" onClick={() => window.open(publication.fbPermalink!, "_blank", "noreferrer")}>
-                    View on Facebook
-                  </button>
-                )}
-              </div>
-              {publication?.status === "error" && publication.error && (
-                <p className="hint" style={{ color: "var(--danger)" }}>
-                  Last attempt failed: {publication.error}
-                </p>
-              )}
+              <PublishPanel
+                source={{ type: "batch", batchId: entry.batchId, template: entry.template }}
+                previousCaption={publications[0]?.caption || undefined}
+                fallbackCaption={entry.suggestedCaption}
+                kind="reel"
+                previewUrl={entry.mediaUrl}
+              />
             </div>
           </div>
         </div>

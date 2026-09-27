@@ -17,7 +17,7 @@ const REEL_H = 1920;
  * the ffmpeg/ffprobe Remotion ships in its platform compositor package, so
  * this works on a machine without a system ffmpeg too.
  */
-function resolveTool(name: "ffmpeg" | "ffprobe"): string {
+export function resolveTool(name: "ffmpeg" | "ffprobe"): string {
   if (name === "ffmpeg" ? isFfmpegAvailable() : spawnSync(name, ["-version"], { stdio: "ignore" }).status === 0) return name;
   const remotionDir = join(process.cwd(), "node_modules", "@remotion");
   const exe = process.platform === "win32" ? `${name}.exe` : name;

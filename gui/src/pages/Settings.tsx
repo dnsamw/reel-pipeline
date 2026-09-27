@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api";
+import { PlatformDot } from "../components/PublishPanel";
 import { ReelConfigNumberFields, ReelConfigPaletteFields } from "../components/ReelConfigFields";
 import { RecipePicker } from "../components/RecipePicker";
-import type { FacebookStatus, Palette, RecipeRecord, ReelConfig, ReelTheme, Settings as SettingsRecord } from "../types";
+import type { FacebookStatus, Palette, PlatformStatus, RecipeRecord, ReelConfig, ReelTheme, Settings as SettingsRecord } from "../types";
 
 type ConfigOverrides = Partial<ReelConfig>;
 
@@ -25,8 +26,45 @@ export function Settings() {
   const [fbStatus, setFbStatus] = useState<FacebookStatus | null>(null);
   const [fbBusy, setFbBusy] = useState(false);
 
+  const [platforms, setPlatforms] = useState<PlatformStatus[]>([]);
+
   function reloadFacebookStatus() {
     api.facebookStatus().then(setFbStatus).catch((err) => setError(err instanceof Error ? err.message : String(err)));
+    api.platforms().then(setPlatforms).catch(() => {});
+  }
+
+  async function connectInstagram() {
+    setFbBusy(true);
+    setError(null);
+    try {
+      const ig = await api.instagramConnect();
+      setStatus(`Instagram connected: @${ig.username}.`);
+      reloadFacebookStatus();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setFbBusy(false);
+    }
+  }
+
+  async function disconnectOAuth(disconnectCall: () => Promise<void>) {
+    setFbBusy(true);
+    try {
+      await disconnectCall();
+      reloadFacebookStatus();
+    } finally {
+      setFbBusy(false);
+    }
+  }
+
+  async function disconnectInstagram() {
+    setFbBusy(true);
+    try {
+      await api.instagramDisconnect();
+      reloadFacebookStatus();
+    } finally {
+      setFbBusy(false);
+    }
   }
 
   useEffect(() => {
@@ -51,14 +89,26 @@ export function Settings() {
     const fbError = searchParams.get("fbError");
     const fbConnected = searchParams.get("fbConnected");
     const fbPick = searchParams.get("fbPick");
-    if (!fbError && !fbConnected && !fbPick) return;
+    const ytError = searchParams.get("ytError");
+    const ytConnected = searchParams.get("ytConnected");
+    const ttError = searchParams.get("ttError");
+    const ttConnected = searchParams.get("ttConnected");
+    if (!fbError && !fbConnected && !fbPick && !ytError && !ytConnected && !ttError && !ttConnected) return;
+    if (ttError) setError(`TikTok: ${ttError}`);
+    if (ttConnected) setStatus(`TikTok connected: ${ttConnected}.`);
     if (fbError) setError(fbError);
     if (fbConnected) setStatus("Facebook Page connected.");
+    if (ytError) setError(`YouTube: ${ytError}`);
+    if (ytConnected) setStatus(`YouTube connected: ${ytConnected}.`);
     reloadFacebookStatus();
     setSearchParams((params) => {
       params.delete("fbError");
       params.delete("fbConnected");
       params.delete("fbPick");
+      params.delete("ytError");
+      params.delete("ytConnected");
+      params.delete("ttError");
+      params.delete("ttConnected");
       return params;
     }, { replace: true });
     // fbPick needs no local action beyond reloading status - the pending-pages picker below renders from fbStatus.pendingPages.
@@ -231,39 +281,250 @@ export function Settings() {
       )}
 
       <div className="card">
-        <h2>Facebook Page</h2>
-        <p className="hint" style={{ marginTop: 0 }}>
-          Connect the Page you admin so rendered reels can be published straight from the Monitor page, with a
-          record kept of what was generated vs. what's actually live.
+        <h2>Connected accounts</h2>
+        <p className="hint accounts-intro">
+          Where Post Creator exports and rendered reels can be published. Each publish lets you pick which of these to post to.
         </p>
 
-        {fbStatus?.pendingPages ? (
-          <>
-            <p className="hint">That Facebook account admins more than one Page - pick which one to connect:</p>
-            {fbStatus.pendingPages.map((p) => (
-              <div key={p.id} className="button-row" style={{ marginTop: 0, marginBottom: 8 }}>
-                <button type="button" disabled={fbBusy} onClick={() => selectPage(p.id)}>
-                  Use "{p.name}"
-                </button>
+        <div className="account-row">
+          <PlatformDot platform="facebook" />
+          <div className="account-main">
+            <strong>Facebook Page</strong>
+            {fbStatus?.pendingPages ? (
+              <>
+                <span className="hint">That Facebook account admins more than one Page - pick which one to connect:</span>
+                <div className="button-row" style={{ marginTop: 6 }}>
+                  {fbStatus.pendingPages.map((p) => (
+                    <button key={p.id} type="button" disabled={fbBusy} onClick={() => selectPage(p.id)}>
+                      Use "{p.name}"
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : fbStatus?.page ? (
+              <span className="account-name">{fbStatus.page.name}</span>
+            ) : (
+              <span className="hint">Photos, Reels and videos on the Page you admin.</span>
+            )}
+          </div>
+          {fbStatus?.page ? (
+            <>
+              <span className="badge done">Connected</span>
+              <button type="button" className="danger" disabled={fbBusy} onClick={disconnect}>
+                Disconnect
+              </button>
+            </>
+          ) : (
+            !fbStatus?.pendingPages && (
+              <button type="button" onClick={() => (window.location.href = api.facebookConnectUrl())}>
+                Connect
+              </button>
+            )
+          )}
+        </div>
+
+        {(() => {
+          const ig = platforms.find((p) => p.platform === "instagram");
+          return (
+            <div className="account-row">
+              <PlatformDot platform="instagram" />
+              <div className="account-main">
+                <strong>Instagram</strong>
+                {ig?.connected ? (
+                  <span className="account-name">{ig.accountName}</span>
+                ) : (
+                  <>
+                    <span className="hint">Reels and feed images, published through your Facebook Page.</span>
+                    <details className="setup-steps">
+                      <summary>Setup steps</summary>
+                      <ol>
+                        <li>
+                          In the Instagram app: <em>Settings → Account type and tools → Switch to professional account</em> (Business or
+                          Creator).
+                        </li>
+                        <li>
+                          Link it to your Facebook Page: in Meta Business Suite or the Page's settings, under <em>Linked accounts → Instagram</em>.
+                        </li>
+                        <li>
+                          In your Meta app dashboard, add the <code>instagram_basic</code> and <code>instagram_content_publish</code> permissions
+                          (in the Facebook Login for Business configuration your <code>FACEBOOK_CONFIG_ID</code> points at, if you use one).
+                        </li>
+                        <li>Disconnect and reconnect Facebook above so the new permissions are granted.</li>
+                        <li>
+                          Click <strong>Connect</strong>. It finds the Instagram account linked to your Page; no separate login.
+                        </li>
+                      </ol>
+                    </details>
+                  </>
+                )}
               </div>
-            ))}
+              {ig?.connected ? (
+                <>
+                  <span className="badge done">Connected</span>
+                  <button type="button" className="danger" disabled={fbBusy} onClick={disconnectInstagram}>
+                    Disconnect
+                  </button>
+                </>
+              ) : (
+                <button type="button" disabled={fbBusy || !fbStatus?.page} onClick={connectInstagram} title={fbStatus?.page ? undefined : "Connect Facebook first"}>
+                  Connect
+                </button>
+              )}
+            </div>
+          );
+        })()}
+
+        <OAuthAccountRow
+          status={platforms.find((p) => p.platform === "youtube")}
+          connectUrl={api.youtubeConnectUrl()}
+          busy={fbBusy}
+          onDisconnect={() => disconnectOAuth(api.youtubeDisconnect)}
+          connectedNote="Uploads are Private unless you choose otherwise when publishing."
+          steps={
+            <>
+              <ol>
+                <li>
+                  In <a href="https://console.cloud.google.com/" target="_blank" rel="noreferrer">Google Cloud Console</a>, create a project (or
+                  pick one) and enable <strong>YouTube Data API v3</strong> (APIs &amp; Services → Library).
+                </li>
+                <li>
+                  <em>APIs &amp; Services → OAuth consent screen</em>: user type <strong>External</strong>, fill in the app name and your email,
+                  and add yourself under <strong>Test users</strong>.
+                </li>
+                <li>
+                  <em>Credentials → Create credentials → OAuth client ID</em>, application type <strong>Desktop app</strong>.
+                </li>
+                <li>
+                  Put the client ID and secret in <code>.env</code> as <code>YOUTUBE_CLIENT_ID</code> and <code>YOUTUBE_CLIENT_SECRET</code>, then
+                  restart the server.
+                </li>
+                <li>
+                  Click <strong>Connect</strong> and sign in with the Google account that owns the channel. "Google hasn't verified this app" is
+                  expected for your own test app: choose <em>Continue</em>.
+                </li>
+              </ol>
+              <p className="hint">
+                Until Google audits the project, YouTube keeps every upload <strong>private</strong>. While the consent screen is in "Testing",
+                the login expires after 7 days and you reconnect here.
+              </p>
+            </>
+          }
+        />
+
+        <OAuthAccountRow
+          status={platforms.find((p) => p.platform === "tiktok")}
+          connectUrl={api.tiktokConnectUrl()}
+          busy={fbBusy}
+          onDisconnect={() => disconnectOAuth(api.tiktokDisconnect)}
+          connectedNote="Reels go to your TikTok drafts - finish and post them in the TikTok app."
+          steps={
+            <>
+              <ol>
+                <li>
+                  At <a href="https://developers.tiktok.com/" target="_blank" rel="noreferrer">developers.tiktok.com</a>, log in and create an
+                  app (<em>Manage apps → Connect an app</em>).
+                </li>
+                <li>
+                  Add the products <strong>Login Kit</strong> and <strong>Content Posting API</strong>. Under Content Posting API, enable{" "}
+                  <strong>Upload</strong> (Direct Post isn't needed). Make sure the scopes include <code>user.info.basic</code> and{" "}
+                  <code>video.upload</code>.
+                </li>
+                <li>
+                  In Login Kit, choose platform <strong>Desktop</strong> and add the redirect URI{" "}
+                  <code>http://127.0.0.1:*/api/tiktok/callback/</code> (the <code>*</code> port and the trailing slash matter).
+                </li>
+                <li>
+                  Until the app is reviewed, use its <strong>Sandbox</strong> and add your TikTok account as a <strong>target user</strong> there,
+                  using the Sandbox's client key and secret in the next step.
+                </li>
+                <li>
+                  Put the client key and secret in <code>.env</code> as <code>TIKTOK_CLIENT_KEY</code> and <code>TIKTOK_CLIENT_SECRET</code>, then
+                  restart the server and click <strong>Connect</strong>.
+                </li>
+              </ol>
+              <p className="hint">
+                Uploads arrive as drafts in your TikTok inbox (at most 5 pending per 24 hours). TikTok's API doesn't carry the caption for
+                drafts, so you paste it in the app. Videos only.
+              </p>
+            </>
+          }
+        />
+
+        {platforms
+          .filter((p) => !p.available)
+          .map((p) => (
+            <div className="account-row upcoming" key={p.platform}>
+              <PlatformDot platform={p.platform} />
+              <div className="account-main">
+                <strong>{p.label}</strong>
+                <span className="hint">{p.setupHint}</span>
+              </div>
+              <span className="badge queued">Coming soon</span>
+            </div>
+          ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A platform connected through its own OAuth login (YouTube, TikTok): Connect
+ * navigates to the server's /connect route (full-page redirect to the
+ * platform), which returns to /settings with ?xxConnected / ?xxError.
+ */
+function OAuthAccountRow({
+  status,
+  connectUrl,
+  busy,
+  onDisconnect,
+  connectedNote,
+  steps,
+}: {
+  status: PlatformStatus | undefined;
+  connectUrl: string;
+  busy: boolean;
+  onDisconnect: () => void;
+  connectedNote: string;
+  steps: React.ReactNode;
+}) {
+  if (!status?.available) return null;
+  return (
+    <div className="account-row">
+      <PlatformDot platform={status.platform} />
+      <div className="account-main">
+        <strong>{status.label}</strong>
+        {status.connected ? (
+          <>
+            <span className="account-name">{status.accountName}</span>
+            <span className="hint">{connectedNote}</span>
           </>
-        ) : fbStatus?.page ? (
-          <div className="button-row" style={{ marginTop: 0, alignItems: "center" }}>
-            <span className="badge done">Connected</span>
-            <span>{fbStatus.page.name}</span>
-            <button type="button" className="danger" disabled={fbBusy} onClick={disconnect} style={{ marginLeft: "auto" }}>
-              Disconnect
-            </button>
-          </div>
         ) : (
-          <div className="button-row" style={{ marginTop: 0 }}>
-            <button type="button" onClick={() => (window.location.href = api.facebookConnectUrl())}>
-              Connect with Facebook
-            </button>
-          </div>
+          <>
+            <span className="hint">{status.setupHint}</span>
+            <details className="setup-steps">
+              <summary>Setup steps</summary>
+              {steps}
+            </details>
+          </>
         )}
       </div>
+      {status.connected ? (
+        <>
+          <span className="badge done">Connected</span>
+          <button type="button" className="danger" disabled={busy} onClick={onDisconnect}>
+            Disconnect
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          disabled={!status.configured}
+          title={status.configured ? undefined : "Add the credentials to .env first"}
+          onClick={() => (window.location.href = connectUrl)}
+        >
+          Connect
+        </button>
+      )}
     </div>
   );
 }

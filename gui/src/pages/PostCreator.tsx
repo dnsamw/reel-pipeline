@@ -4,8 +4,9 @@ import { api } from "../api";
 import { ColorField } from "../components/ReelConfigFields";
 import { PostPreview } from "../components/PostPreview";
 import { PostReelPanel } from "../components/PostReelPanel";
-import { PostPublishBox } from "../components/PostPublishBox";
-import { suggestPostCaption } from "../lib/postCaption";
+import { PublishPanel } from "../components/PublishPanel";
+import { postCaptionContext, suggestPostCaption } from "../lib/postCaption";
+import type { CaptionContext } from "../types";
 import { PostTemplatePicker } from "../components/PostTemplatePicker";
 import { TemplatePicker } from "../components/TemplatePicker";
 import { getPostTemplate, postTemplates } from "../../../src/posts/registry";
@@ -80,7 +81,7 @@ export function PostCreator() {
 
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [lastExport, setLastExport] = useState<{ url: string; savedPath: string; filename: string; snapshot: string; caption: string } | null>(null);
+  const [lastExport, setLastExport] = useState<{ url: string; savedPath: string; filename: string; snapshot: string; caption: string; context: CaptionContext } | null>(null);
 
   useEffect(() => {
     api.templates().then(setReelTemplates).catch(() => {});
@@ -158,7 +159,7 @@ export function PostCreator() {
       const { blob, savedPath } = await api.renderPost({ templateId, fields: draft.fields, lists: draft.lists, colors: draft.colors, safeZones: draft.safeZones });
       const url = URL.createObjectURL(blob);
       const filename = savedPath.split("/").pop() || `${templateId}.png`;
-      setLastExport({ url, savedPath, filename, snapshot: contentSnapshot, caption: suggestPostCaption(def, draft.fields, draft.lists) });
+      setLastExport({ url, savedPath, filename, snapshot: contentSnapshot, caption: suggestPostCaption(def, draft.fields, draft.lists), context: postCaptionContext(def, draft.fields, draft.lists, "image") });
       const a = document.createElement("a");
       a.href = url;
       a.download = filename;
@@ -251,10 +252,10 @@ export function PostCreator() {
                 <img src={lastExport.url} alt="Exported post" />
                 <p className="hint saved-path">Saved to {lastExport.savedPath}</p>
               </div>
-              <PostPublishBox
-                savedPath={lastExport.savedPath}
-                templateId={templateId}
-                suggestedCaption={lastExport.caption}
+              <PublishPanel
+                source={{ type: "post", savedPath: lastExport.savedPath }}
+                fallbackCaption={lastExport.caption}
+                captionContext={lastExport.context}
                 kind="image"
                 stale={lastExport.snapshot !== contentSnapshot}
                 previewUrl={lastExport.url}

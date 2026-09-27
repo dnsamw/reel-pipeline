@@ -348,6 +348,11 @@ export const studyPalListStory: PostTemplateDef = {
     ]
       .filter(Boolean)
       .join("\n\n"),
+  captionContext: (f, l) => ({
+    format: "list",
+    topic: f.title || null,
+    items: (l.items ?? []).filter((it) => it.phrase).map((it) => ({ english: it.phrase, sinhala: it.meaning || null, pronunciation: it.pron || null })),
+  }),
   loadFonts: loadPostFonts,
   component: StudyPalListStory,
 };

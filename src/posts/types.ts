@@ -1,3 +1,4 @@
+import type { CaptionContext } from "../captions/types";
 import type { ComponentType } from "react";
 import type { Palette } from "../theme/tokens";
 
@@ -85,6 +86,8 @@ export interface PostTemplateDef {
   colorsFromPalette: (palette: Palette, variant: "light" | "dark") => PostColors;
   /** Starting Facebook caption for this post's content - editable before publishing. Omit to fall back to the text fields joined together. */
   suggestCaption?: (fields: PostFields, lists: PostLists) => string;
+  /** What the post says, for the caption engines (server/captions/) - omit to fall back to the text fields as free text. */
+  captionContext?: (fields: PostFields, lists: PostLists) => Omit<CaptionContext, "kind">;
   /** Resolves once every font the component uses is loaded - awaited before the fit measurements and before renderStill captures. */
   loadFonts: () => Promise<unknown>;
   component: ComponentType<PostTemplateProps>;

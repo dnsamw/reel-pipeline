@@ -307,8 +307,36 @@ export interface FacebookStatus {
   pendingPages: { id: string; name: string }[] | null;
 }
 
+export type PublishPlatform = "facebook" | "instagram" | "youtube" | "tiktok";
+
+/** Mirrors server/distribution/types.ts's PlatformStatus. */
+export interface PlatformStatus {
+  platform: PublishPlatform;
+  label: string;
+  connected: boolean;
+  accountName: string | null;
+  setupHint: string | null;
+  /** False for platforms not built yet ("coming soon"). */
+  available: boolean;
+  /** False when the server lacks this platform's app credentials in .env. */
+  configured?: boolean;
+}
+
+export interface PublishTargetOption extends PlatformStatus {
+  /** Why this file can't go to this platform right now; null = ready. */
+  unavailableReason: string | null;
+}
+
+/** What's being published - a Post Creator export or a batch reel from the manifest. */
+export type PublishSource = { type: "post"; savedPath: string } | { type: "batch"; batchId: string; template: string };
+
 export interface Publication {
   id: string;
+  platform: PublishPlatform;
+  /** Live progress text while status is "uploading". */
+  stage: string | null;
+  /** For a successful publish: live post, TikTok draft, or private/unlisted YouTube upload (null = live). */
+  outcome: "live" | "draft" | "private" | "unlisted" | null;
   batchId: string;
   template: string;
   outputPath: string;
@@ -319,8 +347,17 @@ export interface Publication {
   status: "uploading" | "published" | "error";
   error: string | null;
   caption: string;
+  captionMeta: CaptionMeta | null;
   createdAt: string;
   publishedAt: string | null;
+}
+
+export type { CaptionContext, CaptionMeta, CaptionPlatform, CaptionSuggestion, CaptionTone } from "../../src/captions/types";
+import type { CaptionMeta } from "../../src/captions/types";
+
+export interface AiStatus {
+  available: boolean;
+  model: string | null;
 }
 
 export interface VideoSpec {

@@ -101,7 +101,9 @@ studypal-reels/
     render/
       renderBatch.ts           The batch runner (Node-only, the only place everything meets)
       manifest.ts              Manifest read/write/resumability types
-      caption.ts                Suggested social caption text per batch
+      caption.ts                Plain caption stored in manifest.json per batch (the Publish panel's fallback)
+    captions/
+      types.ts                 CaptionContext/CaptionMeta/... shared by server/captions, post templates and the GUI
       sidechain.ts             --sidechain=true post-process: real ffmpeg sidechaincompress ducking (Node-only)
   assets/
     fonts/  music/  sfx/  voice/  tts/     Served via Remotion's staticFile() - see remotion.config.ts's publicDir
@@ -534,15 +536,72 @@ can't drift apart. Things worth knowing:
   post only gets side insets. Templates receive the result as the `insets` prop (zeros when the option is off)
   and use `max(design margin, inset)`, so the normal layout doesn't change when it's off. `safeZones` travels
   with the render/reel requests into the `"Post"` still's props.
-- **Publishing** (`POST /api/posts/publish`) takes the `savedPath` an export returned. It only accepts files
-  under `output/posts/`, never re-renders, and picks the Graph API call from the file itself:
-  - PNG goes to `/{page}/photos` (`publishPhotoToConnectedPage`).
-  - A 9:16 MP4 of 3-90s (checked with ffprobe) goes through the three-step `/{page}/video_reels` flow
-    (`publishReelToConnectedPage`: start, upload to rupload, finish with `video_state=PUBLISHED`).
-  - Anything else goes to `/{page}/videos`.
+- **Publishing** goes through the shared distribution layer below; Post Creator exports are published by the
+  `savedPath` their export returned (only files under `output/posts/`, never re-rendered).
 
-  Rows go into the shared `publications` table with `batchId` set to `post:<file name>`, so they can't collide
-  with manifest batches. Reels need the same `pages_manage_posts` permission as the existing video upload.
+### Publishing (distribution)
+
+`server/distribution/`. Every platform is a `PlatformAdapter` (`types.ts`) that answers three questions:
+`status()` (connected, and as which account?), `unsupportedReason(media)` (can this file go there?) and
+`publish(media, {caption, title}, onStage)`. The publish flow, the GUI and the history never special-case a
+platform. Adding one means a new adapter file plus an entry in `distribution/index.ts`.
+
+- **Sources** (`media.ts`): `{type:"post", savedPath}` (a Post Creator export) or `{type:"batch", batchId,
+  template}` (a manifest reel). Files are probed with ffprobe (kind, size, duration) and validated per platform.
+- **Endpoints:**
+  - `POST /api/distribution/targets` returns, for one file, every platform plus `unavailableReason`
+    (not connected / unsupported / coming soon). The GUI's Publish panel is built from this.
+  - `POST /api/distribution/publish` validates every target first, creates one `publications` row per
+    platform, and returns them immediately.
+  - The publishes then run concurrently in the background. `onStage` writes progress text to the row's
+    `stage` column, and the GUI polls `GET /api/publications/:id`.
+  - On startup, rows still `uploading` are failed ("interrupted by a server restart"), since jobs don't
+    survive a restart.
+- **Storage:** `publications` gained `platform` (existing rows default to `facebook`) and `stage` via additive
+  migrations in `db.ts`. Non-Facebook accounts live in `social_accounts` (one row per platform, tokens never
+  sent to the GUI). Post Creator rows use `batchId` = `post:<file name>`.
+- **Facebook** (`facebookAdapter.ts`) wraps `server/facebook.ts`: PNG → `/{page}/photos`; 9:16 MP4 of 3-90s →
+  the `/{page}/video_reels` start/upload/finish flow; other video → `/{page}/videos`.
+- **Instagram** (`instagramAdapter.ts`) uses the Instagram API with Facebook Login, driven by the connected
+  Page's token. `POST /api/instagram/connect` reads `/{page}?fields=instagram_business_account` and stores the
+  account. Needs `instagram_basic` and `instagram_content_publish` on the Meta app.
+  - Reels: a container with `upload_type=resumable`, then the bytes to `rupload.facebook.com/ig-api-upload`,
+    then poll `status_code` until `FINISHED`, then `media_publish`.
+  - Images: the API only fetches an `image_url` and this app is local. So the PNG is converted to JPEG
+    (Instagram's only image format), uploaded to the Page as an *unpublished* photo, and Instagram is given
+    that photo's Facebook CDN URL.
+  - Limits: 100 API posts per 24h. Feed images must be 4:5 to 1.91:1, Reels 3s to 15min.
+- **YouTube** (`youtubeAdapter.ts`), Data API v3:
+  - Login: Google OAuth for installed apps. `GET /api/youtube/connect` redirects to Google with PKCE (S256),
+    `access_type=offline` and `prompt=consent` (to get a refresh token). The redirect is the loopback URL
+    `http://127.0.0.1:<PORT>/api/youtube/callback` on this API server, which "Desktop app" OAuth clients accept
+    without registering it. The callback exchanges the code, reads the channel (`channels?mine=true`) and
+    stores tokens in `social_accounts`. Access tokens are refreshed a minute before they expire.
+  - Upload: `videos.insert` resumable (`uploadType=resumable` returns a `Location`, then one PUT of the
+    bytes). Category 27 (Education), `selfDeclaredMadeForKids: false`. The title is the caption engine's
+    YouTube title, or the caption's first line (max 100 chars, no `<>`). `privacy` defaults to `private`.
+    Vertical videos of 3 minutes or less are Shorts (YouTube decides; there's no separate endpoint).
+  - Limits: 100 `videos.insert` calls per day per project. Until the project passes YouTube's API audit,
+    uploads are forced **private**. While the consent screen is in "Testing", refresh tokens expire after
+    **7 days**; a refresh then fails with `invalid_grant`, which surfaces as "reconnect YouTube in Settings".
+- **TikTok** (`tiktokAdapter.ts`), Content Posting API **Upload** flow (scope `video.upload`):
+  - Why Upload, not Direct Post: Upload works without TikTok's app audit, and the video lands in the creator's
+    inbox as a **draft** to finish in the app. Unaudited Direct Post is forced private-only.
+  - Login: Login Kit for **Desktop**, which unlike the web kit accepts a localhost/127.0.0.1 redirect. It uses
+    PKCE, but TikTok's desktop `code_challenge` is the **hex** SHA-256 of the verifier, not base64url like
+    Google's. The redirect is `http://127.0.0.1:<PORT>/api/tiktok/callback/`; register it as
+    `http://127.0.0.1:*/api/tiktok/callback/`, since TikTok matches exactly (`*` = any port). Tokens:
+    access 24h, refresh 365 days, and a refresh may return a new refresh token, which is stored. Disconnect
+    also revokes the token on TikTok's side.
+  - Upload: `POST /v2/post/publish/inbox/video/init/` with `source_info` = `FILE_UPLOAD`, then PUT the
+    chunks with `Content-Range`. Files up to 64MB go as one exact-size chunk; larger files use 10MB chunks,
+    with the remainder on the last chunk (allowed up to 128MB). Then poll `/v2/post/publish/status/fetch/`
+    every 10s (the limit is 6 requests/min) until `SEND_TO_USER_INBOX`, recorded as outcome `draft`.
+  - The inbox init has no caption field, so the GUI offers "Copy caption" on the result. Max 5 pending
+    drafts per 24h. Photos need `PULL_FROM_URL` from a verified domain, so TikTok gets videos only.
+- **Outcomes:** a successful publish records `outcome`: `live`, `draft` (TikTok), or `private`/`unlisted`
+  (YouTube, taken from YouTube's response, so a forced-private upload from an unaudited project shows as
+  private). Monitor's dots and the Media Library's "Published" badge count `live` only.
 
 ## Known limitations & gotchas
 

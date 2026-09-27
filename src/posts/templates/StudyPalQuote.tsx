@@ -221,6 +221,7 @@ export const studyPalQuote: PostTemplateDef = {
     };
   },
   suggestCaption: (f) => [f.headline, f.sinhala, f.footer].filter(Boolean).join("\n\n"),
+  captionContext: (f) => ({ format: "quote", topic: f.kicker || null, items: [], extraText: [f.headline, f.sinhala].filter(Boolean) }),
   loadFonts: loadPostFonts,
   component: StudyPalQuote,
 };

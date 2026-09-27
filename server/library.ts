@@ -77,7 +77,7 @@ function imageReferences(): { label: string; json: string }[] {
 export function listLibrary(): { items: LibraryItem[]; manifest: { entries: number; missingFiles: number } } {
   const manifest = loadManifest(MANIFEST_PATH);
   const manifestEntries = Object.entries(manifest);
-  const publications = listPublications().filter((p) => p.status === "published");
+  const publications = listPublications().filter((p) => p.status === "published" && (p.outcome ?? "live") === "live");
   const refs = imageReferences();
 
   const items: LibraryItem[] = [];

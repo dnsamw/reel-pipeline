@@ -167,12 +167,46 @@ above, Batch Render, or Queue Render. A saved template preset still overrides th
 explicit flags on a single run override both. This is also where a Facebook Page gets connected ("Connect with
 Facebook").
 
-**Publishing to Facebook** — once a Page is connected, the Monitor page's "Rendered batches" list plays each
-reel back inline and can publish it straight to that Page (`POST /{page-id}/videos` via the Graph API) with an
-editable caption, pre-filled from the manifest's suggested caption. Every publish attempt (and its result) is
-recorded, so Monitor always shows what's been generated vs. what's actually live, with a link to the post once
-it's up. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#gui-batch-monitor--template-library) for the OAuth
-setup steps and how the Page token is stored.
+**Publishing (Facebook, Instagram, YouTube, TikTok)** — connect accounts under Settings → **Connected
+accounts**. Every export in Post Creator (the PNG under "Image post", the MP4 under "Reel") and every rendered
+reel on Monitor gets the same **Publish** panel:
+- Tick the platforms to post to. Only platforms that can take that file are offered; the others say why (for
+  example, Instagram feed images must be between 4:5 and 1.91:1, so a 9:16 story PNG is steered to its reel
+  export).
+- Edit the caption and confirm. A caption is suggested for you, built in and with no AI or internet service
+  needed: it hides the quiz answer so viewers watch to the reveal, asks for a comment or save, links the book
+  and adds hashtags. Pick a tone (Friendly, Challenge, Teacher), **Shuffle** for another version, or tick
+  **Separate caption per platform** to shape one for each (Instagram "link in bio", short TikTok, YouTube
+  title).
+- **Write with AI** (optional): with `NVIDIA_API_KEY` in `.env` (Kimi K3 through NVIDIA's API), it writes a
+  fresh caption. It can take up to a minute. Without a key, or if the key has expired, the button is disabled
+  or you get the built-in suggestion with a note saying why.
+- Each platform then shows live progress (uploading → processing → published) with a link to the post.
+
+Publishing runs in the background, so you can keep working. Every attempt is recorded per platform, and
+Monitor's header badge shows which platforms a reel is live on.
+
+- **Facebook:** PNGs become photo posts, 9:16 videos of 3-90s become Reels, other videos become Page videos.
+- **Instagram:** needs an Instagram Professional account linked to the connected Page, plus the
+  `instagram_basic` and `instagram_content_publish` permissions on the Meta app (setup steps are in
+  Settings). It publishes through the Page's token, so there's no second login. Reels upload straight from
+  disk. Images are staged as an *unpublished* Facebook Page photo because Instagram only fetches images from a
+  public URL; they never appear on the Page.
+- **YouTube:** needs a Google Cloud OAuth client of type "Desktop app" with the YouTube Data API v3 enabled
+  (`YOUTUBE_CLIENT_ID` / `YOUTUBE_CLIENT_SECRET` in `.env`; setup steps are in Settings). Vertical videos up to
+  3 minutes become Shorts. Uploads are **Private** by default: release them from YouTube Studio, or pick
+  Unlisted/Public when publishing. Until Google audits the project, YouTube forces every upload private
+  regardless. While the consent screen is in "Testing", the login expires after 7 days and you reconnect in
+  Settings. Videos only; YouTube has no API for image posts.
+- **TikTok:** needs a TikTok developer app with Login Kit (platform **Desktop**, redirect
+  `http://127.0.0.1:*/api/tiktok/callback/`) and the Content Posting API's **Upload** product
+  (`TIKTOK_CLIENT_KEY` / `TIKTOK_CLIENT_SECRET` in `.env`; setup steps are in Settings). Reels are sent to
+  your **TikTok drafts**: open TikTok → Inbox to finish and post them. TikTok's API doesn't carry a caption for
+  drafts, so the Publish panel gives you a **Copy caption** button. Max 5 pending drafts per 24h. Videos only.
+
+The Publish panel labels results honestly: **Published** (live), **Sent to drafts** (TikTok), or **Uploaded
+(private/unlisted)** (YouTube, as reported back by YouTube). Monitor's "published" dots count live posts only.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#publishing-distribution) for what each platform's API allows.
 
 **Post Creator page** (`/post-creator`) — static 1080×1080 image posts. Pick a post template from the
 dropdown (each option has a small live preview), edit its text fields and optional background photo, then set
@@ -195,11 +229,8 @@ their original size if you prefer. Music loops if it's shorter than the reel and
 H.264/AAC at 30fps, downloaded and saved next to the PNG in `output/posts/`. It uses ffmpeg on `PATH`, falling
 back to the copy bundled with Remotion.
 
-**Publishing posts to Facebook:** once a Page is connected (Settings), each export (the PNG under "Image post",
-the MP4 under "Reel") gets a caption box, pre-filled from the post's text, and a **Publish** button. It posts
-exactly the file that was exported, and warns you if you've edited the post since. PNGs go up as photo posts.
-9:16 videos of 3-90s go up as **Reels**; anything else (e.g. a square "Original" reel) goes up as a regular Page
-video. You confirm before anything is posted, and every attempt is logged with the Monitor page's publishes.
+Exports are published from the same **Publish** panel as Monitor's reels (see Publishing above). It posts
+exactly the file that was exported, and warns you if you've edited the post since.
 
 To add a new post design: drop the HTML mock into `post-templates/`, port it to
 `src/posts/templates/<Name>.tsx` exporting a `PostTemplateDef` (fields, color slots, defaults, and how to map a
