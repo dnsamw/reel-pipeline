@@ -1,17 +1,20 @@
-import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
-import { db } from "./db";
 import type { ReelConfig } from "../src/config/config";
 
 const execFileAsync = promisify(execFile);
 
-// Committed to git as one file per template - see pushTemplatesToGit below.
-// SQLite (db.ts) is the live/query store the server actually reads from;
-// this directory is purely the version-controlled export of it.
+// The JSON files themselves are the template store (one file per template,
+// named <id>.json) - there is no database copy. templates-images/ holds the
+// presets built around a background image (config.backgroundImage - see
+// assets/background-images), templates/ holds the rest. Both are committed
+// to git - see pushTemplatesToGit below.
+const IMAGE_TEMPLATES_DIR = join(process.cwd(), "templates-images");
 const TEMPLATES_DIR = join(process.cwd(), "templates");
+const TEMPLATE_DIRS = [IMAGE_TEMPLATES_DIR, TEMPLATES_DIR];
 
 export interface TemplateInput {
   name: string;
@@ -28,51 +31,49 @@ export interface TemplateRecord extends TemplateInput {
   updatedAt: string;
 }
 
-interface TemplateRow {
-  id: string;
-  name: string;
-  description: string;
-  template_number: string;
-  config_json: string;
-  created_at: string;
-  updated_at: string;
-}
-
 function slugify(name: string): string {
   return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "template";
 }
 
-function rowToRecord(row: TemplateRow): TemplateRecord {
-  return {
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    templateNumber: row.template_number as TemplateRecord["templateNumber"],
-    config: JSON.parse(row.config_json),
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
+/** Path of an existing template's JSON file, or null if no folder has it. */
+function findTemplateFile(id: string): string | null {
+  for (const dir of TEMPLATE_DIRS) {
+    const file = join(dir, `${id}.json`);
+    if (existsSync(file)) return file;
+  }
+  return null;
+}
+
+function readTemplateFile(file: string): TemplateRecord {
+  const record = JSON.parse(readFileSync(file, "utf-8")) as TemplateRecord;
+  return { ...record, description: record.description ?? "" };
 }
 
 export function listTemplates(): TemplateRecord[] {
-  const rows = db.prepare("SELECT * FROM templates ORDER BY updated_at DESC").all() as TemplateRow[];
-  return rows.map(rowToRecord);
+  const records: TemplateRecord[] = [];
+  for (const dir of TEMPLATE_DIRS) {
+    if (!existsSync(dir)) continue;
+    for (const file of readdirSync(dir).filter((f) => f.endsWith(".json"))) {
+      try {
+        records.push(readTemplateFile(join(dir, file)));
+      } catch (err) {
+        console.error(`Skipping unreadable template ${join(dir, file)}:`, err);
+      }
+    }
+  }
+  return records.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 export function getTemplate(id: string): TemplateRecord | null {
-  const row = db.prepare("SELECT * FROM templates WHERE id = ?").get(id) as TemplateRow | undefined;
-  return row ? rowToRecord(row) : null;
+  const file = findTemplateFile(id);
+  return file ? readTemplateFile(file) : null;
 }
 
-function exportToJson(record: TemplateRecord): void {
-  mkdirSync(TEMPLATES_DIR, { recursive: true });
-  writeFileSync(join(TEMPLATES_DIR, `${record.id}.json`), JSON.stringify(record, null, 2) + "\n");
-}
-
-/** Creates a new template (no `id`) or updates an existing one (`id` passed) - either way, writes SQLite and its JSON export together so they never drift apart. */
+/** Creates a new template (no `id`) or updates an existing one (`id` passed) by writing its JSON file. An existing template stays in the folder it's already in; a new one goes to templates-images/ if it uses a background image, else templates/. */
 export function saveTemplate(input: TemplateInput, id?: string): TemplateRecord {
   const now = new Date().toISOString();
-  const existing = id ? getTemplate(id) : null;
+  const existingFile = id ? findTemplateFile(id) : null;
+  const existing = existingFile ? readTemplateFile(existingFile) : null;
   const recordId = existing?.id ?? id ?? `${slugify(input.name)}-${randomUUID().slice(0, 8)}`;
   const record: TemplateRecord = {
     id: recordId,
@@ -84,45 +85,31 @@ export function saveTemplate(input: TemplateInput, id?: string): TemplateRecord 
     updatedAt: now,
   };
 
-  db.prepare(
-    `INSERT INTO templates (id, name, description, template_number, config_json, created_at, updated_at)
-     VALUES (@id, @name, @description, @templateNumber, @configJson, @createdAt, @updatedAt)
-     ON CONFLICT(id) DO UPDATE SET
-       name = @name, description = @description, template_number = @templateNumber,
-       config_json = @configJson, updated_at = @updatedAt`,
-  ).run({
-    id: record.id,
-    name: record.name,
-    description: record.description,
-    templateNumber: record.templateNumber,
-    configJson: JSON.stringify(record.config),
-    createdAt: record.createdAt,
-    updatedAt: record.updatedAt,
-  });
-
-  exportToJson(record);
+  const dir = input.config.backgroundImage ? IMAGE_TEMPLATES_DIR : TEMPLATES_DIR;
+  const file = existingFile ?? join(dir, `${record.id}.json`);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(file, JSON.stringify(record, null, 2) + "\n");
   return record;
 }
 
 export function deleteTemplate(id: string): void {
-  db.prepare("DELETE FROM templates WHERE id = ?").run(id);
-  const file = join(TEMPLATES_DIR, `${id}.json`);
-  if (existsSync(file)) unlinkSync(file);
+  const file = findTemplateFile(id);
+  if (file) unlinkSync(file);
 }
 
 /**
- * Commits and pushes templates/*.json to the current branch - this, not the
+ * Commits and pushes templates/*.json and templates-images/*.json to the current branch - this, not the
  * save above, is the actual "push to GitHub" action, and only ever runs when
  * a user explicitly clicks it in the GUI (never automatically on save), same
  * as pushing from any other git client.
  */
 export async function pushTemplatesToGit(message: string): Promise<{ pushed: boolean; output: string }> {
   const cwd = process.cwd();
-  const { stdout: statusOut } = await execFileAsync("git", ["status", "--porcelain", "--", "templates"], { cwd });
+  const { stdout: statusOut } = await execFileAsync("git", ["status", "--porcelain", "--", "templates", "templates-images"], { cwd });
   if (!statusOut.trim()) {
-    return { pushed: false, output: "Nothing to commit - templates/ already matches the last commit." };
+    return { pushed: false, output: "Nothing to commit - templates/ and templates-images/ already match the last commit." };
   }
-  await execFileAsync("git", ["add", "templates"], { cwd });
+  await execFileAsync("git", ["add", "templates", "templates-images"], { cwd });
   await execFileAsync("git", ["commit", "-m", message], { cwd });
   const { stdout: pushOut, stderr: pushErr } = await execFileAsync("git", ["push"], { cwd });
   return { pushed: true, output: [statusOut, pushOut, pushErr].filter(Boolean).join("\n") };

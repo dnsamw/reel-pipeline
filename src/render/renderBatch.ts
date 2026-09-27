@@ -1,11 +1,12 @@
-import { mkdirSync, readFileSync, unlinkSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { bundle } from "@remotion/bundler";
 import { renderMedia, selectComposition } from "@remotion/renderer";
-import { getPhrases, getPhrasesByIds, disconnect } from "../data/getPhrases";
+import { getPhrases, getPhrasesByIds, markPhrasesGenerated, disconnect } from "../data/getPhrases";
 import { batchPhrases, type ReelBatch } from "../data/batch";
-import { defaultConfig, type ReelConfig } from "../config/config";
-import { pickMusicTrack, pickMusicStartFrame, getAudioDurationSeconds } from "../audio/music";
+import { defaultConfig, RANDOM_BACKGROUND_IMAGE, type ReelConfig } from "../config/config";
+import { createRandomBackgroundPicker } from "./backgroundImages";
+import { pickMusicTrack, pickMusicStartFrame } from "../audio/music";
 import { findTickFile } from "../audio/tick";
 import { findRevealSound } from "../audio/revealSound";
 import { pickIntroVoice } from "../audio/voice";
@@ -228,8 +229,6 @@ async function main() {
         ttsRevealFiles.push(null);
       });
     }
-    const musicFile = pickMusicTrack(config.musicDir, index);
-    const musicDurationSeconds = musicFile ? await getAudioDurationSeconds(config.musicDir, musicFile) : 0;
     audioPlan.set(batch.id, {
       musicFile: pickMusicTrack(config.musicDir, rotationSeed),
       musicStartFrame: pickMusicStartFrame(rotationSeed, config.fps),
@@ -252,6 +251,8 @@ async function main() {
 
   let rendered = 0;
 
+  const pickBackgroundImage = createRandomBackgroundPicker();
+
   for (const { batch, index } of toRender) {
     const plan = audioPlan.get(batch.id)!;
     const outputPath = join(config.outputDir, outputFilename(batch, template, bookTag));
@@ -260,9 +261,22 @@ async function main() {
     const duckThisBatch = sidechainEnabled && plan.musicFile != null;
     const renderTarget = duckThisBatch ? `${outputPath}.dialogue.mp4` : outputPath;
 
+    // "random" templates get a fresh image per reel, so a batch run doesn't
+    // produce a row of identical-looking videos. A fixed image that's since
+    // been renamed/deleted would 404 and abort the whole render, so that
+    // falls back to a random pick too instead.
+    const missingImage =
+      config.backgroundImage != null &&
+      config.backgroundImage !== RANDOM_BACKGROUND_IMAGE &&
+      !existsSync(join(process.cwd(), "assets", config.backgroundImage));
+    if (missingImage) console.warn(`  Background image not found: assets/${config.backgroundImage} - picking a random one instead.`);
+    const batchConfig: ReelConfig =
+      config.backgroundImage === RANDOM_BACKGROUND_IMAGE || missingImage ? { ...config, backgroundImage: pickBackgroundImage() } : config;
+    if (batchConfig !== config) console.log(`  Background image: ${batchConfig.backgroundImage ?? "none (assets/background-images is empty)"}`);
+
     const inputProps: ReelProps = {
       phrases: batch.phrases,
-      config,
+      config: batchConfig,
       // Music is left out of the Remotion mix entirely when ducking - the
       // real track gets layered back in afterward by applyMusicSidechain,
       // compressed against this render's dialogue/sfx audio as the trigger.
@@ -311,6 +325,7 @@ async function main() {
       tickFile,
       revealSoundFile,
       introVoiceFile: plan.introVoiceFile,
+      backgroundImage: batchConfig.backgroundImage,
       ttsEnabled: config.ttsEnabled,
       ttsPhraseFiles: plan.ttsPhraseFiles,
       ttsRevealFiles: plan.ttsRevealFiles,
@@ -321,6 +336,7 @@ async function main() {
     };
     manifest[manifestKey(batch, template)] = entry;
     saveManifest(config.manifestPath, manifest);
+    await markPhrasesGenerated(batch.phrases.map((p) => p.id));
 
     rendered++;
   }

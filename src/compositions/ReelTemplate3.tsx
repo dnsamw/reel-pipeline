@@ -43,7 +43,14 @@ export function ReelTemplate3({
   const lastGuessRevealIndex = timeline.map((item) => item.type).lastIndexOf("guessReveal");
 
   return (
-    <ThemeProvider theme={config.theme}>
+    <ThemeProvider
+      theme={config.theme}
+      backgroundImage={config.backgroundImage}
+      backgroundImageScrim={config.backgroundImageScrim}
+      textColors={config.textColors}
+      outroBackgroundColor={config.outroBackgroundColor}
+      outroAccentColor={config.outroAccentColor}
+    >
       {musicFile && (
         <Html5Audio src={staticFile(`music/${musicFile}`)} loop trimBefore={musicStartFrame} volume={config.musicVolume} />
       )}

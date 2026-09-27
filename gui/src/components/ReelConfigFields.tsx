@@ -40,7 +40,17 @@ function isValidHex(v: string): boolean {
 // works, but pasting into it doesn't reliably register in Chromium (the
 // paste event isn't forwarded to that shadow-DOM field the way it is for a
 // normal text input). The swatch stays as a secondary visual-picker button.
-export function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+export function ColorField({
+  label,
+  value,
+  onChange,
+  placeholder = "#58238b",
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
   return (
     <div className="field">
       <label>{label}</label>
@@ -49,7 +59,7 @@ export function ColorField({ label, value, onChange }: { label: string; value: s
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="#58238b"
+          placeholder={placeholder}
           spellCheck={false}
           className="color-hex-input"
         />

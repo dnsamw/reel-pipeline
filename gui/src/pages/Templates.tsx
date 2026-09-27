@@ -45,6 +45,7 @@ export function Templates() {
               <div className="template-list-info">
                 <div>
                   <strong>{t.name}</strong> <span className="hint">(Composition {t.templateNumber})</span>
+                  {t.config.backgroundImage && <span className="badge" style={{ marginLeft: 8 }}>Background image</span>}
                 </div>
                 <div className="meta">{t.description || "No description"} · updated {new Date(t.updatedAt).toLocaleString()}</div>
               </div>

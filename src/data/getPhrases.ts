@@ -16,6 +16,11 @@ const prisma = new PrismaClient();
  * every phrase from every book would be pulled together. Matches by exact
  * Book.id or a case-insensitive substring of Book.title, so
  * --book=<uuid-or-partial-title> both work.
+ *
+ * Only returns phrases with `generated: false` - once a reel has been made
+ * for a phrase (under any template - see markPhrasesGenerated), it's done
+ * for good and never resurfaces here, in Batch Render or Queue Render alike.
+ * Use getPhrasesByIds for an explicit manual re-render of a specific reel.
  */
 export async function getPhrases(
   chapterOrderRange: [number, number] | null = null,
@@ -28,7 +33,7 @@ export async function getPhrases(
     },
     orderBy: { order: "asc" },
     include: {
-      phrases: { orderBy: { order: "asc" } },
+      phrases: { where: { generated: false }, orderBy: { order: "asc" } },
     },
   });
 
@@ -128,6 +133,18 @@ export interface PhraseContentEdit {
  */
 export async function updatePhrase(id: string, fields: PhraseContentEdit): Promise<void> {
   await prisma.bookPhrase.update({ where: { id }, data: fields });
+}
+
+/**
+ * Marks phrases as generated once a reel has actually been rendered for
+ * them (any template) - see renderBatch.ts, called right after a batch's
+ * render succeeds. getPhrases() excludes generated phrases from then on, so
+ * this is what makes a rendered reel's phrases disappear from Batch Render/
+ * Queue Render for good, regardless of which composition renders it next.
+ */
+export async function markPhrasesGenerated(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  await prisma.bookPhrase.updateMany({ where: { id: { in: ids } }, data: { generated: true } });
 }
 
 export async function disconnect() {

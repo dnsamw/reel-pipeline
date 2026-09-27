@@ -17,6 +17,7 @@ export function App() {
             Monitor
           </NavLink>
           <NavLink to="/review">Queue Render</NavLink>
+          <NavLink to="/review-new">Queue Render (New)</NavLink>
           <NavLink to="/render">Batch Render</NavLink>
           <NavLink to="/templates">Templates</NavLink>
           <NavLink to="/video-spec">Video Spec</NavLink>
@@ -28,6 +29,7 @@ export function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/render" element={<StartRender />} />
           <Route path="/review" element={<ReviewQueue />} />
+          <Route path="/review-new" element={<ReviewQueue onlyImageTemplates />} />
           <Route path="/templates" element={<Templates />} />
           <Route path="/templates/new" element={<TemplateEditor />} />
           <Route path="/templates/:id" element={<TemplateEditor />} />

@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import { ReelPreview } from "../components/ReelPreview";
-import { ReelConfigNumberFields, ReelConfigPaletteFields } from "../components/ReelConfigFields";
+import { ColorField, ReelConfigNumberFields, ReelConfigPaletteFields } from "../components/ReelConfigFields";
 import type { Palette, ReelConfig, ReelTheme, TemplateRecord } from "../types";
+import { TEXT_COLOR_FIELDS, type TextColorKey } from "../../../src/theme/textColors";
+import { RANDOM_BACKGROUND_IMAGE } from "../../../src/config/config";
 
 type ConfigOverrides = Partial<ReelConfig>;
 
@@ -19,12 +21,17 @@ export function TemplateEditor() {
   const [themeEnabled, setThemeEnabled] = useState(false);
   const [defaultTheme, setDefaultTheme] = useState<ReelTheme | null>(null);
   const [defaults, setDefaults] = useState<ReelConfig | null>(null);
+  const [backgroundImages, setBackgroundImages] = useState<string[]>([]);
 
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(isNew ? null : id ?? null);
   const [saving, setSaving] = useState(false);
   const [pushing, setPushing] = useState(false);
+
+  useEffect(() => {
+    api.backgroundImages().then(setBackgroundImages).catch(() => {});
+  }, []);
 
   useEffect(() => {
     api.defaultTheme().then(setDefaultTheme).catch(() => {});
@@ -65,6 +72,15 @@ export function TemplateEditor() {
     });
   }
 
+  function setTextColor(key: TextColorKey, value: string) {
+    setConfig((c) => {
+      const next = { ...(c.textColors ?? {}) };
+      if (value) next[key] = value;
+      else delete next[key];
+      return { ...c, textColors: Object.keys(next).length ? next : null };
+    });
+  }
+
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -78,7 +94,7 @@ export function TemplateEditor() {
       };
       const record: TemplateRecord = savedId ? await api.updateTemplate(savedId, payload) : await api.createTemplate(payload);
       setSavedId(record.id);
-      setStatus("Saved to SQLite and exported to templates/" + record.id + ".json");
+      setStatus("Saved to " + record.id + ".json");
       if (isNew) navigate(`/templates/${record.id}`, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -89,7 +105,7 @@ export function TemplateEditor() {
 
   async function onPush() {
     if (!savedId) return;
-    const message = prompt("Commit message for templates/*.json", `Update template: ${name}`);
+    const message = prompt("Commit message for the template JSON files", `Update template: ${name}`);
     if (!message) return;
     setPushing(true);
     setError(null);
@@ -109,8 +125,20 @@ export function TemplateEditor() {
   // Merges defaults under the current overrides so every field has a
   // concrete value (buildTimeline/etc. can't tolerate undefined), without
   // needing timing/audio to be accurate - see ReelPreview.tsx.
+  const isRandomBackground = config.backgroundImage === RANDOM_BACKGROUND_IMAGE;
+  // Real renders pick a new image per reel (renderBatch.ts) - the preview
+  // just shows one of them, re-picked each time "Random" is selected.
+  const randomPreviewImage = useMemo(
+    () => (backgroundImages.length ? backgroundImages[Math.floor(Math.random() * backgroundImages.length)] : null),
+    [backgroundImages, isRandomBackground],
+  );
   const previewConfig: ReelConfig | null = defaults
-    ? { ...defaults, ...config, theme: themeEnabled ? config.theme ?? defaultTheme ?? null : null }
+    ? {
+        ...defaults,
+        ...config,
+        backgroundImage: isRandomBackground ? randomPreviewImage : config.backgroundImage ?? defaults.backgroundImage,
+        theme: themeEnabled ? config.theme ?? defaultTheme ?? null : null,
+      }
     : null;
 
   return (
@@ -163,6 +191,82 @@ export function TemplateEditor() {
         </div>
 
         <div className="card">
+          <h2>Background</h2>
+          <ColorField
+            label="Outro background color"
+            value={(config.outroBackgroundColor as string | null) ?? ""}
+            onChange={(v) => setField("outroBackgroundColor", v || null)}
+            placeholder="palette color"
+          />
+          <ColorField
+            label="Outro circles color"
+            value={(config.outroAccentColor as string | null) ?? ""}
+            onChange={(v) => setField("outroAccentColor", v || null)}
+            placeholder="palette color"
+          />
+          <div className="field">
+            <label>Background image</label>
+            <select
+              value={(config.backgroundImage as string | null) ?? ""}
+              onChange={(e) => setField("backgroundImage", e.target.value || null)}
+            >
+              <option value="">None - use the plain theme background color</option>
+              <option value={RANDOM_BACKGROUND_IMAGE}>Random - a different image for each reel</option>
+              {backgroundImages.map((img) => (
+                <option key={img} value={img}>
+                  {img.replace("background-images/", "")}
+                </option>
+              ))}
+            </select>
+          </div>
+          {config.backgroundImage && (
+            <>
+              {isRandomBackground ? (
+                <p className="hint" style={{ marginTop: 10 }}>
+                  Each rendered reel picks one of the {backgroundImages.length} images in assets/background-images at random. The
+                  preview shows one of them.
+                </p>
+              ) : (
+                <img
+                  src={`/${config.backgroundImage}`}
+                  alt=""
+                  style={{ marginTop: 10, width: "100%", maxWidth: 220, borderRadius: 8, display: "block" }}
+                />
+              )}
+              <div className="field" style={{ marginTop: 14 }}>
+                <label>Tint over the image (0 = fully clear/transparent, 1 = fully hides it)</label>
+                <input
+                  type="number"
+                  step={0.05}
+                  min={0}
+                  max={1}
+                  value={(config.backgroundImageScrim as number) ?? 0.55}
+                  onChange={(e) => setField("backgroundImageScrim", Number(e.target.value))}
+                />
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="card">
+          <h2>Text colors</h2>
+          <p className="hint" style={{ marginTop: 0 }}>
+            One color per text element. Leave a field empty to use the palette color below.
+          </p>
+          <div className="grid">
+            {TEXT_COLOR_FIELDS.map((f) => (
+              <ColorField
+                key={f.key}
+                label={`${f.scene} - ${f.label}`}
+                value={config.textColors?.[f.key] ?? ""}
+                onChange={(v) => setTextColor(f.key, v)}
+                placeholder="palette color"
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="card">
           <h2>Colors</h2>
           <div className="field checkbox" style={{ marginBottom: 14 }}>
             <input id="theme-enabled" type="checkbox" checked={themeEnabled} onChange={(e) => setThemeEnabled(e.target.checked)} />
@@ -188,7 +292,7 @@ export function TemplateEditor() {
             {pushing ? "Pushing..." : "Push to GitHub"}
           </button>
         </div>
-        {!savedId && <p className="hint">Save at least once before pushing - the JSON export is written on save.</p>}
+        {!savedId && <p className="hint">Save at least once before pushing - the JSON file is written on save.</p>}
       </form>
 
       <aside className="editor-preview">

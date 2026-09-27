@@ -1,6 +1,6 @@
 import { Html5Audio, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { fontFamily } from "../../theme/tokens";
-import { usePalette } from "../../theme/ThemeContext";
+import { usePalette, useTextColor } from "../../theme/ThemeContext";
 import type { Phrase } from "../../data/phrase";
 import { SceneFrame } from "./SceneFrame";
 
@@ -27,6 +27,7 @@ export function RevealScene({
   const scale = interpolate(enter, [0, 1], [0.92, 1]);
   const opacity = interpolate(enter, [0, 1], [0, 1]);
   const colors = usePalette("light");
+  const textColor = useTextColor();
 
   return (
     <SceneFrame progress={{ current: index, total }}>
@@ -51,7 +52,7 @@ export function RevealScene({
               fontSize: 64,
               lineHeight: 1.3,
               textAlign: "center",
-              color: colors.primary,
+              color: textColor("translation", colors.primary),
               margin: 0,
             }}
           >
@@ -69,7 +70,7 @@ export function RevealScene({
             width: "100%",
           }}
         >
-          <p style={{ fontFamily: fontFamily.sans, fontSize: 32, lineHeight: 1.45, color: colors.foreground, margin: 0 }}>
+          <p style={{ fontFamily: fontFamily.sans, fontSize: 32, lineHeight: 1.45, color: textColor("explanation", colors.foreground), margin: 0 }}>
             {phrase.explanation}
           </p>
           {phrase.explanationSi && (
@@ -78,7 +79,7 @@ export function RevealScene({
                 fontFamily: fontFamily.sinhala,
                 fontSize: 30,
                 lineHeight: 1.5,
-                color: colors.foreground,
+                color: textColor("explanationSi", colors.foreground),
                 margin: 0,
               }}
             >

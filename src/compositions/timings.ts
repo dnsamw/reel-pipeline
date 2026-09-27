@@ -74,3 +74,29 @@ export function buildTimelineT2(batchSize: number, config: ReelConfig): Timeline
   items.push({ type: "outro", durationInFrames: Math.round(config.outroSeconds * config.fps) });
   return items;
 }
+
+/** Upper bound for one phrase's prompt + countdown + reveal, in seconds - see fitPhraseSeconds. */
+export const MAX_SECONDS_PER_PHRASE = 10;
+/** Lower bound - countdownSeconds alone must stay >= 1 and the other two >= 0.5 (config.ts's schema). */
+export const MIN_SECONDS_PER_PHRASE = 3;
+
+/**
+ * Rescales phraseSeconds/countdownSeconds/revealSeconds so one phrase's
+ * prompt + countdown + reveal adds up to exactly `seconds`, keeping the
+ * config's existing proportions between the three (e.g. 4.5/5/5 -> 3.1/3.4/3.5
+ * for 10s). Used by the Queue Render page's "Seconds per phrase" option.
+ */
+export function fitPhraseSeconds(
+  config: Pick<ReelConfig, "phraseSeconds" | "countdownSeconds" | "revealSeconds">,
+  seconds: number,
+): Pick<ReelConfig, "phraseSeconds" | "countdownSeconds" | "revealSeconds"> {
+  const target = Math.min(MAX_SECONDS_PER_PHRASE, Math.max(MIN_SECONDS_PER_PHRASE, seconds));
+  const current = config.phraseSeconds + config.countdownSeconds + config.revealSeconds;
+  const scale = current > 0 ? target / current : 1;
+  const round = (n: number) => Math.round(n * 10) / 10;
+  const phraseSeconds = Math.max(0.5, round(config.phraseSeconds * scale));
+  const countdownSeconds = Math.max(1, round(config.countdownSeconds * scale));
+  // Reveal absorbs the rounding so the three always sum to exactly `target`.
+  const revealSeconds = Math.max(0.5, round(target - phraseSeconds - countdownSeconds));
+  return { phraseSeconds, countdownSeconds, revealSeconds };
+}

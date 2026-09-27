@@ -1,6 +1,6 @@
 import { Html5Audio, Sequence, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { fontFamily } from "../../theme/tokens";
-import { usePalette } from "../../theme/ThemeContext";
+import { usePalette, useTextColor } from "../../theme/ThemeContext";
 import type { Phrase } from "../../data/phrase";
 import { SceneFrame } from "./SceneFrame";
 import { computeGuessRevealPhases } from "./guessRevealPhases";
@@ -42,6 +42,7 @@ export function GuessRevealSceneT3({
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const darkColors = usePalette("dark");
+  const textColor = useTextColor();
   const darkPrimaryTint = darkColors.primaryTint;
   const { promptTranslateY, promptScale, ringOpacity, ringProgress, countdownNumber, answerOpacity } =
     computeGuessRevealPhases({ frame, fps, promptFrames, countdownFrames });
@@ -91,7 +92,7 @@ export function GuessRevealSceneT3({
               height: 64,
               borderRadius: "50%",
               backgroundColor: darkPrimaryTint,
-              color: darkColors.primary,
+              color: textColor("phraseNumber", darkColors.primary),
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -109,7 +110,7 @@ export function GuessRevealSceneT3({
               fontSize: 60,
               lineHeight: 1.3,
               textAlign: "center",
-              color: "#ffffff",
+              color: textColor("translation", "#ffffff"),
               margin: 0,
             }}
           >
@@ -149,7 +150,7 @@ export function GuessRevealSceneT3({
               fontFamily={fontFamily.sans}
               fontWeight={700}
               fontSize={80}
-              fill={darkColors.primary}
+              fill={textColor("countdown", darkColors.primary)}
             >
               {countdownNumber}
             </text>
@@ -177,7 +178,7 @@ export function GuessRevealSceneT3({
               fontSize: 54,
               lineHeight: 1.2,
               textAlign: "center",
-              color: darkColors.foreground,
+              color: textColor("phrase", darkColors.foreground),
               margin: 0,
             }}
           >
@@ -188,7 +189,7 @@ export function GuessRevealSceneT3({
               style={{
                 fontFamily: fontFamily.sinhala,
                 fontSize: 30,
-                color: darkColors.mutedForeground,
+                color: textColor("pronunciation", darkColors.mutedForeground),
                 textAlign: "center",
                 margin: 0,
               }}
@@ -208,7 +209,7 @@ export function GuessRevealSceneT3({
               marginTop: 8,
             }}
           >
-            <p style={{ fontFamily: fontFamily.sans, fontSize: 24, lineHeight: 1.4, color: darkColors.foreground, margin: 0 }}>
+            <p style={{ fontFamily: fontFamily.sans, fontSize: 24, lineHeight: 1.4, color: textColor("explanation", darkColors.foreground), margin: 0 }}>
               {phrase.explanation}
             </p>
             {phrase.explanationSi && (
@@ -217,7 +218,7 @@ export function GuessRevealSceneT3({
                   fontFamily: fontFamily.sinhala,
                   fontSize: 22,
                   lineHeight: 1.45,
-                  color: darkColors.foreground,
+                  color: textColor("explanationSi", darkColors.foreground),
                   margin: 0,
                 }}
               >

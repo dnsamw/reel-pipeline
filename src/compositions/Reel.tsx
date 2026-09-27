@@ -80,7 +80,14 @@ export function Reel({
   const lastRevealIndex = timeline.map((item) => item.type).lastIndexOf("reveal");
 
   return (
-    <ThemeProvider theme={config.theme}>
+    <ThemeProvider
+      theme={config.theme}
+      backgroundImage={config.backgroundImage}
+      backgroundImageScrim={config.backgroundImageScrim}
+      textColors={config.textColors}
+      outroBackgroundColor={config.outroBackgroundColor}
+      outroAccentColor={config.outroAccentColor}
+    >
       {musicFile && (
         <Html5Audio src={staticFile(`music/${musicFile}`)} loop trimBefore={musicStartFrame} volume={config.musicVolume} />
       )}
@@ -122,7 +129,12 @@ export function Reel({
               />
             );
           } else {
-            content = <OutroScene ctaUrl={config.ctaUrl} />;
+            // theme="light" (overriding OutroScene's own "dark" default) so the
+            // CTA card stays on the light palette like the rest of Composition
+            // 1's scenes, instead of inverting to a dark card - matters once a
+            // template sets its own colors (e.g. the background-image presets
+            // in templates-images/) rather than relying on the brand default.
+            content = <OutroScene ctaUrl={config.ctaUrl} theme="light" />;
           }
 
           return (

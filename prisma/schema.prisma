@@ -41,6 +41,8 @@ model BookPhrase {
   explanation     String
   explanationSi   String?     @map("explanation_si")
   order           Int         @default(0)
+  /// Set true once a reel has been generated for this phrase, with ANY template - see src/render/renderBatch.ts's markPhrasesGenerated. Added by hand via `prisma db execute`, not `prisma migrate`.
+  generated       Boolean     @default(false)
 
   @@map("book_phrases")
 }

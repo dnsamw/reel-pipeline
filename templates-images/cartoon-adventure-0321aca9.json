@@ -1,0 +1,48 @@
+{
+  "id": "cartoon-adventure-0321aca9",
+  "name": "Cartoon Adventure",
+  "description": "Bright, playful cartoon artwork behind every scene, clear (light) background with black text - not the dark composition.",
+  "templateNumber": "3",
+  "config": {
+    "backgroundImage": "random",
+    "backgroundImageScrim": 0,
+    "textColors": {
+      "introText": "#000000",
+      "pronunciation": "#000000",
+      "translation": "#000000",
+      "explanationSi": "#1c1717",
+      "introIcon": "#3b2b2b",
+      "phraseNumber": "#050505",
+      "phrase": "#121111",
+      "countdown": "#291f1f",
+      "explanation": "#0f0a0a",
+      "outroUrl": "#3f3131",
+      "outroSubtitle": "#f6efef",
+      "outroHeading": "#e0d2d2"
+    },
+    "theme": {
+      "light": {
+        "primary": "#000000",
+        "brand2": "#d14d00",
+        "gold": "#f0c800",
+        "goldInk": "#1e1d1a",
+        "foreground": "#000000",
+        "mutedForeground": "#000000",
+        "border": "#dbdcdd",
+        "background": "#a13030"
+      },
+      "dark": {
+        "primary": "#FFFFFF",
+        "brand2": "#80ff00",
+        "gold": "#dac24e",
+        "goldInk": "#8b4f13",
+        "foreground": "#b95050",
+        "mutedForeground": "#8a5151",
+        "border": "#22272B",
+        "background": "#f2ef45"
+      }
+    }
+  },
+  "createdAt": "2026-09-24T00:00:00.000Z",
+  "updatedAt": "2026-09-25T16:40:50.379Z"
+}

@@ -37,6 +37,12 @@ export interface ReelConfig {
   ttsEnabled: boolean;
   ttsRate: number;
   theme: ReelTheme | null;
+  backgroundImage: string | null;
+  backgroundImageScrim: number;
+  /** Per-text-element color overrides - see src/theme/textColors.ts. */
+  textColors: Record<string, string | null> | null;
+  outroBackgroundColor: string | null;
+  outroAccentColor: string | null;
   musicVolume: number;
   tickVolume: number;
   revealSoundVolume: number;

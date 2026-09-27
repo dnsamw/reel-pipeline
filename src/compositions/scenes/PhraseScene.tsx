@@ -1,6 +1,6 @@
 import { Html5Audio, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { fontFamily } from "../../theme/tokens";
-import { usePalette } from "../../theme/ThemeContext";
+import { usePalette, useTextColor } from "../../theme/ThemeContext";
 import type { Phrase } from "../../data/phrase";
 import { SceneFrame } from "./SceneFrame";
 
@@ -23,6 +23,7 @@ export function PhraseScene({
   const translateY = interpolate(enter, [0, 1], [24, 0]);
   const opacity = interpolate(enter, [0, 1], [0, 1]);
   const colors = usePalette("light");
+  const textColor = useTextColor();
 
   return (
     <SceneFrame progress={{ current: index, total }}>
@@ -44,7 +45,7 @@ export function PhraseScene({
             height: 72,
             borderRadius: "50%",
             backgroundColor: colors.primaryTint,
-            color: colors.primary,
+            color: textColor("phraseNumber", colors.primary),
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -62,7 +63,7 @@ export function PhraseScene({
             fontSize: 86,
             lineHeight: 1.2,
             textAlign: "center",
-            color: colors.foreground,
+            color: textColor("phrase", colors.foreground),
             margin: 0,
           }}
         >
@@ -73,7 +74,7 @@ export function PhraseScene({
             style={{
               fontFamily: fontFamily.sinhala,
               fontSize: 42,
-              color: colors.mutedForeground,
+              color: textColor("pronunciation", colors.mutedForeground),
               textAlign: "center",
               margin: 0,
             }}

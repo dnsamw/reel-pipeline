@@ -37,6 +37,27 @@ export const configSchema = z.object({
   ttsEnabled: z.boolean(),
   ttsRate: z.number().min(0.5).max(2).describe("TTS speaking-rate multiplier - 1 is normal speed, passed to Azure as SSML <prosody rate>"),
   theme: themeSchema.nullable().describe("Template library color override - null means the built-in brand palette (theme/tokens.ts)"),
+  backgroundImage: z
+    .string()
+    .nullable()
+    .describe("Filename under assets/background-images, shown full-bleed behind every scene - null uses the plain theme background color, \"random\" picks a different image from assets/background-images for each rendered reel"),
+  backgroundImageScrim: z
+    .number()
+    .min(0)
+    .max(1)
+    .describe("Opacity of the theme-background-color tint drawn over backgroundImage for text legibility - 0 leaves the photo fully clear, 1 fully hides it"),
+  textColors: z
+    .record(z.string(), z.string().nullable())
+    .nullable()
+    .describe("Per-text-element color overrides keyed by theme/textColors.ts's TEXT_COLOR_FIELDS - a missing/null key uses the theme palette's color"),
+  outroBackgroundColor: z
+    .string()
+    .nullable()
+    .describe("Background color of the outro CTA scene - null uses the theme palette's color"),
+  outroAccentColor: z
+    .string()
+    .nullable()
+    .describe("Color of the two decorative circles on the outro CTA scene - null uses the theme palette's color"),
   musicVolume: z.number().min(0).max(1),
   tickVolume: z.number().min(0).max(1),
   revealSoundVolume: z.number().min(0).max(1),
@@ -55,6 +76,14 @@ export const configSchema = z.object({
 
 export type ReelConfig = z.infer<typeof configSchema>;
 
+/**
+ * config.backgroundImage value meaning "a different random image from
+ * assets/background-images for each reel" - resolved to a real path before
+ * rendering (renderBatch.ts per batch, TemplateEditor for the live preview),
+ * so compositions only ever see a concrete filename or null.
+ */
+export const RANDOM_BACKGROUND_IMAGE = "random";
+
 export const defaultConfig: ReelConfig = {
   phrasesPerReel: 3,
   introSeconds: 3,
@@ -71,6 +100,11 @@ export const defaultConfig: ReelConfig = {
   ttsEnabled: false,
   ttsRate: 1,
   theme: null,
+  backgroundImage: null,
+  backgroundImageScrim: 0.55,
+  textColors: null,
+  outroBackgroundColor: null,
+  outroAccentColor: null,
   musicVolume: 0.3,
   tickVolume: 0.6,
   revealSoundVolume: 0.8,

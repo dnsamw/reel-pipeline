@@ -30,6 +30,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   defaults: () => request<ReelConfig>("/config/defaults"),
   defaultTheme: () => request<ReelTheme>("/theme/default"),
+  backgroundImages: () => request<string[]>("/background-images"),
   books: () => request<Book[]>("/books"),
   chapters: (book?: string | null) => request<Chapter[]>(`/chapters${book ? `?book=${encodeURIComponent(book)}` : ""}`),
   previewBatches: (params: { book?: string | null; min?: number | null; max?: number | null; phrasesPerReel?: number }) => {
@@ -78,6 +79,8 @@ export const api = {
     sidechain?: boolean;
     templateId?: string;
     phraseIds?: string[];
+    /** Squeezes each phrase's prompt + countdown + reveal into this many seconds (max 10) - see fitPhraseSeconds. */
+    secondsPerPhrase?: number;
   }) => request<RenderRun>("/render/start", { method: "POST", body: JSON.stringify(body) }),
   listRuns: () => request<RenderRun[]>("/render"),
   getRun: (id: string) => request<RenderRun>(`/render/${encodeURIComponent(id)}`),

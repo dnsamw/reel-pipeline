@@ -1,6 +1,6 @@
 import { Html5Audio, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { fontFamily } from "../../theme/tokens";
-import { usePalette } from "../../theme/ThemeContext";
+import { usePalette, useTextColor } from "../../theme/ThemeContext";
 import { SceneFrame } from "./SceneFrame";
 
 export function IntroScene({
@@ -20,6 +20,7 @@ export function IntroScene({
   const scale = interpolate(enter, [0, 1], [0.85, 1]);
   const opacity = interpolate(enter, [0, 1], [0, 1]);
   const c = usePalette(theme);
+  const textColor = useTextColor();
   const pTint = c.primaryTint;
 
   return (
@@ -32,7 +33,7 @@ export function IntroScene({
             height: 130,
             borderRadius: "50%",
             backgroundColor: pTint,
-            color: c.primary,
+            color: textColor("introIcon", c.primary),
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -50,7 +51,7 @@ export function IntroScene({
             fontSize: 58,
             lineHeight: 1.35,
             textAlign: "center",
-            color: c.foreground,
+            color: textColor("introText", c.foreground),
             margin: 0,
             maxWidth: 820,
           }}

@@ -1,0 +1,33 @@
+{
+  "id": "cartoon-candy-pop-ddaee5b4",
+  "name": "Cartoon Candy Pop",
+  "description": "Same cartoon artwork as Cartoon Adventure, in a punchy pink/purple palette - clear (light) background with black text.",
+  "templateNumber": "1",
+  "config": {
+    "backgroundImage": "background-images/cartoon.jpg",
+    "theme": {
+      "light": {
+        "primary": "#000000",
+        "brand2": "#FF3D81",
+        "gold": "#FFC93C",
+        "goldInk": "#5A3D00",
+        "foreground": "#000000",
+        "mutedForeground": "#000000",
+        "border": "#e3d6e8",
+        "background": "#FFFFFF"
+      },
+      "dark": {
+        "primary": "#FFFFFF",
+        "brand2": "#FF5C9A",
+        "gold": "#FFC93C",
+        "goldInk": "#5A3D00",
+        "foreground": "#FFFFFF",
+        "mutedForeground": "#FFFFFF",
+        "border": "#2E1E33",
+        "background": "#1A0F1D"
+      }
+    }
+  },
+  "createdAt": "2026-09-24T02:00:00.000Z",
+  "updatedAt": "2026-09-25T02:00:00.000Z"
+}

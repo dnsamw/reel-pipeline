@@ -2,9 +2,9 @@ node_modules/
 .env
 output/
 cache/
-# SQLite store for the GUI's template library (server/db.ts) - the live/query
-# copy. templates/*.json (its git-tracked export) is intentionally NOT
-# ignored - that's what gets pushed to GitHub, see server/templates.ts.
+# SQLite store for GUI settings/publishing (server/db.ts). Templates are NOT
+# in here - they live as git-tracked JSON in templates/ and templates-images/,
+# see server/templates.ts.
 data/
 gui/dist/
 assets/music/*

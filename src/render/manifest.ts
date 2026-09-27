@@ -13,6 +13,8 @@ export interface ManifestEntry {
   tickFile: string | null;
   revealSoundFile: string | null;
   introVoiceFile: string | null;
+  /** The background image actually used - for a "random" template, the one picked for this reel. Absent on entries rendered before this was recorded. */
+  backgroundImage?: string | null;
   ttsEnabled: boolean;
   ttsPhraseFiles: (string | null)[];
   ttsRevealFiles: (string | null)[];

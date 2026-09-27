@@ -7,6 +7,8 @@ import { colors as lightPalette, darkColors as darkPalette } from "../src/theme/
 import { getPhrases, listBooks, listChapters, updatePhrase, disconnect } from "../src/data/getPhrases";
 import { batchPhrases } from "../src/data/batch";
 import { loadManifest, isRendered } from "../src/render/manifest";
+import { listBackgroundImages } from "../src/render/backgroundImages";
+import { fitPhraseSeconds, MAX_SECONDS_PER_PHRASE, MIN_SECONDS_PER_PHRASE } from "../src/compositions/timings";
 import { listTemplates, getTemplate, saveTemplate, deleteTemplate, pushTemplatesToGit } from "./templates";
 import { getSettings, saveSettings, resolveDefaultConfig, writeConfigPresetFile } from "./settings";
 import {
@@ -173,6 +175,15 @@ app.get("/api/theme/default", (_req, res) => {
   res.json({ light: lightPalette, dark: darkPalette });
 });
 
+/** Images under assets/background-images (subfolders included) - populates the "Background image" picker in TemplateEditor. Paths are relative to assets/, matching config.backgroundImage / staticFile()'s convention. */
+app.get("/api/background-images", (_req, res) => {
+  try {
+    res.json(listBackgroundImages());
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
 // --- Template library ---
 
 app.get("/api/templates", (_req, res) => {
@@ -232,7 +243,7 @@ app.post("/api/templates/:id/push", async (req, res) => {
 
 app.post("/api/render/start", (req, res) => {
   try {
-    const { chapters, limit, force, tts, template, book, sidechain, templateId, phraseIds } = req.body ?? {};
+    const { chapters, limit, force, tts, template, book, sidechain, templateId, phraseIds, secondsPerPhrase } = req.body ?? {};
     const args: string[] = [];
 
     // phraseIds targets one exact reel (the Queue Render page's Render Queue
@@ -274,6 +285,15 @@ app.post("/api/render/start", (req, res) => {
     // overrides win over those (same precedence as templates vs explicit
     // flags below) - merged into one file since --presetFile only takes one.
     const mergedConfig = { ...getSettings().config, ...(templateRecord?.config ?? {}) };
+    // Queue Render's "Seconds per phrase" - squeezes that template's phrase/
+    // countdown/reveal timings (keeping their proportions) into the chosen length.
+    if (secondsPerPhrase != null) {
+      const seconds = Number(secondsPerPhrase);
+      if (!Number.isFinite(seconds) || seconds < MIN_SECONDS_PER_PHRASE || seconds > MAX_SECONDS_PER_PHRASE) {
+        return res.status(400).json({ error: `secondsPerPhrase must be between ${MIN_SECONDS_PER_PHRASE} and ${MAX_SECONDS_PER_PHRASE}` });
+      }
+      Object.assign(mergedConfig, fitPhraseSeconds({ ...defaultConfig, ...mergedConfig }, seconds));
+    }
     if (Object.keys(mergedConfig).length > 0) {
       const presetPath = writeConfigPresetFile(mergedConfig, join(tmpdir(), "studypal-reels-presets"));
       args.push(`--presetFile=${presetPath}`);

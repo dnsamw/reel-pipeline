@@ -1,6 +1,6 @@
 import { Html5Audio, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { fontFamily } from "../../theme/tokens";
-import { usePalette } from "../../theme/ThemeContext";
+import { usePalette, useTextColor } from "../../theme/ThemeContext";
 import { SceneFrame } from "./SceneFrame";
 
 /**
@@ -26,6 +26,7 @@ export function CountdownScene({
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const colors = usePalette("light");
+  const textColor = useTextColor();
   const progress = interpolate(frame, [0, durationInFrames], [0, 1], { extrapolateRight: "clamp" });
 
   const steps = Math.max(1, Math.round(durationInFrames / fps));
@@ -63,7 +64,7 @@ export function CountdownScene({
           fontFamily={fontFamily.sans}
           fontWeight={700}
           fontSize={100}
-          fill={colors.primary}
+          fill={textColor("countdown", colors.primary)}
         >
           {number}
         </text>

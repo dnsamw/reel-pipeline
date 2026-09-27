@@ -41,7 +41,13 @@ export function RenderQueuePanel({
   entries: RenderQueueEntry[];
   onChange: (batchId: string, update: Partial<RenderQueueEntry>) => void;
   onRemove: (batchId: string) => void;
-  style: { templateId?: string; template: "1" | "2" | "3"; tts: "default" | "true" | "false"; sidechain: boolean };
+  style: {
+    templateId?: string;
+    template: "1" | "2" | "3";
+    tts: "default" | "true" | "false";
+    sidechain: boolean;
+    secondsPerPhrase?: number;
+  };
   onItemRendered: () => void;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -57,6 +63,7 @@ export function RenderQueuePanel({
         template: style.template,
         tts: style.tts === "default" ? undefined : style.tts === "true",
         sidechain: style.sidechain || undefined,
+        secondsPerPhrase: style.secondsPerPhrase,
       });
       onChange(entry.batchId, { run: started });
       const finished = await pollUntilDone(started.id, (run) => onChange(entry.batchId, { run }));
@@ -107,7 +114,7 @@ export function RenderQueuePanel({
           </div>
           <div className="button-row">
             <button type="button" disabled={batchRunning || pendingCount === 0} onClick={renderBatch}>
-              {batchRunning ? "Rendering batch..." : `Render batch (${pendingCount})`}
+              {batchRunning ? "Rendering batch..." : `Render batch (${pendingCount})`} 
             </button>
           </div>
         </>

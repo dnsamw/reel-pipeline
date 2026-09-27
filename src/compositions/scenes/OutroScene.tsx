@@ -1,6 +1,6 @@
 import { AbsoluteFill } from "remotion";
 import { fontFamily } from "../../theme/tokens";
-import { usePalette } from "../../theme/ThemeContext";
+import { useOutroAccentColor, useOutroBackgroundColor, useTextColor, usePalette } from "../../theme/ThemeContext";
 
 // Same path data as ubuntu-node/src/components/brand/Logo.tsx and
 // ubuntu-node/src/lib/pdf-theme.ts's logoIconPath - kept in sync manually
@@ -11,9 +11,11 @@ export const logoViewBox = "3 28 95 46";
 
 /**
  * `theme` picks which palette the outro renders in - independent of the
- * scenes before it, since the outro is meant to contrast: Template 1/2 (light
- * main scenes) use theme="dark" here, Template 3 (dark main scenes) uses
- * theme="light" for the same contrast effect in reverse.
+ * scenes before it, since the outro is meant to contrast: Template 2 (light
+ * main scenes) uses theme="dark" here, Template 3 (dark main scenes) uses
+ * theme="light" for the same contrast effect in reverse. Template 1
+ * (Reel.tsx) overrides the default down to theme="light" instead, so its
+ * outro stays on-palette rather than inverting - see Reel.tsx's own comment.
  */
 export function OutroScene({ ctaUrl, theme = "dark" }: { ctaUrl: string; theme?: "light" | "dark" }) {
   // Both palettes are needed regardless of `theme` - the contrast effect
@@ -21,9 +23,10 @@ export function OutroScene({ ctaUrl, theme = "dark" }: { ctaUrl: string; theme?:
   // the dark palette's primary as an accent) rather than just inverting one.
   const light = usePalette("light");
   const dark = usePalette("dark");
+  const textColor = useTextColor();
   const isDark = theme === "dark";
-  const bg = isDark ? light.primary : light.background;
-  const accent = isDark ? light.brand2 : dark.primary;
+  const bg = useOutroBackgroundColor() || (isDark ? light.primary : light.background);
+  const accent = useOutroAccentColor() || (isDark ? light.brand2 : dark.primary);
   const accentOpacity = isDark ? [0.45, 0.35] : [0.12, 0.08];
   const logoTileBg = isDark ? "rgba(255,255,255,0.12)" : "rgba(88,35,139,0.08)";
   const logoFill = isDark ? light.background : light.primary;
@@ -82,7 +85,7 @@ export function OutroScene({ ctaUrl, theme = "dark" }: { ctaUrl: string; theme?:
               fontWeight: 700,
               fontSize: 58,
               lineHeight: 1.25,
-              color: headingColor,
+              color: textColor("outroHeading", headingColor),
               textAlign: "center",
               margin: 0,
             }}
@@ -93,7 +96,7 @@ export function OutroScene({ ctaUrl, theme = "dark" }: { ctaUrl: string; theme?:
             style={{
               fontFamily: fontFamily.sans,
               fontSize: 30,
-              color: subColor,
+              color: textColor("outroSubtitle", subColor),
               textAlign: "center",
               margin: 0,
               maxWidth: 620,
@@ -109,7 +112,7 @@ export function OutroScene({ ctaUrl, theme = "dark" }: { ctaUrl: string; theme?:
               backgroundColor: pillBg,
             }}
           >
-            <p style={{ fontFamily: fontFamily.sans, fontWeight: 700, fontSize: 34, color: pillTextColor, margin: 0 }}>
+            <p style={{ fontFamily: fontFamily.sans, fontWeight: 700, fontSize: 34, color: textColor("outroUrl", pillTextColor), margin: 0 }}>
               {ctaUrl}
             </p>
           </div>
