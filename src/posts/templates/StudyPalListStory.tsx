@@ -18,7 +18,7 @@ const PHOTO_HEIGHT = 1120;
  * to 0.4x until the list fits (hence maxItems 10 - more than that can't fit). The optional photo variant isn't in the HTML
  * mock - it's this port's addition, mirroring StudyPalQuote's image mode.
  */
-function StudyPalListStory({ fields, lists, colors }: PostTemplateProps) {
+function StudyPalListStory({ fields, lists, colors, insets }: PostTemplateProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLOListElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -29,11 +29,23 @@ function StudyPalListStory({ fields, lists, colors }: PostTemplateProps) {
   const hasImage = !!imgSrc;
   const c = colors;
 
+  // Design margins, pushed further in by the Reels safe zones when those are
+  // on. Safe mode also tightens the vertical gaps, since the zones take ~650px
+  // of height away from the list.
+  const pad = {
+    top: Math.max(110, insets.top),
+    right: Math.max(80, insets.right),
+    bottom: Math.max(100, insets.bottom),
+    left: Math.max(80, insets.left),
+  };
+  const tight = insets.top > 0 || insets.bottom > 0;
+  const gap = { heading: tight ? 50 : 90, list: tight ? 44 : 70, footer: tight ? 36 : 50 };
+
   useShrinkToFit(
     listRef,
     (s) => rootRef.current?.style.setProperty("--s", String(s)),
     { max: 1.25, min: 0.4, step: 0.02 },
-    [JSON.stringify(items), fields.title, fields.titleSi, fields.kicker, fields.footer, hasImage],
+    [JSON.stringify(items), fields.title, fields.titleSi, fields.kicker, fields.footer, hasImage, JSON.stringify(insets)],
   );
 
   useLayoutEffect(() => {
@@ -90,7 +102,7 @@ function StudyPalListStory({ fields, lists, colors }: PostTemplateProps) {
           position: "relative",
           zIndex: 2,
           height: "100%",
-          padding: "110px 80px 100px",
+          padding: `${pad.top}px ${pad.right}px ${pad.bottom}px ${pad.left}px`,
           display: "flex",
           flexDirection: "column",
         }}
@@ -118,7 +130,7 @@ function StudyPalListStory({ fields, lists, colors }: PostTemplateProps) {
         </div>
 
         {/* Heading - pushed down over the photo's faded lower half in image mode */}
-        <div style={{ marginTop: hasImage ? 380 : 90 }}>
+        <div style={{ marginTop: hasImage ? Math.max(gap.heading, 380 - (pad.top - 110)) : gap.heading }}>
           <h1
             style={
               {
@@ -148,7 +160,7 @@ function StudyPalListStory({ fields, lists, colors }: PostTemplateProps) {
           ref={listRef}
           style={{
             listStyle: "none",
-            margin: "70px 0 0",
+            margin: `${gap.list}px 0 0`,
             padding: 0,
             flex: 1,
             minHeight: 0,
@@ -228,7 +240,7 @@ function StudyPalListStory({ fields, lists, colors }: PostTemplateProps) {
 
         {/* Footer */}
         {fields.footer && (
-          <div style={{ marginTop: 50, display: "flex", alignItems: "center", gap: 20, fontSize: 34, fontWeight: 600, color: c.mutedText }}>
+          <div style={{ marginTop: gap.footer, display: "flex", alignItems: "center", gap: 20, fontSize: 34, fontWeight: 600, color: c.mutedText }}>
             <span style={{ width: 72, height: 9, borderRadius: 5, background: c.accent, flex: "none" }} />
             {fields.footer}
           </div>
@@ -325,6 +337,17 @@ export const studyPalListStory: PostTemplateDef = {
       mutedText: p.mutedForeground,
     };
   },
+  suggestCaption: (f, l) =>
+    [
+      [f.title, f.titleSi].filter(Boolean).join("\n"),
+      (l.items ?? [])
+        .filter((it) => it.phrase)
+        .map((it, i) => `${i + 1}. ${it.phrase}${it.meaning ? ` - ${it.meaning}` : ""}`)
+        .join("\n"),
+      f.footer,
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
   loadFonts: loadPostFonts,
   component: StudyPalListStory,
 };

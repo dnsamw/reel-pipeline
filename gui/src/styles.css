@@ -1,15 +1,87 @@
+/* Brand fonts, same families as the post templates (src/posts/fonts.ts). */
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap");
+
+/* Light theme (default). Every colour the GUI chrome uses comes from these
+   tokens, so the dark theme below only has to redefine them. */
 :root {
+  color-scheme: light;
   --primary: #58238b;
   --primary-tint: #f2ecf8;
+  --on-primary: #ffffff;
   --gold: #fab005;
+  --gold-ink: #3b1259;
   --fg: #09090b;
   --muted: #6b6470;
   --border: #e4dfec;
+  --border-strong: #c9b8dc;
   --bg: #ffffff;
   --bg-soft: #faf9fc;
+  --surface: #ffffff;
   --danger: #c0392b;
+  --danger-bg: #fde2df;
   --ok: #1e8f5e;
-  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --ok-bg: #dff5e8;
+  --warn: #8a6d1d;
+  --warn-bg: #fef3d9;
+  --sidebar-bg: #58238b;
+  --sidebar-fg: #ffffff;
+  --shadow: rgba(9, 9, 11, 0.12);
+  --font-body: "Figtree", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-body);
+}
+
+/* Dark theme - the brand's own dark palette (src/theme/tokens.ts darkColors). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --primary: #9b52e0;
+    --primary-tint: #2a1d38;
+    --on-primary: #ffffff;
+    --gold: #fbc851;
+    --gold-ink: #1a1024;
+    --fg: #f5f5f5;
+    --muted: #a39bab;
+    --border: #332b3b;
+    --border-strong: #4d4057;
+    --bg: #1b1421;
+    --bg-soft: #120d17;
+    --surface: #1b1421;
+    --danger: #f07a6c;
+    --danger-bg: #3a1c1c;
+    --ok: #5fd39a;
+    --ok-bg: #16301f;
+    --warn: #f3cf6b;
+    --warn-bg: #352a12;
+    --sidebar-bg: #1f1428;
+    --sidebar-fg: #f5f5f5;
+    --shadow: rgba(0, 0, 0, 0.45);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --primary: #9b52e0;
+  --primary-tint: #2a1d38;
+  --on-primary: #ffffff;
+  --gold: #fbc851;
+  --gold-ink: #1a1024;
+  --fg: #f5f5f5;
+  --muted: #a39bab;
+  --border: #332b3b;
+  --border-strong: #4d4057;
+  --bg: #1b1421;
+  --bg-soft: #120d17;
+  --surface: #1b1421;
+  --danger: #f07a6c;
+  --danger-bg: #3a1c1c;
+  --ok: #5fd39a;
+  --ok-bg: #16301f;
+  --warn: #f3cf6b;
+  --warn-bg: #352a12;
+  --sidebar-bg: #1f1428;
+  --sidebar-fg: #f5f5f5;
+  --shadow: rgba(0, 0, 0, 0.45);
 }
 
 * {
@@ -38,8 +110,8 @@ body {
   flex-direction: column;
   gap: 24px;
   padding: 20px 16px;
-  background: var(--primary);
-  color: white;
+  background: var(--sidebar-bg);
+  color: var(--sidebar-fg);
   /* Fixed, not sticky: a sticky sidebar stops at the bottom of .app, so
      anything absolutely positioned that overflows it (an open dropdown,
      a floating panel) let the page scroll past the sidebar's end. */
@@ -60,21 +132,42 @@ body {
 .app-sidebar-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
+  padding: 0 4px;
+}
+
+.app-sidebar.collapsed .app-sidebar-header {
+  justify-content: center;
+  padding: 0;
 }
 
 .app-sidebar .brand {
-  font-weight: 700;
-  font-size: 17px;
-  padding: 0 10px;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.05;
   white-space: nowrap;
   overflow: hidden;
+}
+
+.app-sidebar .brand-name {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 19px;
+  letter-spacing: -0.02em;
+}
+
+.app-sidebar .brand-sub {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold);
 }
 
 .sidebar-toggle {
   background: transparent;
   border: none;
-  color: white;
+  color: var(--sidebar-fg);
   cursor: pointer;
   padding: 6px;
   border-radius: 6px;
@@ -121,7 +214,7 @@ body {
 
 .app-sidebar nav a.active,
 .app-sidebar nav a:hover {
-  color: white;
+  color: var(--sidebar-fg);
   background: rgba(255, 255, 255, 0.12);
   border-left-color: var(--gold);
 }
@@ -158,20 +251,31 @@ body {
 }
 
 h1 {
-  font-size: 22px;
-  margin: 0 0 18px;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 4px 0 20px;
 }
 
 h2 {
-  font-size: 16px;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   margin: 0 0 12px;
   color: var(--primary);
+}
+
+h3 {
+  font-family: var(--font-display);
 }
 
 .card {
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px var(--shadow);
   padding: 20px;
   margin-bottom: 20px;
 }
@@ -204,6 +308,16 @@ h2 {
   border-radius: 6px;
   font-size: 14px;
   font-family: inherit;
+  background: var(--surface);
+  color: var(--fg);
+}
+
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -1px;
+  border-color: transparent;
 }
 
 .color-input-row {
@@ -240,17 +354,28 @@ button {
   border-radius: 6px;
   border: 1px solid var(--primary);
   background: var(--primary);
-  color: white;
+  color: var(--on-primary);
   cursor: pointer;
+  font-weight: 600;
+  transition: filter 0.12s, background 0.12s, border-color 0.12s;
+}
+
+button:not(:disabled):hover {
+  filter: brightness(1.08);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
 }
 
 button.secondary {
-  background: white;
+  background: var(--surface);
   color: var(--primary);
 }
 
 button.danger {
-  background: white;
+  background: var(--surface);
   color: var(--danger);
   border-color: var(--danger);
 }
@@ -296,17 +421,17 @@ th {
 }
 
 .badge.running {
-  background: #fff3cd;
-  color: #8f5614;
+  background: var(--warn-bg);
+  color: var(--warn);
 }
 
 .badge.done {
-  background: #dff5e8;
+  background: var(--ok-bg);
   color: var(--ok);
 }
 
 .badge.error {
-  background: #fde2df;
+  background: var(--danger-bg);
   color: var(--danger);
 }
 
@@ -335,7 +460,7 @@ th {
 }
 
 .error-banner {
-  background: #fde2df;
+  background: var(--danger-bg);
   color: var(--danger);
   padding: 10px 14px;
   border-radius: 6px;
@@ -344,7 +469,7 @@ th {
 }
 
 .success-banner {
-  background: #dff5e8;
+  background: var(--ok-bg);
   color: var(--ok);
   padding: 10px 14px;
   border-radius: 6px;
@@ -353,8 +478,8 @@ th {
 }
 
 .draft-banner {
-  background: #fef3d9;
-  color: #8a6d1d;
+  background: var(--warn-bg);
+  color: var(--warn);
   padding: 10px 14px;
   border-radius: 6px;
   margin-bottom: 16px;
@@ -464,7 +589,7 @@ th {
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  background: white;
+  background: var(--surface);
   color: var(--fg);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -496,10 +621,10 @@ th {
   right: 0;
   max-height: 320px;
   overflow-y: auto;
-  background: white;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(9, 9, 11, 0.12);
+  box-shadow: 0 8px 24px var(--shadow);
 }
 
 .template-picker-option {
@@ -1274,9 +1399,10 @@ button.small {
 .segmented button {
   border: none;
   border-radius: 0;
-  background: white;
+  background: var(--surface);
   color: var(--fg);
   padding: 7px 16px;
+  font-weight: 500;
 }
 
 .segmented button + button {
@@ -1285,7 +1411,7 @@ button.small {
 
 .segmented button.active {
   background: var(--primary);
-  color: white;
+  color: var(--on-primary);
 }
 
 .post-image-field {
@@ -1369,7 +1495,7 @@ button.small {
   width: 28px;
   height: 28px;
   padding: 0;
-  background: white;
+  background: var(--surface);
   color: var(--primary);
   border: 1px solid var(--border);
 }
@@ -1393,4 +1519,332 @@ button.small {
   margin-top: 14px;
   border-radius: 8px;
   background: #000;
+}
+
+.post-export-result img {
+  display: block;
+  max-width: 280px;
+  max-height: 420px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.post-publish-box {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.post-publish-stale {
+  color: var(--warn);
+}
+
+/* --- ConfirmDialog (components/ConfirmDialog.tsx) --- */
+
+.confirm-dialog {
+  width: min(480px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--fg);
+  box-shadow: 0 20px 50px rgba(9, 9, 11, 0.25);
+}
+
+.confirm-dialog::backdrop {
+  background: rgba(21, 15, 26, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.confirm-dialog[open] {
+  animation: confirm-dialog-in 0.14s ease-out;
+}
+
+@keyframes confirm-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+
+.confirm-dialog-body {
+  padding: 20px 22px 8px;
+}
+
+.confirm-dialog-body h3 {
+  margin: 0 0 12px;
+  font-size: 17px;
+  color: var(--primary);
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 22px 18px;
+}
+
+button.danger-solid {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: white;
+}
+
+.publish-confirm {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  font-size: 14px;
+}
+
+.publish-confirm img,
+.publish-confirm video {
+  flex: none;
+  width: 110px;
+  max-height: 196px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #1a1024;
+}
+
+.publish-confirm-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.publish-confirm-info p {
+  margin: 0 0 8px;
+}
+
+.publish-confirm-caption {
+  max-height: 120px;
+  overflow-y: auto;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+
+/* "Saved to output/…" lines under exports - a plain .hint is pulled up
+   (-6px) to hug the input above it, which crowds images/videos/buttons. */
+.hint.saved-path {
+  margin: 10px 0 0;
+  word-break: break-all;
+}
+
+/* Same 20px gap between the Settings form's Save button and the next card as between cards. */
+.settings-form {
+  margin-bottom: 20px;
+}
+
+/* --- Media Library (pages/MediaLibrary.tsx) --- */
+
+.library-text {
+  font-size: 14px;
+  margin: 0;
+}
+
+.library-tabs {
+  flex-wrap: wrap;
+}
+
+.hint.library-tab-hint {
+  margin: 10px 0 0;
+}
+
+.library-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-soft);
+}
+
+.library-select-all {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hint.library-selection {
+  flex: 1;
+  margin: 0;
+}
+
+.library-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 14px;
+}
+
+.library-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg);
+  cursor: pointer;
+  transition: border-color 0.1s, box-shadow 0.1s;
+}
+
+.library-card:hover {
+  border-color: var(--border-strong);
+}
+
+.library-card.selected {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 2px rgba(192, 57, 43, 0.25);
+}
+
+.library-thumb {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  background: #1a1024;
+}
+
+.library-thumb img,
+.library-thumb video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.library-check {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.library-open {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--primary);
+}
+
+.library-meta {
+  padding: 10px 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.library-name {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hint.library-sub {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.library-confirm {
+  font-size: 14px;
+}
+
+.library-confirm p {
+  margin: 0 0 10px;
+}
+
+.library-confirm .hint {
+  margin: 0 0 8px;
+}
+
+.library-confirm-list {
+  margin: 0 0 12px;
+  padding: 8px 10px 8px 26px;
+  max-height: 140px;
+  overflow-y: auto;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: "Cascadia Code", Consolas, monospace;
+  word-break: break-all;
+}
+
+.hint.library-warning {
+  color: var(--danger);
+}
+
+/* --- Sidebar sections + footer (App.tsx) --- */
+
+.app-sidebar nav {
+  flex: 1;
+}
+
+.nav-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-section + .nav-section {
+  margin-top: 10px;
+}
+
+.nav-section-title {
+  padding: 6px 12px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+
+.nav-divider {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  margin: 4px 6px 6px;
+}
+
+.app-sidebar-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.app-sidebar.collapsed .app-sidebar-footer {
+  flex-direction: column;
+}
+
+.sidebar-toggle-label {
+  margin-left: 8px;
+  font-size: 13px;
+  font-weight: 500;
 }

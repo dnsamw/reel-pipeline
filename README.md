@@ -1,4 +1,8 @@
-# StudyPal Reel Pipeline
+# StudyPal Studio
+
+StudyPal's content studio: batch-rendered phrase reels, image posts and still-image reels (Post Creator),
+a media library, and one-click publishing to a Facebook Page - through a local web app (`npm run gui`) or
+the CLI below.
 
 Bulk-generates vertical reel videos (Instagram/TikTok-style, 1080×1920) promoting *The Ultimate
 Sinhala-to-English Phrasebook* directly from StudyPal's live database — a phrase in, a fully edited,
@@ -119,6 +123,11 @@ Then open `http://localhost:5183`. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.
 for how it's wired together, what "template" presets can and can't do yet, and where intro/outro video-clip
 support (not implemented yet) fits in.
 
+The app follows your OS light/dark setting. The theme button at the bottom of the sidebar switches between
+System, Light and Dark, and the choice is remembered per browser. All GUI colours are CSS variables at the
+top of `gui/src/styles.css` (a light set and a dark set built from the brand's dark palette), so new UI should
+use those rather than hard-coded colours.
+
 Two ways to render from the GUI:
 - **Batch Render** — bulk/unattended, same as the CLI flags below.
 - **Queue Render** — a two-column workspace: the left column lists every reel in scope (tabbed "Not yet" /
@@ -143,6 +152,15 @@ models beyond phrases can be added later without changing the editor. A custom r
 renderable, not just previewable — pick it anywhere a "Composition" is chosen. See
 [docs/COMPOSITION_DESIGNER.md](docs/COMPOSITION_DESIGNER.md) for the full design.
 
+**Media Library page** (`/library`) — every generated or uploaded file in one place, in three tabs: batch
+reels (`output/`), Post Creator exports (`output/posts/`) and uploaded images (`assets/images/`). Each card
+shows whether it's tracked in the manifest, published to Facebook, or still used by a recipe/template. Select
+files and **Delete selected**. Deleting a batch reel also removes its manifest entry, so that batch counts as
+not rendered again. The **Render manifest** panel can **Remove missing entries** (entries whose video is gone)
+or **Reset manifest** (every batch becomes not rendered; videos are kept and a backup of the manifest is saved
+first). Every destructive action asks for confirmation, and reel/manifest changes are refused while a render
+is running.
+
 **Settings page** — GUI-wide defaults (durations/volumes/TTS/colors/copy, plus the default composition and
 whether music-ducking is on by default) that every render starts from, whether it goes through the CLI flags
 above, Batch Render, or Queue Render. A saved template preset still overrides these where it sets a field;
@@ -164,12 +182,24 @@ downloads it, and keeps a copy in `output/posts/`. The first export after a code
 bundle (~20-30s); later ones take a few seconds. Your in-progress post for each template is remembered in the
 browser.
 
+**Reels safe zones:** a Reel's top, bottom and right edge are covered by Facebook's UI (icons, caption, the
+like/share column), and tall phones crop its sides. **Keep content inside Reels safe zones** (under the
+preview, on by default for 9:16 templates) moves the content clear of those areas in the preview, the PNG and
+the reel. **Show safe-zone guides** shades them on the preview. For a square post exported as a 9:16 reel, only
+the side margins change.
+
 **Export reel (MP4)** turns the same post into a still-image video: pick a background track from
 `assets/music/` (▶ previews it from your chosen start point), set the length (3-90s), start offset and volume,
 then export. Square posts are centred on a 9:16 canvas filled with the post's background colour, or kept at
 their original size if you prefer. Music loops if it's shorter than the reel and fades in/out. The MP4 is
 H.264/AAC at 30fps, downloaded and saved next to the PNG in `output/posts/`. It uses ffmpeg on `PATH`, falling
 back to the copy bundled with Remotion.
+
+**Publishing posts to Facebook:** once a Page is connected (Settings), each export (the PNG under "Image post",
+the MP4 under "Reel") gets a caption box, pre-filled from the post's text, and a **Publish** button. It posts
+exactly the file that was exported, and warns you if you've edited the post since. PNGs go up as photo posts.
+9:16 videos of 3-90s go up as **Reels**; anything else (e.g. a square "Original" reel) goes up as a regular Page
+video. You confirm before anything is posted, and every attempt is logged with the Monitor page's publishes.
 
 To add a new post design: drop the HTML mock into `post-templates/`, port it to
 `src/posts/templates/<Name>.tsx` exporting a `PostTemplateDef` (fields, color slots, defaults, and how to map a
@@ -184,6 +214,7 @@ export pick it up automatically.
 | `--book=<uuid-or-title>` | Which book to pull from — required once more than one book exists in the DB |
 | `--template=1\|2\|3` | Which visual template (default `1`) |
 | `--tts=true\|false` | Voiced narration on/off (default `false`) |
+| `--ttsEn=true\|false` / `--ttsSi=true\|false` | With narration on, voice only one language, e.g. `--ttsSi=false` keeps the English phrase voice and drops the Sinhala one, whose Azure output isn't always good enough to post. Both default to on; the Settings page sets the GUI's defaults, and Batch Render / Queue Render can override them per run |
 | `--limit=N` | Stop after N *new* renders this run |
 | `--force` | Re-render even batches already in the manifest |
 | `--sidechain=true\|false` | Duck background music under dialogue/sfx via ffmpeg's real `sidechaincompress` filter (default `false`). Costs a second render pass per batch (~10-20% more total time, measured — not a flat 2x, since frame-painting isn't the dominant render cost here). Requires `ffmpeg` on `PATH`; if it's missing, the whole run warns once and falls back to the normal single-pass mix instead of failing |

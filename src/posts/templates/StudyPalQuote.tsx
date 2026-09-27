@@ -11,7 +11,7 @@ import type { PostTemplateDef, PostTemplateProps } from "../types";
  * optional full-bleed photo (the HTML's "With image" mode) that pushes the
  * text to the bottom over a gradient shade.
  */
-function StudyPalQuote({ fields, colors }: PostTemplateProps) {
+function StudyPalQuote({ fields, colors, insets }: PostTemplateProps) {
   const boxRef = useRef<HTMLDivElement>(null);
   const headRef = useRef<HTMLHeadingElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -20,7 +20,7 @@ function StudyPalQuote({ fields, colors }: PostTemplateProps) {
   const imgSrc = resolvePostAsset(fields.image ?? "");
   const hasImage = !!imgSrc;
 
-  useFitFontSize(boxRef, headRef, { max: hasImage ? 104 : 132, min: 44 }, [fields.headline, fields.sinhala, hasImage]);
+  useFitFontSize(boxRef, headRef, { max: hasImage ? 104 : 132, min: 44 }, [fields.headline, fields.sinhala, hasImage, JSON.stringify(insets)]);
 
   // Block a render capture until the photo is actually decoded - otherwise
   // renderStill can screenshot an empty <img>.
@@ -34,7 +34,12 @@ function StudyPalQuote({ fields, colors }: PostTemplateProps) {
   }, [imgSrc, hold]);
 
   const c = colors;
-  const pad = 72;
+  // Design margins, pushed in by the Reels safe zones when those are on (for a
+  // square post centred on a reel canvas that is only ever the sides).
+  const padL = Math.max(72, insets.left);
+  const padR = Math.max(72, insets.right);
+  const dTop = Math.max(0, insets.top - 64);
+  const dBottom = Math.max(0, insets.bottom - 62);
 
   const root: CSSProperties = {
     width: 1080,
@@ -65,7 +70,7 @@ function StudyPalQuote({ fields, colors }: PostTemplateProps) {
       )}
 
       {/* Brand bar */}
-      <div style={{ position: "absolute", top: 64, left: pad, right: pad, display: "flex", alignItems: "center", gap: 18, zIndex: 2 }}>
+      <div style={{ position: "absolute", top: 64 + dTop, left: padL, right: padR, display: "flex", alignItems: "center", gap: 18, zIndex: 2 }}>
         <StudyPalLogo size={68} tile={c.accent} ink={c.background} />
         <span style={{ fontFamily: postFonts.display, fontWeight: 700, fontSize: 38, letterSpacing: "-0.01em", color: c.text }}>
           {fields.brand}
@@ -93,10 +98,10 @@ function StudyPalQuote({ fields, colors }: PostTemplateProps) {
         ref={boxRef}
         style={{
           position: "absolute",
-          left: pad,
-          right: pad,
-          top: hasImage ? 480 : 190,
-          bottom: hasImage ? 140 : 150,
+          left: padL,
+          right: padR,
+          top: (hasImage ? 480 : 190) + dTop,
+          bottom: (hasImage ? 140 : 150) + dBottom,
           display: "flex",
           flexDirection: "column",
           justifyContent: hasImage ? "flex-end" : "center",
@@ -131,9 +136,9 @@ function StudyPalQuote({ fields, colors }: PostTemplateProps) {
         <div
           style={{
             position: "absolute",
-            left: pad,
-            right: pad,
-            bottom: 62,
+            left: padL,
+            right: padR,
+            bottom: 62 + dBottom,
             display: "flex",
             alignItems: "center",
             gap: 18,
@@ -215,6 +220,7 @@ export const studyPalQuote: PostTemplateDef = {
       mutedText: p.mutedForeground,
     };
   },
+  suggestCaption: (f) => [f.headline, f.sinhala, f.footer].filter(Boolean).join("\n\n"),
   loadFonts: loadPostFonts,
   component: StudyPalQuote,
 };

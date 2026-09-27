@@ -2,6 +2,15 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import type { FacebookStatus, Manifest, ManifestEntry, Publication, RenderRun } from "../types";
 
+/** Which languages a rendered reel was actually voiced in, from its per-phrase TTS files (older entries only have ttsEnabled). */
+function ttsLabel(entry: ManifestEntry): string {
+  if (!entry.ttsEnabled) return "off";
+  if (!entry.ttsPhraseFiles || !entry.ttsRevealFiles) return "on";
+  const en = entry.ttsPhraseFiles.some(Boolean);
+  const si = entry.ttsRevealFiles.some(Boolean);
+  return en && si ? "English + Sinhala" : en ? "English only" : si ? "Sinhala only" : "off";
+}
+
 export function Dashboard() {
   const [manifest, setManifest] = useState<Manifest | null>(null);
   const [runs, setRuns] = useState<RenderRun[]>([]);
@@ -177,7 +186,7 @@ function ManifestRow({
             <video className="manifest-row-video" src={entry.mediaUrl} controls preload="none" />
             <div className="manifest-row-details">
               <p className="hint" style={{ marginTop: 0 }}>
-                TTS {entry.ttsEnabled ? "on" : "off"} - sidechain {entry.sidechain ? "on" : "off"} - {entry.outputPath}
+                TTS {ttsLabel(entry)} - sidechain {entry.sidechain ? "on" : "off"} - {entry.outputPath}
               </p>
               <div className="field">
                 <label>Facebook caption</label>

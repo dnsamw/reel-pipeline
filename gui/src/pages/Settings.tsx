@@ -138,7 +138,7 @@ export function Settings() {
       {!loaded ? (
         <p className="hint">Loading...</p>
       ) : (
-        <form onSubmit={onSave}>
+        <form onSubmit={onSave} className="settings-form">
           <div className="card">
             <h2>Run defaults</h2>
             <div className="grid">
@@ -154,6 +154,24 @@ export function Settings() {
                   onChange={(e) => setField("ttsEnabled", e.target.checked)}
                 />
                 <label htmlFor="settings-tts">Narration (TTS) on by default</label>
+              </div>
+              <div className="field checkbox">
+                <input
+                  id="settings-tts-en"
+                  type="checkbox"
+                  checked={config.ttsEnglish ?? true}
+                  onChange={(e) => setField("ttsEnglish", e.target.checked)}
+                />
+                <label htmlFor="settings-tts-en">English voice (the phrase)</label>
+              </div>
+              <div className="field checkbox">
+                <input
+                  id="settings-tts-si"
+                  type="checkbox"
+                  checked={config.ttsSinhala ?? true}
+                  onChange={(e) => setField("ttsSinhala", e.target.checked)}
+                />
+                <label htmlFor="settings-tts-si">Sinhala voice (the meaning)</label>
               </div>
               <div className="field checkbox">
                 <input

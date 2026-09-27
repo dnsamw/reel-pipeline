@@ -46,10 +46,23 @@ export type PostListItem = Record<string, string>;
 export type PostLists = Record<string, PostListItem[]>;
 export type PostColors = Record<string, string>;
 
+/** Minimum distance, in the template's own pixels, content must keep from each edge - see safeZones.ts. */
+export interface PostInsets {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
 export interface PostTemplateProps {
   fields: PostFields;
   lists: PostLists;
   colors: PostColors;
+  /**
+   * All zero unless "Reels safe zones" is on. Templates take the max of these
+   * and their own design margins, so the normal layout is unchanged when off.
+   */
+  insets: PostInsets;
 }
 
 export interface PostTemplateDef {
@@ -70,6 +83,8 @@ export interface PostTemplateDef {
    * colors as reels without each template's slots having to match Palette's.
    */
   colorsFromPalette: (palette: Palette, variant: "light" | "dark") => PostColors;
+  /** Starting Facebook caption for this post's content - editable before publishing. Omit to fall back to the text fields joined together. */
+  suggestCaption?: (fields: PostFields, lists: PostLists) => string;
   /** Resolves once every font the component uses is loaded - awaited before the fit measurements and before renderStill captures. */
   loadFonts: () => Promise<unknown>;
   component: ComponentType<PostTemplateProps>;

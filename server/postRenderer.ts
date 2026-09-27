@@ -73,7 +73,7 @@ function inlineAssetImages(templateId: string, fields: PostFields): PostFields {
   return out;
 }
 
-export async function renderPostPng(input: { templateId: string; fields: PostFields; lists: PostLists; colors: PostColors }): Promise<{ png: Buffer; savedPath: string; width: number; height: number }> {
+export async function renderPostPng(input: { templateId: string; fields: PostFields; lists: PostLists; colors: PostColors; safeZones?: boolean }): Promise<{ png: Buffer; savedPath: string; width: number; height: number }> {
   const def = getPostTemplate(input.templateId);
   if (!def) throw new Error(`Unknown post template "${input.templateId}"`);
 
@@ -82,6 +82,7 @@ export async function renderPostPng(input: { templateId: string; fields: PostFie
     fields: inlineAssetImages(def.id, { ...def.defaultFields, ...input.fields }),
     lists: { ...def.defaultLists, ...input.lists },
     colors: { ...def.defaultColors, ...input.colors },
+    safeZones: !!input.safeZones,
   };
 
   const serveUrl = await getBundle();

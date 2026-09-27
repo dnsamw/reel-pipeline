@@ -82,7 +82,7 @@ function runFfmpeg(bin: string, args: string[]): Promise<void> {
  * video render needed, so it takes seconds rather than rendering every frame.
  */
 export async function renderPostReel(
-  post: { templateId: string; fields: PostFields; lists: PostLists; colors: PostColors },
+  post: { templateId: string; fields: PostFields; lists: PostLists; colors: PostColors; safeZones?: boolean },
   opts: PostReelOptions,
 ): Promise<{ mp4Path: string }> {
   const duration = Math.min(90, Math.max(3, Number(opts.durationSeconds) || 15));
@@ -128,4 +128,19 @@ export async function renderPostReel(
   ];
   await runFfmpeg(ffmpeg, args);
   return { mp4Path };
+}
+
+/** Width/height/duration of a rendered MP4 - used to decide Reel vs regular Page video when publishing. */
+export function probeVideo(path: string): { width: number; height: number; durationSeconds: number } {
+  const out = spawnSync(
+    resolveTool("ffprobe"),
+    ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height:format=duration", "-of", "json", path],
+    { encoding: "utf8" },
+  );
+  const json = JSON.parse(out.stdout || "{}");
+  return {
+    width: Number(json.streams?.[0]?.width) || 0,
+    height: Number(json.streams?.[0]?.height) || 0,
+    durationSeconds: Number(json.format?.duration) || 0,
+  };
 }

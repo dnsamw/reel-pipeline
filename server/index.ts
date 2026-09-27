@@ -1,8 +1,8 @@
 import express from "express";
 import cors from "cors";
-import { join, relative, extname, basename } from "node:path";
+import { join, relative, extname, basename, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { defaultConfig } from "../src/config/config";
 import { colors as lightPalette, darkColors as darkPalette } from "../src/theme/tokens";
 import { dataSources } from "../src/data/dataSources";
@@ -25,12 +25,15 @@ import {
   getConnectedPage,
   disconnectPage,
   publishVideoToConnectedPage,
+  publishPhotoToConnectedPage,
+  publishReelToConnectedPage,
 } from "./facebook";
 import { listPublications, createPublication, markPublished, markError } from "./publications";
 import { startRender, getRun, listRuns, cancelRun } from "./renderRunner";
 import { introOutroVideoSpec } from "./videoSpec";
-import { renderPostPng, warmPostBundle } from "./postRenderer";
-import { listMusicTracks, renderPostReel } from "./postReel";
+import { renderPostPng, warmPostBundle, POSTS_OUTPUT_DIR } from "./postRenderer";
+import { listMusicTracks, renderPostReel, probeVideo } from "./postReel";
+import { listLibrary, deleteLibraryItems, resetManifest, pruneManifest } from "./library";
 
 const app = express();
 app.use(cors());
@@ -336,9 +339,9 @@ app.post("/api/posts/warm", (_req, res) => {
 
 app.post("/api/posts/render", async (req, res) => {
   try {
-    const { templateId, fields, lists, colors } = req.body ?? {};
+    const { templateId, fields, lists, colors, safeZones } = req.body ?? {};
     if (typeof templateId !== "string") return res.status(400).json({ error: "templateId is required" });
-    const { png, savedPath } = await renderPostPng({ templateId, fields: fields ?? {}, lists: lists ?? {}, colors: colors ?? {} });
+    const { png, savedPath } = await renderPostPng({ templateId, fields: fields ?? {}, lists: lists ?? {}, colors: colors ?? {}, safeZones: !!safeZones });
     res.setHeader("Content-Type", "image/png");
     res.setHeader("X-Saved-Path", relative(process.cwd(), savedPath).replace(/\\/g, "/"));
     res.send(png);
@@ -359,10 +362,10 @@ app.get("/api/music", (_req, res) => {
 // under output/posts/ and returned as the response body.
 app.post("/api/posts/reel", async (req, res) => {
   try {
-    const { templateId, fields, lists, colors, reel } = req.body ?? {};
+    const { templateId, fields, lists, colors, safeZones, reel } = req.body ?? {};
     if (typeof templateId !== "string") return res.status(400).json({ error: "templateId is required" });
     const { mp4Path } = await renderPostReel(
-      { templateId, fields: fields ?? {}, lists: lists ?? {}, colors: colors ?? {} },
+      { templateId, fields: fields ?? {}, lists: lists ?? {}, colors: colors ?? {}, safeZones: !!safeZones },
       {
         durationSeconds: reel?.durationSeconds,
         musicFile: typeof reel?.musicFile === "string" && reel.musicFile ? reel.musicFile : null,
@@ -379,11 +382,114 @@ app.post("/api/posts/reel", async (req, res) => {
   }
 });
 
+// Publishes an already-exported Post Creator file (the PNG or MP4 the GUI is
+// showing - identified by the X-Saved-Path its export returned) to the
+// connected Facebook Page. The format follows the file, not the request:
+// PNG -> photo post; 9:16 MP4 of 3-90s -> Reel; any other MP4 -> Page video.
+// Logged in the same publications table as Monitor's reel publishes, with
+// batchId "post:<file name>" so the two never collide.
+app.post("/api/posts/publish", async (req, res) => {
+  try {
+    const { savedPath, caption, templateId } = req.body ?? {};
+    if (typeof savedPath !== "string" || !savedPath) return res.status(400).json({ error: "savedPath is required - export the post first" });
+    const abs = resolve(process.cwd(), savedPath);
+    if (!abs.startsWith(POSTS_OUTPUT_DIR + sep) || !existsSync(abs)) return res.status(404).json({ error: `Exported file not found: ${savedPath}` });
+    const ext = extname(abs).toLowerCase();
+    if (ext !== ".png" && ext !== ".mp4") return res.status(400).json({ error: "Only exported .png and .mp4 files can be published" });
+
+    const page = getConnectedPage();
+    if (!page) return res.status(400).json({ error: "No Facebook Page connected - connect one in Settings first" });
+
+    let format: "photo" | "reel" | "video" = "photo";
+    if (ext === ".mp4") {
+      const v = probeVideo(abs);
+      const is916 = v.width > 0 && v.width * 16 === v.height * 9;
+      format = is916 && v.durationSeconds >= 3 && v.durationSeconds <= 90 ? "reel" : "video";
+    }
+
+    const record = createPublication({
+      batchId: `post:${basename(abs)}`,
+      template: typeof templateId === "string" && templateId ? templateId : "post",
+      outputPath: savedPath,
+      pageId: page.id,
+      pageName: page.name,
+      caption: typeof caption === "string" ? caption : "",
+    });
+
+    try {
+      let fbId: string;
+      let permalink: string;
+      if (format === "photo") {
+        const r = await publishPhotoToConnectedPage(abs, record.caption);
+        fbId = r.id;
+        permalink = r.permalink;
+      } else if (format === "reel") {
+        const r = await publishReelToConnectedPage(abs, record.caption);
+        fbId = r.videoId;
+        permalink = r.permalink;
+      } else {
+        const r = await publishVideoToConnectedPage(abs, record.caption);
+        fbId = r.videoId;
+        permalink = r.permalink;
+      }
+      res.json({ ...markPublished(record.id, fbId, permalink), format });
+    } catch (err) {
+      res.status(502).json({ ...markError(record.id, err instanceof Error ? err.message : String(err)), format });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// --- Media Library (gui /library): browse + delete generated/uploaded media, reset the manifest ---
+// See server/library.ts. Errors carrying a `status` (409 while a render is running) keep it.
+function libraryError(res: express.Response, err: unknown) {
+  const status = (err as { status?: number })?.status ?? 400;
+  res.status(status).json({ error: err instanceof Error ? err.message : String(err) });
+}
+
+app.get("/api/library", (_req, res) => {
+  try {
+    res.json(listLibrary());
+  } catch (err) {
+    libraryError(res, err);
+  }
+});
+
+app.post("/api/library/delete", (req, res) => {
+  try {
+    const { ids } = req.body ?? {};
+    if (!Array.isArray(ids) || ids.length === 0 || !ids.every((id) => typeof id === "string")) {
+      return res.status(400).json({ error: "ids must be a non-empty array of media ids" });
+    }
+    res.json(deleteLibraryItems(ids));
+  } catch (err) {
+    libraryError(res, err);
+  }
+});
+
+app.post("/api/library/manifest/reset", (_req, res) => {
+  try {
+    res.json(resetManifest());
+  } catch (err) {
+    libraryError(res, err);
+  }
+});
+
+app.post("/api/library/manifest/prune", (_req, res) => {
+  try {
+    res.json(pruneManifest());
+  } catch (err) {
+    libraryError(res, err);
+  }
+});
+
 // --- Batch render orchestration (wraps `npm run render:batch`, doesn't replace it) ---
 
 app.post("/api/render/start", (req, res) => {
   try {
-    const { chapters, limit, force, tts, template, book, sidechain, templateId, phraseIds, recipeId } = req.body ?? {};
+    const { chapters, limit, force, tts, ttsEnglish, ttsSinhala, template, book, sidechain, templateId, phraseIds, recipeId } = req.body ?? {};
     const args: string[] = [];
 
     // phraseIds targets one exact reel (the Queue Render page's Render Queue
@@ -411,6 +517,8 @@ app.post("/api/render/start", (req, res) => {
     }
     if (!usingPhraseIds && force) args.push("--force");
     if (tts != null) args.push(`--tts=${tts === true || tts === "true"}`);
+    if (ttsEnglish != null) args.push(`--ttsEn=${ttsEnglish === true || ttsEnglish === "true"}`);
+    if (ttsSinhala != null) args.push(`--ttsSi=${ttsSinhala === true || ttsSinhala === "true"}`);
     if (sidechain) args.push("--sidechain=true");
     if (!usingPhraseIds && book != null) {
       if (typeof book !== "string" || !book.trim()) return res.status(400).json({ error: "book must be a non-empty string" });

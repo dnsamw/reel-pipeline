@@ -36,6 +36,8 @@ export interface ReelConfig {
   chapterOrderRange: [number, number] | null;
   bookId: string | null;
   ttsEnabled: boolean;
+  ttsEnglish: boolean;
+  ttsSinhala: boolean;
   ttsRate: number;
   theme: ReelTheme | null;
   musicVolume: number;
@@ -237,6 +239,9 @@ export interface ManifestEntry {
   chapterTitle: string;
   phraseIds: string[];
   ttsEnabled: boolean;
+  /** Per phrase - null where that language wasn't voiced. Used to show which TTS languages a reel has. */
+  ttsPhraseFiles?: (string | null)[];
+  ttsRevealFiles?: (string | null)[];
   sidechain: boolean;
   outputPath: string;
   renderedAt: string;
@@ -327,4 +332,26 @@ export interface VideoSpec {
   audio: string;
   duration: string;
   namingConvention: string;
+}
+
+// Media Library (gui /library) - mirrors server/library.ts.
+export type LibraryKind = "reel" | "post" | "image";
+
+export interface LibraryItem {
+  id: string;
+  kind: LibraryKind;
+  name: string;
+  path: string;
+  url: string;
+  mediaType: "video" | "image";
+  sizeBytes: number;
+  modifiedAt: string;
+  manifest?: { key: string; chapterTitle: string; template: string; renderedAt: string } | null;
+  published?: boolean;
+  usedBy?: string[];
+}
+
+export interface LibraryListing {
+  items: LibraryItem[];
+  manifest: { entries: number; missingFiles: number };
 }

@@ -4,6 +4,8 @@ import { api } from "../api";
 import { ColorField } from "../components/ReelConfigFields";
 import { PostPreview } from "../components/PostPreview";
 import { PostReelPanel } from "../components/PostReelPanel";
+import { PostPublishBox } from "../components/PostPublishBox";
+import { suggestPostCaption } from "../lib/postCaption";
 import { PostTemplatePicker } from "../components/PostTemplatePicker";
 import { TemplatePicker } from "../components/TemplatePicker";
 import { getPostTemplate, postTemplates } from "../../../src/posts/registry";
@@ -11,6 +13,7 @@ import type { PostColors, PostFields, PostListFieldDef, PostListItem, PostLists,
 import type { ReelTheme, TemplateRecord } from "../types";
 
 const LAST_TEMPLATE_KEY = "studypal-reels:post-creator:last-template";
+const GUIDES_KEY = "studypal-reels:post-creator:show-guides";
 const draftKey = (templateId: string) => `studypal-reels:post-creator:draft:${templateId}`;
 
 interface Draft {
@@ -18,6 +21,8 @@ interface Draft {
   lists: PostLists;
   colors: PostColors;
   reelTemplateId: string;
+  /** Keep content inside the Reels/Stories safe zones - on by default for 9:16 templates. */
+  safeZones: boolean;
   variant: "light" | "dark";
 }
 
@@ -59,6 +64,7 @@ function loadDraft(templateId: string): Draft {
     colors: { ...def.defaultColors, ...saved?.colors },
     reelTemplateId: saved?.reelTemplateId ?? "",
     variant: saved?.variant ?? "light",
+    safeZones: saved?.safeZones ?? def.width * 16 === def.height * 9,
   };
 }
 
@@ -66,6 +72,7 @@ export function PostCreator() {
   const [templateId, setTemplateId] = useState(initialTemplateId);
   const def = getPostTemplate(templateId)!;
   const [draft, setDraft] = useState<Draft>(() => loadDraft(templateId));
+  const [showGuides, setShowGuides] = useState(() => readStorage<boolean>(GUIDES_KEY) ?? false);
   const [paletteSource, setPaletteSource] = useState<"template" | "reel">("template");
 
   const [reelTemplates, setReelTemplates] = useState<TemplateRecord[]>([]);
@@ -73,7 +80,7 @@ export function PostCreator() {
 
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [lastExport, setLastExport] = useState<{ url: string; savedPath: string; filename: string } | null>(null);
+  const [lastExport, setLastExport] = useState<{ url: string; savedPath: string; filename: string; snapshot: string; caption: string } | null>(null);
 
   useEffect(() => {
     api.templates().then(setReelTemplates).catch(() => {});
@@ -89,6 +96,11 @@ export function PostCreator() {
   useEffect(() => () => {
     if (lastExport) URL.revokeObjectURL(lastExport.url);
   }, [lastExport]);
+
+  function toggleGuides(on: boolean) {
+    setShowGuides(on);
+    writeStorage(GUIDES_KEY, on);
+  }
 
   function switchTemplate(id: string) {
     writeStorage(LAST_TEMPLATE_KEY, id);
@@ -135,14 +147,18 @@ export function PostCreator() {
     setDraft((d) => ({ ...d, fields: { ...def.defaultFields }, lists: { ...def.defaultLists } }));
   }
 
+  // What an export was made from - compared later to warn that publishing
+  // would post an out-of-date file.
+  const contentSnapshot = JSON.stringify({ templateId, fields: draft.fields, lists: draft.lists, colors: draft.colors, safeZones: draft.safeZones });
+
   async function onExport() {
     setError(null);
     setExporting(true);
     try {
-      const { blob, savedPath } = await api.renderPost({ templateId, fields: draft.fields, lists: draft.lists, colors: draft.colors });
+      const { blob, savedPath } = await api.renderPost({ templateId, fields: draft.fields, lists: draft.lists, colors: draft.colors, safeZones: draft.safeZones });
       const url = URL.createObjectURL(blob);
       const filename = savedPath.split("/").pop() || `${templateId}.png`;
-      setLastExport({ url, savedPath, filename });
+      setLastExport({ url, savedPath, filename, snapshot: contentSnapshot, caption: suggestPostCaption(def, draft.fields, draft.lists) });
       const a = document.createElement("a");
       a.href = url;
       a.download = filename;
@@ -228,7 +244,25 @@ export function PostCreator() {
             </div>
           </div>
 
-          <PostReelPanel def={def} fields={draft.fields} lists={draft.lists} colors={draft.colors} onError={setError} />
+          {lastExport && (
+            <div className="card">
+              <h2>Image post</h2>
+              <div className="post-export-result">
+                <img src={lastExport.url} alt="Exported post" />
+                <p className="hint saved-path">Saved to {lastExport.savedPath}</p>
+              </div>
+              <PostPublishBox
+                savedPath={lastExport.savedPath}
+                templateId={templateId}
+                suggestedCaption={lastExport.caption}
+                kind="image"
+                stale={lastExport.snapshot !== contentSnapshot}
+                previewUrl={lastExport.url}
+              />
+            </div>
+          )}
+
+          <PostReelPanel def={def} fields={draft.fields} lists={draft.lists} colors={draft.colors} safeZones={draft.safeZones} onError={setError} />
         </div>
 
         <div className="editor-preview post-creator-preview">
@@ -236,11 +270,24 @@ export function PostCreator() {
             <h2>Preview</h2>
             {/* Tall formats (stories) are capped by viewport height, not just column width */}
             <div style={{ width: `min(100%, calc(72vh * ${def.width / def.height}))`, margin: "0 auto" }}>
-              <PostPreview def={def} fields={draft.fields} lists={draft.lists} colors={draft.colors} />
+              <PostPreview def={def} fields={draft.fields} lists={draft.lists} colors={draft.colors} safeZones={draft.safeZones} showGuides={showGuides} />
             </div>
             <p className="hint" style={{ marginTop: 8 }}>
               {def.width}×{def.height} PNG
             </p>
+            <div className="field checkbox">
+              <input
+                id="post-safe-zones"
+                type="checkbox"
+                checked={draft.safeZones}
+                onChange={(e) => setDraft((d) => ({ ...d, safeZones: e.target.checked }))}
+              />
+              <label htmlFor="post-safe-zones">Keep content inside Reels safe zones</label>
+            </div>
+            <div className="field checkbox" style={{ marginTop: 6 }}>
+              <input id="post-show-guides" type="checkbox" checked={showGuides} onChange={(e) => toggleGuides(e.target.checked)} />
+              <label htmlFor="post-show-guides">Show safe-zone guides</label>
+            </div>
             <div className="button-row">
               <button type="button" onClick={onExport} disabled={exporting}>
                 {exporting ? "Rendering…" : "Export PNG"}
@@ -253,7 +300,7 @@ export function PostCreator() {
                 </a>
               )}
             </div>
-            {lastExport && <p className="hint">Saved to {lastExport.savedPath}</p>}
+            {lastExport && <p className="hint saved-path">Saved to {lastExport.savedPath}</p>}
           </div>
         </div>
       </div>
@@ -384,3 +431,4 @@ function PostListInput({ def, items, onChange }: { def: PostListFieldDef; items:
     </div>
   );
 }
+

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Pause, Play } from "lucide-react";
 import { api } from "../api";
+import { PostPublishBox } from "./PostPublishBox";
+import { suggestPostCaption } from "../lib/postCaption";
 import type { PostColors, PostFields, PostLists, PostTemplateDef } from "../../../src/posts/types";
 
 type Track = { file: string; durationSeconds: number | null };
@@ -43,18 +45,24 @@ export function PostReelPanel({
   lists,
   colors,
   onError,
+  safeZones,
 }: {
   def: PostTemplateDef;
   fields: PostFields;
   lists: PostLists;
   colors: PostColors;
   onError: (message: string | null) => void;
+  safeZones: boolean;
 }) {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [settings, setSettings] = useState<ReelSettings>(readSettings);
   const [playing, setPlaying] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [result, setResult] = useState<{ url: string; savedPath: string; filename: string } | null>(null);
+  const [result, setResult] = useState<{ url: string; savedPath: string; filename: string; snapshot: string; caption: string } | null>(null);
+
+  // What the reel was made from (post content + reel settings) - compared to
+  // warn that publishing would post an out-of-date file.
+  const snapshot = JSON.stringify({ id: def.id, fields, lists, colors, safeZones, settings });
   const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
@@ -124,11 +132,12 @@ export function PostReelPanel({
         fields,
         lists,
         colors,
+        safeZones,
         reel: { ...settings, musicFile: settings.musicFile || null },
       });
       const url = URL.createObjectURL(blob);
       const filename = savedPath.split("/").pop() || `${def.id}.mp4`;
-      setResult({ url, savedPath, filename });
+      setResult({ url, savedPath, filename, snapshot, caption: suggestPostCaption(def, fields, lists) });
       const a = document.createElement("a");
       a.href = url;
       a.download = filename;
@@ -217,7 +226,8 @@ export function PostReelPanel({
       {result && (
         <>
           <video className="post-reel-result" src={result.url} controls />
-          <p className="hint">Saved to {result.savedPath}</p>
+          <p className="hint saved-path">Saved to {result.savedPath}</p>
+          <PostPublishBox savedPath={result.savedPath} templateId={def.id} suggestedCaption={result.caption} kind="reel" stale={result.snapshot !== snapshot} previewUrl={result.url} />
         </>
       )}
     </div>

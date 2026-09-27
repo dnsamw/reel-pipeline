@@ -481,6 +481,29 @@ decision, fixed-vs-variable duration, `assets/intro-videos/`/`assets/outro-video
 *before* anyone shoots footage, even though the pipeline can't play those clips back yet. Building that
 playback is a separate, larger change — see the trade-offs it involves in that section of the spec doc.
 
+### Media Library
+
+`gui/src/pages/MediaLibrary.tsx` at `/library`, backed by `server/library.ts`:
+- `GET /api/library` lists files from exactly three folders, each with its own extension allow-list:
+  `output/*.mp4` (batch reels), `output/posts/*.{png,mp4}` and `assets/images/*`. Each file is annotated
+  with its manifest entry (matched on `outputPath`), whether it's published (the `publications` table) and,
+  for images, which recipes/templates/settings mention `images/<file>`.
+- `POST /api/library/delete` takes ids of the form `<kind>:<file name>`, never paths. A name that isn't its
+  own `basename` or has the wrong extension is rejected, so a request can't reach anything else on disk.
+  Deleting a batch reel also drops the manifest entries pointing at it.
+- `POST /api/library/manifest/prune` drops entries whose video is missing. `POST /api/library/manifest/reset`
+  copies `manifest.json` to `manifest.backup-<timestamp>.json`, then empties it (videos are kept).
+- Reel deletes and both manifest actions return 409 while a render is running: `renderBatch.ts` rewrites
+  `manifest.json` after every reel and would silently undo them.
+
+### Per-language narration
+
+`ttsEnglish` / `ttsSinhala` in `ReelConfig` (both default `true`, flags `--ttsEn` / `--ttsSi`) apply on top of
+`ttsEnabled`. `renderBatch.ts` synthesizes only the enabled languages and leaves `null` in `ttsPhraseFiles`
+(English) or `ttsRevealFiles` (Sinhala) for the other. The compositions already treat `null` as "no voice
+here", so no composition code changed. The manifest's per-phrase files show which languages a reel has, and
+Monitor displays that (e.g. "TTS English only").
+
 ### Post Creator (static image posts)
 
 `gui/src/pages/PostCreator.tsx` at `/post-creator`. Post templates live in `src/posts/`, one React component
@@ -505,6 +528,21 @@ can't drift apart. Things worth knowing:
   `assets/music/` track (`-stream_loop -1 -ss <start>`, volume + fades). That takes seconds, where
   `renderMedia` would screenshot every frame. With no track it muxes `anullsrc` so the MP4 still has an audio
   stream. `GET /api/music` lists the tracks, with durations from ffprobe.
+- **Safe zones** (`src/posts/safeZones.ts`): `REEL_SAFE_INSETS` is the area of a 1080×1920 reel that the
+  Reels/Stories UI covers or tall phones crop, measured from a real iPhone 17 Pro reel. `reelSafeInsets(w, h)`
+  maps it into a template's own pixels, assuming the fit-and-centre placement `postReel.ts` uses, so a square
+  post only gets side insets. Templates receive the result as the `insets` prop (zeros when the option is off)
+  and use `max(design margin, inset)`, so the normal layout doesn't change when it's off. `safeZones` travels
+  with the render/reel requests into the `"Post"` still's props.
+- **Publishing** (`POST /api/posts/publish`) takes the `savedPath` an export returned. It only accepts files
+  under `output/posts/`, never re-renders, and picks the Graph API call from the file itself:
+  - PNG goes to `/{page}/photos` (`publishPhotoToConnectedPage`).
+  - A 9:16 MP4 of 3-90s (checked with ffprobe) goes through the three-step `/{page}/video_reels` flow
+    (`publishReelToConnectedPage`: start, upload to rupload, finish with `video_state=PUBLISHED`).
+  - Anything else goes to `/{page}/videos`.
+
+  Rows go into the shared `publications` table with `batchId` set to `post:<file name>`, so they can't collide
+  with manifest batches. Reels need the same `pages_manage_posts` permission as the existing video upload.
 
 ## Known limitations & gotchas
 

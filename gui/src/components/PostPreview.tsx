@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { PostColors, PostFields, PostLists, PostTemplateDef } from "../../../src/posts/types";
+import { postInsets, reelSafeInsets } from "../../../src/posts/safeZones";
 
 /**
  * Renders a post template's real component (the same one renderStill
@@ -15,12 +16,18 @@ export function PostPreview({
   lists,
   colors,
   width,
+  safeZones = false,
+  showGuides = false,
 }: {
   def: PostTemplateDef;
   fields: PostFields;
   lists?: PostLists;
   colors: PostColors;
   width?: number;
+  /** Lay the template out inside the Reels safe zones (same as the export). */
+  safeZones?: boolean;
+  /** Shade the areas the Reels/Stories UI covers or tall phones crop off. */
+  showGuides?: boolean;
 }) {
   const [fontsReady, setFontsReady] = useState(false);
   const outerRef = useRef<HTMLDivElement>(null);
@@ -55,14 +62,46 @@ export function PostPreview({
       style={{ width: width ?? "100%", aspectRatio: `${def.width} / ${def.height}` }}
     >
       {fontsReady && w > 0 ? (
-        <div style={{ width: def.width, height: def.height, transform: `scale(${scale})`, transformOrigin: "top left" }}>
-          <Component fields={{ ...def.defaultFields, ...fields }} lists={{ ...def.defaultLists, ...lists }} colors={{ ...def.defaultColors, ...colors }} />
+        <div style={{ position: "relative", width: def.width, height: def.height, transform: `scale(${scale})`, transformOrigin: "top left" }}>
+          <Component fields={{ ...def.defaultFields, ...fields }} lists={{ ...def.defaultLists, ...lists }} colors={{ ...def.defaultColors, ...colors }}
+            insets={postInsets(def.width, def.height, safeZones)}
+          />
+          {showGuides && <SafeZoneGuides def={def} />}
         </div>
       ) : (
         <div className="post-preview-loading">
           <span className="hint">Loading…</span>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * The reel safe zones drawn in the template's own pixels (this sits inside the
+ * scaled 1:1 layer): shaded bands where the Reels/Stories UI covers the post
+ * or tall phones crop it, and a dashed outline of the area content can use.
+ */
+function SafeZoneGuides({ def }: { def: PostTemplateDef }) {
+  const i = reelSafeInsets(def.width, def.height);
+  const band = "rgba(239, 68, 68, 0.28)";
+  const line = Math.max(2, Math.round(def.width / 270));
+  return (
+    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 50 }}>
+      <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: i.top, background: band }} />
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: i.bottom, background: band }} />
+      <div style={{ position: "absolute", left: 0, top: i.top, bottom: i.bottom, width: i.left, background: band }} />
+      <div style={{ position: "absolute", right: 0, top: i.top, bottom: i.bottom, width: i.right, background: band }} />
+      <div
+        style={{
+          position: "absolute",
+          top: i.top,
+          right: i.right,
+          bottom: i.bottom,
+          left: i.left,
+          border: `${line}px dashed rgba(239, 68, 68, 0.9)`,
+        }}
+      />
     </div>
   );
 }

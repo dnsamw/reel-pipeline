@@ -4,6 +4,7 @@ import type {
   CompositionRecipe,
   DataSourceDescriptor,
   FacebookStatus,
+  LibraryListing,
   Manifest,
   Phrase,
   Publication,
@@ -89,6 +90,9 @@ export const api = {
     limit?: number;
     force?: boolean;
     tts?: boolean;
+    /** Per-language narration overrides - omitted means use Settings. */
+    ttsEnglish?: boolean;
+    ttsSinhala?: boolean;
     template?: string;
     book?: string;
     sidechain?: boolean;
@@ -131,6 +135,10 @@ export const api = {
   publish: (body: { batchId: string; template: string; caption?: string }) =>
     request<Publication>("/publish", { method: "POST", body: JSON.stringify(body) }),
 
+  // Publishes an exported Post Creator file; a failed upload comes back as a
+  // Publication with `error` set, which request() turns into a thrown Error.
+  publishPost: (body: { savedPath: string; caption: string; templateId: string }) =>
+    request<Publication & { format: "photo" | "reel" | "video" }>("/posts/publish", { method: "POST", body: JSON.stringify(body) }),
   musicTracks: () => request<{ file: string; durationSeconds: number | null }[]>("/music"),
   // Not through request() - the success response is the MP4 itself.
   renderPostReel: async (body: {
@@ -138,6 +146,7 @@ export const api = {
     fields: Record<string, string>;
     lists: Record<string, Record<string, string>[]>;
     colors: Record<string, string>;
+    safeZones: boolean;
     reel: { durationSeconds: number; musicFile: string | null; musicStartSeconds: number; musicVolume: number; frame: "reel" | "original" };
   }) => {
     const res = await fetch("/api/posts/reel", {
@@ -151,9 +160,17 @@ export const api = {
     }
     return { blob: await res.blob(), savedPath: res.headers.get("X-Saved-Path") ?? "" };
   },
+  library: () => request<LibraryListing>("/library"),
+  deleteLibraryItems: (ids: string[]) =>
+    request<{ deleted: string[]; manifestEntriesRemoved: number; errors: { id: string; error: string }[] }>("/library/delete", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    }),
+  resetManifest: () => request<{ cleared: number; backupPath: string | null }>("/library/manifest/reset", { method: "POST" }),
+  pruneManifest: () => request<{ removed: number }>("/library/manifest/prune", { method: "POST" }),
   warmPostRenderer: () => request<void>("/posts/warm", { method: "POST" }),
   // Not through request() - the success response is the PNG itself, not JSON.
-  renderPost: async (body: { templateId: string; fields: Record<string, string>; lists: Record<string, Record<string, string>[]>; colors: Record<string, string> }) => {
+  renderPost: async (body: { templateId: string; fields: Record<string, string>; lists: Record<string, Record<string, string>[]>; colors: Record<string, string>; safeZones: boolean }) => {
     const res = await fetch("/api/posts/render", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../api";
+import { type TriState, triStateValue } from "./TtsLanguageSelects";
 import { PhraseEditFields, type PhraseEdit } from "./PhraseEditFields";
 import type { Phrase, RenderRun } from "../types";
 
@@ -41,7 +42,7 @@ export function RenderQueuePanel({
   entries: RenderQueueEntry[];
   onChange: (batchId: string, update: Partial<RenderQueueEntry>) => void;
   onRemove: (batchId: string) => void;
-  style: { templateId?: string; recipeId: string; tts: "default" | "true" | "false"; sidechain: boolean };
+  style: { templateId?: string; recipeId: string; tts: "default" | "true" | "false"; ttsEnglish: TriState; ttsSinhala: TriState; sidechain: boolean };
   onItemRendered: () => void;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -56,6 +57,8 @@ export function RenderQueuePanel({
         templateId: style.templateId,
         recipeId: style.recipeId,
         tts: style.tts === "default" ? undefined : style.tts === "true",
+        ttsEnglish: triStateValue(style.ttsEnglish),
+        ttsSinhala: triStateValue(style.ttsSinhala),
         sidechain: style.sidechain || undefined,
       });
       onChange(entry.batchId, { run: started });
