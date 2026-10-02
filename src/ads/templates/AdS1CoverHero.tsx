@@ -18,7 +18,7 @@ const CSS = `
 .s1 .middle { flex: 1; min-height: 560px; display: flex; gap: 24px; margin: 36px 0 40px; }
 .s1 .proof { flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
 .s1 .stat-number { font: 800 140px/.92 var(--f-display); letter-spacing: -0.04em; white-space: nowrap; color: var(--accent); }
-.s1 .stat-label { margin-top: 10px; font: 600 36px/1.2 var(--f-body); color: var(--ink-soft); }
+.s1 .stat-label { margin-bottom: 10px; font: 600 36px/1.2 var(--f-body); color: var(--ink-soft); }
 .s1 .bullets { list-style: none; margin: 44px 0 0; padding: 0; display: grid; gap: 22px; }
 .s1 .bullets li { display: grid; grid-template-columns: 44px 1fr; gap: 16px; align-items: center;
   font: 600 32px/1.25 var(--f-body); color: var(--ink); }
@@ -69,11 +69,11 @@ function AdS1CoverHero({ format, product, fields, lists, colors, mockup }: AdTem
       </div>
       <div className="middle">
         <div className="proof">
-          <div className="stat-number" data-fit data-min="80">
-            {fields.statNumber}
-          </div>
           <div className="stat-label" {...siLang(fields.statLabel)}>
             {fields.statLabel}
+          </div>
+          <div className="stat-number" data-fit data-min="80">
+            {fields.statNumber}
           </div>
           <ul className="bullets">
             {bullets.map((t, i) => (
