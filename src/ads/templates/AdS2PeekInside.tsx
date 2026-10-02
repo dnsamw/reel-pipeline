@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { AdFrame, BrandBar, MockupSlot, OfferBar, siLang, useAdFit } from "../AdKit";
+import { offerDefaults, offerFields } from "../offerFields";
 import type { AdTemplateDef, AdTemplateProps } from "../types";
 
 // Port of ad-templates/ad-s2-peek-inside.html - "Template" CSS section verbatim.
@@ -120,7 +121,7 @@ function AdS2PeekInside({ format, product, fields, colors, mockup }: AdTemplateP
             {b.si}
           </div>
           <div className="title-en">{b.en + (b.enSub ? `: ${b.enSub}` : "")}</div>
-          <OfferBar price={fields.price} priceWas={fields.priceWas} cta={fields.cta} />
+          <OfferBar fields={fields} cta={fields.cta} />
         </div>
       </div>
     </AdFrame>
@@ -143,6 +144,7 @@ export const adS2PeekInside: AdTemplateDef = {
     { key: "translation", label: "Translation (Sinhala)", type: "text", lang: "si", hint: "Empty hides the row." },
     { key: "moreLine", label: "\"More like this\" line", type: "text", auto: (p) => (p.kind === "book" ? `One of ${p.book.phrasesLabel} phrases in this book` : "") },
     { key: "price", label: "Price", type: "text", hint: "Empty hides the price chip." },
+    ...offerFields,
     { key: "priceWas", label: "Old price (struck through)", type: "text" },
     { key: "cta", label: "Call to action", type: "text" },
     { key: "mockup", label: "Mockup", type: "image", hint: "Transparent PNG of this book. Empty = the flat cover with a 3D tilt." },
@@ -154,6 +156,7 @@ export const adS2PeekInside: AdTemplateDef = {
     translation: "හරිම ලේසි දෙයක්",
     moreLine: "",
     price: "Rs ____",
+    ...offerDefaults,
     priceWas: "",
     cta: "Order now · studypal.store",
     mockup: "",

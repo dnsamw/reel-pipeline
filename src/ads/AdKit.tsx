@@ -86,8 +86,19 @@ const AD_BASE_CSS = `
 .ad[data-format="ST"] .brand-name { font-size: 32px; }
 
 .offer-bar { display: flex; align-items: center; gap: 20px; flex: none; flex-wrap: wrap; }
+/* "All 9 Volumes" sits on its own row above the chip (flex-basis 100% in the wrapping offer bar). */
+.price-volumes { flex-basis: 100%; margin-bottom: -6px; font-family: var(--f-display); font-weight: 700; font-size: 34px; line-height: 1.15;
+  letter-spacing: -0.01em; color: var(--deep); }
+.price-volumes[lang] { font-family: var(--f-si); line-height: 1.45; letter-spacing: normal; }
+.price-volumes:empty { display: none; }
 .price-chip { display: inline-flex; align-items: baseline; gap: 16px; padding: 14px 28px; border-radius: 20px;
               background: var(--sp-gold); color: var(--sp-purple-deep); font-family: var(--f-display); white-space: nowrap; }
+/* A word before or after the price - "Just Rs 2,490", or the Sinhala order "Rs 2,490 ...". */
+.price-prefix, .price-suffix { font-weight: 700; font-size: 32px; line-height: 1; }
+.price-prefix { margin-right: -4px; }
+.price-suffix { margin-left: -4px; }
+.price-prefix[lang], .price-suffix[lang] { font-family: var(--f-si); line-height: 1; }
+.price-prefix:empty, .price-suffix:empty { display: none; }
 .price { font-weight: 800; font-size: 56px; line-height: 1; }
 .price-was { font-weight: 700; font-size: 30px; text-decoration: line-through; text-decoration-thickness: 3px; opacity: .65; }
 .price:empty, .price-was:empty { display: none; }
@@ -112,6 +123,25 @@ const AD_BASE_CSS = `
 .cover-wrap.is-tilted { transform: translateX(-50%) perspective(1600px) rotateY(-18deg) rotateX(2deg); }
 .cover-img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 4px 10px 10px 4px;
   box-shadow: inset 6px 0 10px rgba(0,0,0,.18), 24px 30px 50px -10px rgba(15,20,40,.35); }
+
+/* A book's volumes as a fanned stack of its flat cover (Vol 01 in front, the
+   rest fanning out behind it to the right). --n = cover count, --i = index.
+   Sized in cq units of the slot: covers shrink as the count grows so the fan
+   stays visible, and the group is centred on its estimated width. */
+.cover-stack { position: absolute; inset: 0;
+  --w: min(94cqh * 2 / 3, 62cqw, 100cqw / (1 + .12 * (var(--n) - 1)));
+  --dx: min(var(--w) * .3, (100cqw - var(--w) * 1.3) / max(var(--n) - 1, 1));
+  --step: min(3.5deg, 10deg / max(var(--n) - 1, 1));
+  --left: max(0px, (100cqw - var(--w) * 1.15 - (var(--n) - 1) * var(--dx)) / 2); }
+.cover-stack .mockup-shadow { left: calc(var(--left) - var(--w) * .05); transform: none;
+  width: calc(var(--w) * 1.15 + (var(--n) - 1) * var(--dx)); }
+.vol-cover { position: absolute; left: var(--left); bottom: 0; width: var(--w); height: calc(var(--w) * 1.5);
+  container-type: size; transform-origin: 50% 100%;
+  transform: translateX(calc(var(--i) * var(--dx))) rotate(calc(var(--i) * var(--step)));
+  z-index: calc(50 - var(--i)); filter: brightness(calc(1 - var(--i) * .035)); }
+.vol-badge { position: absolute; top: 3cqh; right: 2.5cqw; z-index: 2; padding: 1.1cqh 3.4cqw; border-radius: 99px;
+  background: #fff; color: var(--c-accent); font: 800 6.4cqw/1 var(--f-display); letter-spacing: .02em; white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(15,20,40,.25); }
 
 /* CSS fallback cover (base 400x600, scaled to the wrap by CssCover) */
 .css-cover { position: absolute; left: 0; top: 0; width: 400px; height: 600px; transform-origin: 0 0; overflow: hidden;
@@ -145,6 +175,7 @@ const AD_BASE_CSS = `
 .purple .save-badge { background: #fff; color: var(--sp-purple-deep); }
 .purple .cta { color: rgba(255,255,255,.92); }
 .purple .price-chip { box-shadow: 0 16px 30px -14px rgba(0,0,0,.5); }
+.purple .price-volumes { color: var(--hi); }
 .ad.purple[data-format="ST"] .cta { margin-left: 0; width: 100%; }
 `;
 
@@ -220,12 +251,24 @@ export function BrandBar({ chip, chipClassName }: { chip: string; chipClassName?
   );
 }
 
-export function OfferBar({ price, priceWas, saveBadge, cta }: { price: string; priceWas: string; saveBadge?: string; cta: string }) {
+/** "All 9 Volumes" line, price chip ("Just Rs 2,490 ~Rs 2,990~"), optional save badge, CTA. Pass the template's resolved fields. */
+export function OfferBar({ fields, saveBadge, cta }: { fields: Record<string, string>; saveBadge?: string; cta: string }) {
+  // A whitespace-only volumes line is how the GUI hides it (empty falls back to the product's count).
+  const volumes = (fields.volumesLine ?? "").trim();
   return (
     <div className="offer-bar">
+      <span className="price-volumes" {...siLang(volumes)}>
+        {volumes}
+      </span>
       <div className="price-chip">
-        <span className="price">{price}</span>
-        <span className="price-was">{priceWas}</span>
+        <span className="price-prefix" {...siLang(fields.pricePrefix)}>
+          {fields.pricePrefix ?? ""}
+        </span>
+        <span className="price">{fields.price ?? ""}</span>
+        <span className="price-suffix" {...siLang(fields.priceSuffix)}>
+          {fields.priceSuffix ?? ""}
+        </span>
+        <span className="price-was">{fields.priceWas ?? ""}</span>
       </div>
       {saveBadge !== undefined && <span className="save-badge">{saveBadge}</span>}
       <span className="cta" {...siLang(cta)}>
@@ -412,9 +455,28 @@ function CssCover({ book }: { book: AdBook }) {
 }
 
 /** The flat cover PNG with the CSS 3D treatment (Part 8.5), or the CSS cover if the PNG is missing. */
-function CoverMockup({ book, tilt }: { book: AdBook; tilt: boolean }) {
+/** The book's volumes as a fanned stack of its cover, each with a "VOL 01".. badge - Vol 01 in front. */
+function CoverStack({ book, count }: { book: AdBook; count: number }) {
   const src = resolvePostAsset(book.cover);
   const status = useImageStatus(src);
+  return (
+    <div className="cover-stack" style={{ "--n": count, "--c-accent": book.accent } as CSSProperties}>
+      <div className="mockup-shadow" />
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className="vol-cover" style={{ "--i": i } as CSSProperties}>
+          {status === "ok" && <HeldImg src={src} className="cover-img" />}
+          {status === "error" && <CssCover book={book} />}
+          <span className="vol-badge">VOL {String(i + 1).padStart(2, "0")}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CoverMockup({ book, tilt, stack = 1 }: { book: AdBook; tilt: boolean; stack?: number }) {
+  const src = resolvePostAsset(book.cover);
+  const status = useImageStatus(src);
+  if (stack > 1) return <CoverStack book={book} count={stack} />;
   return (
     <>
       <div className="mockup-shadow for-cover" />
@@ -436,6 +498,7 @@ export function MockupSlot({
   book,
   tilt = true,
   adjust,
+  stack = 1,
   className = "mockup-slot",
   style,
 }: {
@@ -444,6 +507,8 @@ export function MockupSlot({
   book: AdBook;
   tilt?: boolean;
   adjust?: AdMockupAdjust;
+  /** Covers in the fallback: 1 = the single tilted cover, more = a fanned stack of volumes. Ignored when the mockup image loads. */
+  stack?: number;
   className?: string;
   style?: CSSProperties;
 }) {
@@ -460,7 +525,7 @@ export function MockupSlot({
           <HeldImg src={resolved} className="mockup" style={nudge} />
         </>
       ) : status === "loading" ? null : (
-        <CoverMockup book={book} tilt={tilt} />
+        <CoverMockup book={book} tilt={tilt} stack={stack} />
       )}
     </div>
   );

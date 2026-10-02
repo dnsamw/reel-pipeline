@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { AdFrame, BrandBar, MockupSlot, OfferBar, siLang, useAdFit } from "../AdKit";
+import { offerDefaults, offerFields } from "../offerFields";
 import type { AdTemplateDef, AdTemplateProps } from "../types";
 
 // Port of ad-templates/ad-s1-cover-hero.html - "Template" CSS section verbatim.
@@ -48,6 +49,12 @@ const CSS = `
 .ad.s1[data-format="ST"] .cta { margin-left: 0; width: 100%; }
 `;
 
+/** "Covers in the stack" field -> 1..12; anything unparsable = the book's volume count. */
+function stackCount(raw: string | undefined, volumes: number): number {
+  const n = parseInt(raw ?? "", 10);
+  return Math.min(12, Math.max(1, Number.isFinite(n) ? n : volumes));
+}
+
 function AdS1CoverHero({ format, product, fields, lists, colors, mockup }: AdTemplateProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   if (product.kind !== "book") throw new Error("S1 advertises a single book");
@@ -83,9 +90,9 @@ function AdS1CoverHero({ format, product, fields, lists, colors, mockup }: AdTem
             ))}
           </ul>
         </div>
-        <MockupSlot src={fields.mockup} book={b} tilt adjust={mockup} />
+        <MockupSlot src={fields.mockup} book={b} tilt adjust={mockup} stack={stackCount(fields.stack, b.volumes)} />
       </div>
-      <OfferBar price={fields.price} priceWas={fields.priceWas} cta={fields.cta} />
+      <OfferBar fields={fields} cta={fields.cta} />
     </AdFrame>
   );
 }
@@ -111,9 +118,17 @@ export const adS1CoverHero: AdTemplateDef = {
     { key: "statLabel", label: "Number label", type: "text" },
     { key: "bullets", label: "Bullets", type: "list", itemLabel: "Bullet", itemFields: [{ key: "text", label: "Text", type: "text" }], minItems: 0, maxItems: 3, hint: "PT only - SQ and ST hide them to keep the image text short." },
     { key: "price", label: "Price", type: "text", hint: "Empty hides the price chip." },
+    ...offerFields,
     { key: "priceWas", label: "Old price (struck through)", type: "text" },
     { key: "cta", label: "Call to action", type: "text" },
-    { key: "mockup", label: "Mockup", type: "image", hint: "Transparent PNG of this book (e.g. b04-front.png). Empty = the flat cover with a 3D tilt." },
+    { key: "mockup", label: "Mockup", type: "image", hint: "Transparent PNG of this book (e.g. b04-front.png). Empty = the book's flat cover." },
+    {
+      key: "stack",
+      label: "Covers in the stack",
+      type: "text",
+      auto: (p) => (p.kind === "book" ? String(p.book.volumes) : "1"),
+      hint: "Without a mockup image, the cover is shown as a fanned stack of the book's volumes, Vol 01 in front. Empty = one per volume; 1 = a single tilted cover. Up to 12.",
+    },
   ],
   defaultFields: {
     hook: "",
@@ -121,9 +136,11 @@ export const adS1CoverHero: AdTemplateDef = {
     statNumber: "",
     statLabel: "real phrases",
     price: "Rs ____",
+    ...offerDefaults,
     priceWas: "",
     cta: "Order now · studypal.store",
     mockup: "",
+    stack: "",
   },
   defaultLists: {
     bullets: [{ text: "Pronunciation in Sinhala letters" }, { text: "Meaning + when to use it" }, { text: "Real-life situations" }],

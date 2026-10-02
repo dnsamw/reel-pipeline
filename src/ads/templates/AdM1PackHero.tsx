@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { resolvePostAsset } from "../../posts/PostReady";
 import { AdFrame, BrandBar, MockupSlot, OfferBar, siLang, useAdFit, useImageStatus } from "../AdKit";
 import { bookByNumber, PACKS, type AdBook } from "../products";
+import { offerDefaults, offerFields } from "../offerFields";
 import type { AdTemplateDef, AdTemplateProps } from "../types";
 
 // Port of ad-templates/ad-m1-pack-hero.html - "Template" CSS section, with
@@ -82,7 +83,7 @@ function AdM1PackHero({ format, product, fields, colors, mockup }: AdTemplatePro
           </>
         )}
       </div>
-      <OfferBar price={fields.price} priceWas={fields.priceWas} saveBadge={fields.saveBadge} cta={fields.cta} />
+      <OfferBar fields={fields} saveBadge={fields.saveBadge} cta={fields.cta} />
     </AdFrame>
   );
 }
@@ -108,6 +109,7 @@ export const adM1PackHero: AdTemplateDef = {
       placeholder: (p) => (p.kind === "pack" ? `3 books · ${p.pack.phrasesLabel} phrases · ${p.pack.volumes} volumes` : ""),
     },
     { key: "price", label: "Price", type: "text", hint: "Empty hides the price chip." },
+    ...offerFields,
     { key: "priceWas", label: "Old price (struck through)", type: "text" },
     { key: "saveBadge", label: "Save badge", type: "text", hint: "Empty hides it." },
     { key: "cta", label: "Call to action", type: "text" },
@@ -123,6 +125,7 @@ export const adM1PackHero: AdTemplateDef = {
     books: "",
     statLine: "",
     price: "Rs ____",
+    ...offerDefaults,
     priceWas: "Rs ____",
     saveBadge: "Save __%",
     cta: "Order now · studypal.store",

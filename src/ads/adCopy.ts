@@ -35,7 +35,13 @@ export function suggestPrimaryText(product: AdProduct, fields: PostFields, lists
   const benefits = (listed.length ? listed : DEFAULT_BENEFITS).slice(0, 3);
 
   const lines = [hook, `${count}. ${VALUE_LINE_SI}`, ...benefits.map((b) => `✓ ${b}`)];
-  if (isRealPrice(fields.price)) lines.push(`Now ${fields.price}${isRealPrice(fields.priceWas) ? ` (was ${fields.priceWas})` : ""}`);
+  if (isRealPrice(fields.price)) {
+    const volumes = (fields.volumesLine ?? "").trim();
+    const before = fields.pricePrefix ? `${fields.pricePrefix} ` : fields.priceSuffix ? "" : "Now ";
+    const after = fields.priceSuffix ? ` ${fields.priceSuffix}` : "";
+    const price = `${before}${fields.price}${after}${isRealPrice(fields.priceWas) ? ` (was ${fields.priceWas})` : ""}`;
+    lines.push(volumes ? `${volumes} · ${price}` : price);
+  }
   lines.push("👉 Order: studypal.store");
   return lines.join("\n");
 }

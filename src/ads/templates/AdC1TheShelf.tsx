@@ -2,6 +2,7 @@ import { useRef, type CSSProperties } from "react";
 import { resolvePostAsset } from "../../posts/PostReady";
 import { AdFrame, AdLogo, BrandBar, MockupSlot, OfferBar, siLang, useAdFit, useImageStatus } from "../AdKit";
 import { BOOKS, COLLECTION, VALUE_LINE_SI } from "../products";
+import { offerDefaults, offerFields } from "../offerFields";
 import type { AdTemplateDef, AdTemplateProps } from "../types";
 
 // Port of ad-templates/ad-c1-the-shelf.html - "Template" CSS section, with
@@ -135,7 +136,7 @@ function AdC1TheShelf({ format, fields, lists, colors, mockup }: AdTemplateProps
           </>
         )}
       </div>
-      <OfferBar price={fields.price} priceWas={fields.priceWas} saveBadge={fields.saveBadge} cta={fields.cta} />
+      <OfferBar fields={fields} saveBadge={fields.saveBadge} cta={fields.cta} />
     </AdFrame>
   );
 }
@@ -156,6 +157,7 @@ export const adC1TheShelf: AdTemplateDef = {
     { key: "bigLabelSi", label: "Sinhala line", type: "textarea", lang: "si", hint: "Hidden on SQ. Empty hides it." },
     { key: "statLine", label: "Stat line", type: "text", placeholder: () => `${COLLECTION.books} books · ${COLLECTION.volumes} volumes · Sinhala pronunciation` },
     { key: "price", label: "Price", type: "text", hint: "Empty hides the price chip." },
+    ...offerFields,
     { key: "priceWas", label: "Old price (struck through)", type: "text" },
     { key: "saveBadge", label: "Save badge", type: "text", hint: "Empty hides it." },
     { key: "cta", label: "Call to action", type: "text" },
@@ -182,6 +184,7 @@ export const adC1TheShelf: AdTemplateDef = {
     bigLabelSi: VALUE_LINE_SI,
     statLine: "",
     price: "Rs ____",
+    ...offerDefaults,
     priceWas: "Rs ____",
     saveBadge: "Save __%",
     cta: "Order now · studypal.store",

@@ -271,6 +271,11 @@ export pick it up automatically.
 - **Product**: pick the book or pack the ad is for. Book ads take that book's accent and tint colors, and empty
   fields fall back to its copy-bank hook, phrase count and so on (shown as grey placeholders). Each
   template × product remembers its own content, colors and mockup in the browser.
+- **Offer**: "All 9 Volumes" on its own line above the gold price chip, on every template. The count comes from
+  the product (a pack adds up its three books, the collection is 69). The chip has a word before *or* after the
+  price ("Just Rs 2,490", or after the price for Sinhala word order). All three are editable.
+- **S1 volume stack**: without a mockup image, S1 shows the book's volumes as a fanned stack of its cover, Vol 01
+  in front and each labelled VOL 01, 02... ("Covers in the stack" - defaults to the volume count, 1 = a single cover).
 - **Mockup**: upload a transparent PNG mockup per product, then nudge it (scale / rotate / move). With no mockup
   the ad shows the book's flat cover (`assets/ads/covers/`) with a 3D tilt. M1 fans the three covers, and C1
   draws a CSS bookshelf of all ten spines, each with an editable English name and the Sinhala name under it.
