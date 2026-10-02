@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>English Book Series - Price List</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Noto+Sans+Sinhala:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* Brand palette - mirrors src/theme/tokens.ts */
+        :root {
+            --primary: #58238b;
+            --brand2: #9c35b6;
+            --gold: #fab005;
+            --gold-ink: #8f5614;
+            --gold-tint: #fff7e6;
+            --primary-tint: #f9f6fb;
+            --fg: #09090b;
+            --muted: #6b6470;
+            --border: #e4dfec;
+            --bg: #ffffff;
+
+            /* Everything scales with the smaller of width/height so 10 rows
+               always fit without scrolling. */
+            --u: min(1vw, 1.6vh);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: "Poppins", "Noto Sans Sinhala", Arial, sans-serif;
+            background: var(--bg);
+            color: var(--fg);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            height: 100dvh;
+        }
+
+        /* ---------- Header ---------- */
+        .hero {
+            flex: none;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: calc(var(--u) * 2);
+            padding: calc(var(--u) * 1.6) calc(var(--u) * 3);
+            background: linear-gradient(120deg, var(--primary), var(--brand2));
+            color: #fff;
+        }
+
+        .hero h1 {
+            font-size: calc(var(--u) * 2.8);
+            font-weight: 800;
+            line-height: 1.15;
+            letter-spacing: -0.01em;
+        }
+
+        .hero p {
+            font-family: "Noto Sans Sinhala", "Poppins", sans-serif;
+            font-size: calc(var(--u) * 1.5);
+            opacity: 0.85;
+            margin-top: calc(var(--u) * 0.3);
+        }
+
+        .offer {
+            flex: none;
+            display: flex;
+            align-items: center;
+            gap: calc(var(--u) * 1.2);
+            background: var(--gold);
+            color: var(--fg);
+            border-radius: calc(var(--u) * 1.2);
+            padding: calc(var(--u) * 0.8) calc(var(--u) * 1.6);
+            box-shadow: 0 calc(var(--u) * 0.4) calc(var(--u) * 1.5) rgba(0, 0, 0, 0.2);
+        }
+
+        .offer-pct {
+            font-size: calc(var(--u) * 3.4);
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .offer-text {
+            font-size: calc(var(--u) * 1.3);
+            font-weight: 600;
+            line-height: 1.3;
+            color: var(--gold-ink);
+        }
+
+        /* ---------- Table ---------- */
+        .list {
+            flex: 1;
+            min-height: 0;
+            display: grid;
+            grid-template-rows: auto repeat(10, 1fr);
+            padding: calc(var(--u) * 1) calc(var(--u) * 3) calc(var(--u) * 1.4);
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: calc(var(--u) * 4) 1fr calc(var(--u) * 7.5) calc(var(--u) * 9.5) calc(var(--u) * 14);
+            align-items: center;
+            gap: calc(var(--u) * 1.5);
+            padding: 0 calc(var(--u) * 1.2);
+            border-bottom: 1px solid var(--border);
+            min-height: 0;
+        }
+
+        .row:nth-child(odd):not(.head) {
+            background: var(--primary-tint);
+        }
+
+        .head {
+            font-size: calc(var(--u) * 1.2);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--primary);
+            padding-bottom: calc(var(--u) * 0.7);
+            border-bottom: 2px solid var(--primary);
+        }
+
+        .c { text-align: center; }
+
+        .num {
+            display: grid;
+            place-items: center;
+            width: calc(var(--u) * 3.2);
+            height: calc(var(--u) * 3.2);
+            border-radius: 50%;
+            background: var(--primary);
+            color: #fff;
+            font-weight: 700;
+            font-size: calc(var(--u) * 1.4);
+        }
+
+        .titles { min-width: 0; }
+
+        .si {
+            display: block;
+            font-family: "Noto Sans Sinhala", "Poppins", sans-serif;
+            font-weight: 700;
+            font-size: calc(var(--u) * 1.65);
+            line-height: 1.35;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .en {
+            display: block;
+            font-size: calc(var(--u) * 1.25);
+            color: var(--muted);
+            line-height: 1.3;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .stat {
+            font-size: calc(var(--u) * 1.8);
+            font-weight: 700;
+            color: var(--primary);
+            text-align: center;
+        }
+
+        .stat small {
+            display: none;
+        }
+
+        .price {
+            display: flex;
+            align-items: baseline;
+            justify-content: center;
+            gap: calc(var(--u) * 0.8);
+        }
+
+        .old {
+            font-size: calc(var(--u) * 1.3);
+            color: var(--muted);
+            text-decoration: line-through;
+        }
+
+        .new {
+            font-size: calc(var(--u) * 2.2);
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        /* ---------- Portrait / narrow screens ----------
+           Every book has the same price, so the banner carries it and each row
+           gives the full width to the title. */
+        @media (max-aspect-ratio: 1/1) {
+            :root { --u: min(2.4vw, 0.95vh); }
+
+            .hero { padding: calc(var(--u) * 1.8) calc(var(--u) * 2); }
+            .hero h1 { font-size: calc(var(--u) * 2.6); }
+            .hero p { font-size: calc(var(--u) * 1.7); }
+            .offer { padding: calc(var(--u) * 0.8) calc(var(--u) * 1.2); gap: calc(var(--u) * 0.8); }
+            .offer-pct { font-size: calc(var(--u) * 2.6); }
+            .offer-text { font-size: calc(var(--u) * 1.4); }
+
+            .list {
+                grid-template-rows: repeat(10, 1fr);
+                padding: calc(var(--u) * 0.6) calc(var(--u) * 1.5) calc(var(--u) * 1);
+            }
+            .head, .price { display: none; }
+
+            .row {
+                grid-template-columns: calc(var(--u) * 4.2) auto 1fr;
+                grid-template-areas: "n t t" "n m1 m2";
+                column-gap: calc(var(--u) * 1.5);
+                row-gap: calc(var(--u) * 0.2);
+                align-content: center;
+                padding: 0 calc(var(--u) * 0.8);
+            }
+            .row:nth-child(odd):not(.head) { background: transparent; }
+            .row:nth-child(even) { background: var(--primary-tint); }
+
+            .row > :nth-child(1) { grid-area: n; }
+            .titles { grid-area: t; }
+            .row > .stat { grid-area: m1; text-align: left; font-size: calc(var(--u) * 1.5); font-weight: 600; }
+            .row > .stat + .stat { grid-area: m2; }
+            .stat small { display: inline; color: var(--muted); font-weight: 400; }
+
+            .num { width: calc(var(--u) * 3.6); height: calc(var(--u) * 3.6); font-size: calc(var(--u) * 1.6); }
+            .si {
+                font-size: calc(var(--u) * 1.85);
+                line-height: 1.3;
+                white-space: normal;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+            }
+            .en { font-size: calc(var(--u) * 1.5); }
+        }
+    </style>
+</head>
+
+<body>
+
+<header class="hero">
+    <div>
+        <h1>English Book Series — Price List</h1>
+        <p>ඉංග්‍රීසි පොත් පෙළ · මිල ලැයිස්තුව</p>
+    </div>
+    <div class="offer">
+        <span class="offer-pct">50%<br>OFF</span>
+        <span class="offer-text">Every book<br>Rs. 500 → Rs. 250</span>
+    </div>
+</header>
+
+<main class="list">
+    <div class="row head">
+        <span class="c">#</span>
+        <span>Book Title / පොතේ නම</span>
+        <span class="c">Volumes</span>
+        <span class="c">Sentences</span>
+        <span class="c">Price / Book</span>
+    </div>
+
+    <div class="row">
+        <span class="num">1</span>
+        <div class="titles">
+            <span class="si">කතා කරන්න පටන් ගනිමු: ඉංග්‍රීසි ගැන විශ්වාසය ගොඩනඟන අත්වැල</span>
+            <span class="en">Just Start Talking: Your English Confidence Kit</span>
+        </div>
+        <span class="stat">9<small> volumes</small></span>
+        <span class="stat">2,888<small> sentences</small></span>
+        <span class="price"><span class="old">Rs. 500</span><span class="new">Rs. 250</span></span>
+    </div>
+
+    <div class="row">
+        <span class="num">2</span>
+        <div class="titles">
+            <span class="si">එදිනෙදා ඉංග්‍රීසි - ඕනෑම තැනකදී ගේම ගහන්න මූලික අඩිතාලම</span>
+            <span class="en">Everyday English: Foundations for Real Life</span>
+        </div>
+        <span class="stat">8<small> volumes</small></span>
+        <span class="stat">2,200<small> sentences</small></span>
+        <span class="price"><span class="old">Rs. 500</span><span class="new">Rs. 250</span></span>
+    </div>
+
+    <div class="row">
+        <span class="num">3</span>
+        <div class="titles">
+            <span class="si">ඕනෑම තැනකදී තනියම වැඩේ කරගන්න අවශ්‍ය සියලුම ඉංග්‍රීසි!</span>
+            <span class="en">Getting Things Done: Banks, Clinics, Hotels &amp; Travel</span>
+        </div>
+        <span class="stat">8<small> volumes</small></span>
+        <span class="stat">2,602<small> sentences</small></span>
+        <span class="price"><span class="old">Rs. 500</span><span class="new">Rs. 250</span></span>
+    </div>
+
+    <div class="row">
+        <span class="num">4</span>
+        <div class="titles">
+            <span class="si">රට යන්න ලෑස්ති වෙන ඔබ දැනගෙන යායුතුම ඉංග්‍රීසි!</span>
+            <span class="en">Working Abroad: Visas, Interviews &amp; Jobs</span>
+        </div>
+        <span class="stat">9<small> volumes</small></span>
+        <span class="stat">5,500<small> sentences</small></span>
+        <span class="price"><span class="old">Rs. 500</span><span class="new">Rs. 250</span></span>
+    </div>
+
+    <div class="row">
+        <span class="num">5</span>
+        <div class="titles">
+            <span class="si">ඩිජිටල් ජීවිතය, AI සහ නූතන ලෝකයට නැතුවම බැරි ඉංග්‍රීසි</span>
+            <span class="en">Digital Life, AI &amp; Modern World</span>
+        </div>
+        <span class="stat">7<small> volumes</small></span>
+        <span class="stat">2,076<small> sentences</small></span>
+        <span class="price"><span class="old">Rs. 500</span><span class="new">Rs. 250</span></span>
+    </div>
+
+    <div class="row">
+        <span class="num">6</span>
+        <div class="titles">
+            <span class="si">ආදර වන්තයන්ට නැතුවම බැරි ඉංග්‍රීසි</span>
+            <span class="en">Love, Flirting &amp; Social Confidence</span>
+        </div>
+        <span class="stat">8<small> volumes</small></span>
+        <span class="stat">1,600<small> sentences</small></span>
+        <span class="price"><span class="old">Rs. 500</span><span class="new">Rs. 250</span></span>
+    </div>
+
+    <div class="row">
+        <span class="num">7</span>
+        <div class="titles">
+            <span class="si">කැපිලි, කෙටිලි වලට ඉංග්‍රීසියෙන්ම උත්තර!</span>
+            <span class="en">Standing Your Ground: Conflict, Safety &amp; Respect</span>
+        </div>
+        <span class="stat">6<small> volumes</small></span>
+        <span class="stat">1,400<small> sentences</small></span>
+        <span class="price"><span class="old">Rs. 500</span><span class="new">Rs. 250</span></span>
+    </div>
+
+    <div class="row">
+        <span class="num">8</span>
+        <div class="titles">
+            <span class="si">ශුද්ධ ඉංග්‍රීසි (18+): කෙටි යෙදුම්, කුණුහරුප සහ සූක්ෂම වචන</span>
+            <span class="en">Real Talk (18+): Slang, Swearing &amp; Street Register</span>
+        </div>
+        <span class="stat">5<small> volumes</small></span>
+        <span class="stat">1,200<small> sentences</small></span>
+        <span class="price"><span class="old">Rs. 500</span><span class="new">Rs. 250</span></span>
+    </div>
+
+    <div class="row">
+        <span class="num">9</span>
+        <div class="titles">
+            <span class="si">පුංචි පැටව් එක්ක ඉංග්‍රීසි - ආදරණීය දෙමාපියන්ට</span>
+            <span class="en">Raising Kids in English: Family &amp; Parenting</span>
+        </div>
+        <span class="stat">4<small> volumes</small></span>
+        <span class="stat">1,200<small> sentences</small></span>
+        <span class="price"><span class="old">Rs. 500</span><span class="new">Rs. 250</span></span>
+    </div>
+
+    <div class="row">
+        <span class="num">10</span>
+        <div class="titles">
+            <span class="si">වැඩිහිටි අපට: අත්‍යාවශ්‍ය එදිනෙදා ඉංග්‍රීසි</span>
+            <span class="en">Silver Surfers: Essential English for Everyday Life</span>
+        </div>
+        <span class="stat">5<small> volumes</small></span>
+        <span class="stat">900<small> sentences</small></span>
+        <span class="price"><span class="old">Rs. 500</span><span class="new">Rs. 250</span></span>
+    </div>
+</main>
+
+</body>
+</html>
