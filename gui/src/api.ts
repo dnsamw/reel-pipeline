@@ -30,6 +30,27 @@ import type {
   VideoSpec,
 } from "./types";
 
+export interface AdRenderBody {
+  templateId: string;
+  format: "SQ" | "PT" | "ST";
+  product: string;
+  fields: Record<string, string>;
+  lists: Record<string, Record<string, string>[]>;
+  colors: Record<string, string>;
+  mockup: { scale: number; x: number; y: number; rotate: number };
+  variant: string;
+}
+
+/** POSTs JSON to an endpoint whose success response is a file - returns it with the X-Saved-Path header. */
+async function postForFile(url: string, body: unknown): Promise<{ blob: Blob; savedPath: string }> {
+  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error ?? `${res.status} ${res.statusText}`);
+  }
+  return { blob: await res.blob(), savedPath: res.headers.get("X-Saved-Path") ?? "" };
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
     headers: { "Content-Type": "application/json" },
@@ -214,6 +235,10 @@ export const api = {
   resetManifest: () => request<{ cleared: number; backupPath: string | null }>("/library/manifest/reset", { method: "POST" }),
   pruneManifest: () => request<{ removed: number }>("/library/manifest/prune", { method: "POST" }),
   warmPostRenderer: () => request<void>("/posts/warm", { method: "POST" }),
+  // Ad Creator - both answer with the file itself (PNG / MP4), not JSON.
+  renderAd: (body: AdRenderBody) => postForFile("/api/ads/render", body),
+  renderAdReel: (body: AdRenderBody & { reel: { durationSeconds: number; musicFile: string | null; musicStartSeconds: number; musicVolume: number; frame: "reel" | "original" } }) =>
+    postForFile("/api/ads/reel", body),
   // Not through request() - the success response is the PNG itself, not JSON.
   renderPost: async (body: { templateId: string; fields: Record<string, string>; lists: Record<string, Record<string, string>[]>; colors: Record<string, string>; safeZones: boolean }) => {
     const res = await fetch("/api/posts/render", {

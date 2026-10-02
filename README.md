@@ -1,7 +1,7 @@
 # StudyPal Studio
 
 StudyPal's content studio: batch-rendered phrase reels, image posts and still-image reels (Post Creator),
-a media library, and one-click publishing to a Facebook Page - through a local web app (`npm run gui`) or
+Facebook/Instagram ad images and videos (Ad Creator), a media library, and one-click publishing to a Facebook Page - through a local web app (`npm run gui`) or
 the CLI below.
 
 Bulk-generates vertical reel videos (Instagram/TikTok-style, 1080×1920) promoting *The Ultimate
@@ -152,8 +152,9 @@ models beyond phrases can be added later without changing the editor. A custom r
 renderable, not just previewable — pick it anywhere a "Composition" is chosen. See
 [docs/COMPOSITION_DESIGNER.md](docs/COMPOSITION_DESIGNER.md) for the full design.
 
-**Media Library page** (`/library`) — every generated or uploaded file in one place, in three tabs: batch
-reels (`output/`), Post Creator exports (`output/posts/`) and uploaded images (`assets/images/`). Each card
+**Media Library page** (`/library`) — every generated or uploaded file in one place, in four tabs: batch
+reels (`output/`), Post Creator exports (`output/posts/`), Ad Creator exports (`output/ads/`) and uploaded
+images (`assets/images/`). Each card
 shows whether it's tracked in the manifest, published to Facebook, or still used by a recipe/template. Select
 files and **Delete selected**. Deleting a batch reel also removes its manifest entry, so that batch counts as
 not rendered again. The **Render manifest** panel can **Remove missing entries** (entries whose video is gone)
@@ -261,6 +262,31 @@ numbered items) is a `type: "list"` field. The Content panel then gets add/remov
 the template sizes itself to however many items there are. The page, the dropdown and the PNG
 export pick it up automatically.
 
+**Ad Creator page** (`/ad-creator`) — Facebook/Instagram ad creatives from the ads plan
+(`study-pal-eng-book/english-book-content/marketing/facebook-ads-plan.md`). Four templates so far, ported from
+`ad-templates/*.html`: **S1 Cover Hero** and **S2 Peek Inside** (single book), **M1 Pack Hero** (3-book pack) and
+**C1 The Shelf** (complete collection). Each renders in three formats: **PT** 1080×1350 (feed, make this first),
+**ST** 1080×1920 (Stories/Reels, content kept inside the safe zones) and **SQ** 1080×1080.
+
+- **Product**: pick the book or pack the ad is for. Book ads take that book's accent and tint colors, and empty
+  fields fall back to its copy-bank hook, phrase count and so on (shown as grey placeholders). Each
+  template × product remembers its own content, colors and mockup in the browser.
+- **Mockup**: upload a transparent PNG mockup per product, then nudge it (scale / rotate / move). With no mockup
+  the ad shows the book's flat cover (`assets/ads/covers/`) with a 3D tilt. M1 fans the three covers, and C1
+  draws a CSS bookshelf of all ten spines, each with an editable English name and the Sinhala name under it.
+- **Export PNG** / **Export all formats** render through Remotion's `renderStill` (same component as the
+  preview) into `output/ads/`, named by the plan's convention `{TEMPLATE}_{PRODUCT}_{FORMAT}_{VARIANT}.png`
+  (e.g. `S1_B04_PT_v1.png`). Exporting the same variant again replaces the file.
+- **Video (MP4)**: the ad as a still-image video over a track from `assets/music/`, same encoder and settings
+  as Post Creator reels. Use the ST format for Reels/Stories placements.
+- **Batch export**: one template across several products and formats in one go (the plan's Part 10.3).
+- **Ad copy**: a suggested Ads Manager headline (≤ 40 characters) and Sinhala-first primary text from the copy
+  bank, with copy buttons. The Sinhala lines are drafts, so get a native speaker to review them.
+
+To add an ad design: save the HTML (built to the plan's Part 7 contract) in `ad-templates/`, port it to
+`src/ads/templates/<Name>.tsx` exporting an `AdTemplateDef` (shared pieces such as the brand bar, offer bar,
+mockup slot and text fitting are in `src/ads/AdKit.tsx`), and append it to `src/ads/registry.ts`.
+
 | Flag | Meaning |
 |---|---|
 | `--chapters=0-2` | Chapter range to render, by `BookChapter.order` (counts from 0) |
@@ -294,6 +320,7 @@ src/
   audio/           Music/sfx/voice/TTS selection + ffmpeg availability check (Node-only)
   compositions/    Composition recipes (recipe/) + beat-kind scene components - see docs/COMPOSITION_DESIGNER.md
   posts/           Post Creator image templates (React) + registry, rendered to PNG via the "Post" still
+  ads/             Ad Creator templates (React), product data (books/packs) + registry, rendered via the "Ad" still
   render/          The batch runner (renderBatch.ts), manifest tracking, and sidechain ducking post-process
 server/            Express API for the GUI - template + recipe libraries (SQLite + git export), global
                    settings, Facebook OAuth + publishing, render orchestration, chapter/book lookups
@@ -304,9 +331,10 @@ recipes/           Git-tracked JSON export of every saved custom recipe (one fil
 data/              SQLite db for the GUI's own state - template + recipe libraries, global settings, connected
                    Facebook Page token, publish history (gitignored - templates/*.json and recipes/*.json are
                    the only parts with a git export)
-assets/            fonts, music, sfx, voice-over, and generated TTS audio
+assets/            fonts, music, sfx, voice-over, generated TTS audio, and the books' flat covers (ads/covers/)
 post-templates/    Original HTML mocks for post designs - the source each src/posts/templates/*.tsx is ported from
-output/            Rendered videos + manifest.json, and output/posts/ PNG exports (gitignored)
+ad-templates/      Original HTML ad designs (ads plan Part 7 contract) - the source of each src/ads/templates/*.tsx
+output/            Rendered videos + manifest.json, output/posts/ and output/ads/ exports (gitignored)
 ```
 
 ## Notes

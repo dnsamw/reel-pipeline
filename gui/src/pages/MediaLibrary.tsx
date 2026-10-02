@@ -11,10 +11,11 @@ const TABS: { kind: LibraryKind; label: string; hint: string }[] = [
     hint: "Reels from Batch Render / Queue Render (output/). Deleting one also removes its manifest entry, so that batch counts as not rendered again.",
   },
   { kind: "post", label: "Post exports", hint: "PNGs and reels exported from Post Creator (output/posts/)." },
+  { kind: "ad", label: "Ad exports", hint: "Ad images and videos exported from Ad Creator (output/ads/), named {TEMPLATE}_{PRODUCT}_{FORMAT}_{VARIANT}." },
   {
     kind: "image",
     label: "Uploaded images",
-    hint: "Images uploaded for recipes and posts (assets/images/). Deleting one that's still in use leaves a missing image wherever it's used.",
+    hint: "Images uploaded for recipes, posts and ads (assets/images/). Deleting one that's still in use leaves a missing image wherever it's used.",
   },
 ];
 
@@ -52,7 +53,7 @@ export function MediaLibrary() {
 
   const items = useMemo(() => (data?.items ?? []).filter((i) => i.kind === tab), [data, tab]);
   const counts = useMemo(() => {
-    const c: Record<LibraryKind, number> = { reel: 0, post: 0, image: 0 };
+    const c: Record<LibraryKind, number> = { reel: 0, post: 0, ad: 0, image: 0 };
     for (const i of data?.items ?? []) c[i.kind]++;
     return c;
   }, [data]);

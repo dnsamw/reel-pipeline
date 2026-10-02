@@ -35,6 +35,7 @@ import { startRender, getRun, listRuns, cancelRun } from "./renderRunner";
 import { introOutroVideoSpec } from "./videoSpec";
 import { renderPostPng, warmPostBundle } from "./postRenderer";
 import { listMusicTracks, renderPostReel } from "./postReel";
+import { renderAdPng, renderAdReel, type AdRenderInput } from "./adRenderer";
 import { listLibrary, deleteLibraryItems, resetManifest, pruneManifest } from "./library";
 import { aiStatus, suggestCaptions } from "./captions";
 import { askAi, getOverview, getReport, linkTikTok, listReports, recentTikTokVideos, refreshStats, startAiReport, startInsightsScheduler } from "./analytics";
@@ -384,6 +385,59 @@ app.post("/api/posts/reel", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// --- Ad Creator (gui /ad-creator): Facebook/Instagram ad images + still-image videos ---
+// Renders the "Ad" still (src/ads/AdStill.tsx) - same AdCanvas the GUI
+// previews - into output/ads/{TEMPLATE}_{PRODUCT}_{FORMAT}_{VARIANT}.png.
+// Shares the post bundle, so /api/posts/warm warms this too.
+function adInput(body: Record<string, unknown>): AdRenderInput {
+  const { templateId, format, product, fields, lists, colors, mockup, variant } = body ?? {};
+  if (typeof templateId !== "string") throw Object.assign(new Error("templateId is required"), { status: 400 });
+  if (format !== "SQ" && format !== "PT" && format !== "ST") throw Object.assign(new Error("format must be SQ, PT or ST"), { status: 400 });
+  return {
+    templateId,
+    format,
+    product: typeof product === "string" ? product : "",
+    fields: (fields as AdRenderInput["fields"]) ?? {},
+    lists: (lists as AdRenderInput["lists"]) ?? {},
+    colors: (colors as AdRenderInput["colors"]) ?? {},
+    mockup: (mockup as AdRenderInput["mockup"]) ?? {},
+    variant: typeof variant === "string" ? variant : "v1",
+  };
+}
+
+function adError(res: express.Response, err: unknown) {
+  console.error(err);
+  res.status((err as { status?: number })?.status ?? 500).json({ error: err instanceof Error ? err.message : String(err) });
+}
+
+app.post("/api/ads/render", async (req, res) => {
+  try {
+    const { png, savedPath } = await renderAdPng(adInput(req.body));
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("X-Saved-Path", relative(process.cwd(), savedPath).replace(/\\/g, "/"));
+    res.send(png);
+  } catch (err) {
+    adError(res, err);
+  }
+});
+
+app.post("/api/ads/reel", async (req, res) => {
+  try {
+    const reel = req.body?.reel;
+    const { mp4Path } = await renderAdReel(adInput(req.body), {
+      durationSeconds: reel?.durationSeconds,
+      musicFile: typeof reel?.musicFile === "string" && reel.musicFile ? reel.musicFile : null,
+      musicStartSeconds: reel?.musicStartSeconds,
+      musicVolume: reel?.musicVolume,
+      frame: reel?.frame === "original" ? "original" : "reel",
+    });
+    res.setHeader("X-Saved-Path", relative(process.cwd(), mp4Path).replace(/\\/g, "/"));
+    res.sendFile(mp4Path);
+  } catch (err) {
+    adError(res, err);
   }
 });
 

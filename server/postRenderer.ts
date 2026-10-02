@@ -56,21 +56,32 @@ const MIME: Record<string, string> = {
 
 /**
  * bundle() snapshots assets/ when it builds, so an image uploaded after that
- * would 404 inside the render. Inline assets/-relative image paths as data:
- * URIs instead - always current, and no rebundle per upload.
+ * would 404 inside the render. Inline an assets/-relative image path as a
+ * data: URI instead - always current, and no rebundle per upload. URLs and
+ * data:/blob: values pass through unchanged.
  */
+export function inlineAssetImage(value: string): string {
+  if (!value || /^(data:|https?:|blob:)/.test(value)) return value;
+  const abs = resolve(ASSETS_DIR, value.replace(/^\/+/, ""));
+  if (!abs.startsWith(ASSETS_DIR + sep) || !existsSync(abs)) throw new Error(`Image not found in assets/: ${value}`);
+  const mime = MIME[extname(abs).toLowerCase()] ?? "application/octet-stream";
+  return `data:${mime};base64,${readFileSync(abs).toString("base64")}`;
+}
+
 function inlineAssetImages(templateId: string, fields: PostFields): PostFields {
   const def = getPostTemplate(templateId)!;
   const out = { ...fields };
-  for (const f of def.fields) {
-    const v = out[f.key];
-    if (f.type !== "image" || !v || /^(data:|https?:|blob:)/.test(v)) continue;
-    const abs = resolve(ASSETS_DIR, v.replace(/^\/+/, ""));
-    if (!abs.startsWith(ASSETS_DIR + sep) || !existsSync(abs)) throw new Error(`Image not found in assets/: ${v}`);
-    const mime = MIME[extname(abs).toLowerCase()] ?? "application/octet-stream";
-    out[f.key] = `data:${mime};base64,${readFileSync(abs).toString("base64")}`;
-  }
+  for (const f of def.fields) if (f.type === "image") out[f.key] = inlineAssetImage(out[f.key] ?? "");
   return out;
+}
+
+/** Renders one of Root.tsx's <Still>s to a PNG buffer - shared by post and ad exports. */
+export async function renderStillPng(compositionId: string, inputProps: Record<string, unknown>): Promise<{ png: Buffer; width: number; height: number }> {
+  const serveUrl = await getBundle();
+  const composition = await selectComposition({ serveUrl, id: compositionId, inputProps });
+  const { buffer } = await renderStill({ composition, serveUrl, inputProps, imageFormat: "png" });
+  if (!buffer) throw new Error("renderStill returned no image");
+  return { png: buffer, width: composition.width, height: composition.height };
 }
 
 export async function renderPostPng(input: { templateId: string; fields: PostFields; lists: PostLists; colors: PostColors; safeZones?: boolean }): Promise<{ png: Buffer; savedPath: string; width: number; height: number }> {
@@ -85,14 +96,11 @@ export async function renderPostPng(input: { templateId: string; fields: PostFie
     safeZones: !!input.safeZones,
   };
 
-  const serveUrl = await getBundle();
-  const composition = await selectComposition({ serveUrl, id: "Post", inputProps });
-  const { buffer } = await renderStill({ composition, serveUrl, inputProps, imageFormat: "png" });
-  if (!buffer) throw new Error("renderStill returned no image");
+  const { png, width, height } = await renderStillPng("Post", inputProps);
 
   mkdirSync(POSTS_OUTPUT_DIR, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const savedPath = join(POSTS_OUTPUT_DIR, `${def.id}-${stamp}.png`);
-  writeFileSync(savedPath, buffer);
-  return { png: buffer, savedPath, width: composition.width, height: composition.height };
+  writeFileSync(savedPath, png);
+  return { png, savedPath, width, height };
 }

@@ -2712,3 +2712,28 @@ button.posts-more {
     grid-template-columns: 1fr;
   }
 }
+
+/* Ad Creator (gui /ad-creator) */
+.ad-check-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 6px 14px;
+}
+
+.ad-check-grid .field.checkbox {
+  margin: 0;
+}
+
+.ad-results {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.hint.text-danger {
+  color: var(--danger);
+}

@@ -9,6 +9,7 @@ import {
   ImagePlus,
   Lightbulb,
   LayoutDashboard,
+  Megaphone,
   ListChecks,
   Monitor,
   Moon,
@@ -29,6 +30,7 @@ import { RecipeEditor } from "./pages/RecipeEditor";
 import { VideoSpecPage } from "./pages/VideoSpecPage";
 import { Settings } from "./pages/Settings";
 import { PostCreator } from "./pages/PostCreator";
+import { AdCreator } from "./pages/AdCreator";
 import { MediaLibrary } from "./pages/MediaLibrary";
 import { Insights } from "./pages/Insights";
 
@@ -55,7 +57,13 @@ const NAV_SECTIONS = [
       { to: "/templates", end: false, icon: Palette, label: "Templates" },
     ],
   },
-  { title: "Posts", items: [{ to: "/post-creator", end: false, icon: ImagePlus, label: "Post Creator" }] },
+  {
+    title: "Posts",
+    items: [
+      { to: "/post-creator", end: false, icon: ImagePlus, label: "Post Creator" },
+      { to: "/ad-creator", end: false, icon: Megaphone, label: "Ad Creator" },
+    ],
+  },
   { title: "Grow", items: [{ to: "/insights", end: false, icon: Lightbulb, label: "Insights" }] },
   {
     title: "Manage",
@@ -145,6 +153,7 @@ export function App() {
           <Route path="/templates/:id" element={<TemplateEditor />} />
           <Route path="/recipes" element={<Recipes />} />
           <Route path="/post-creator" element={<PostCreator />} />
+          <Route path="/ad-creator" element={<AdCreator />} />
           <Route path="/library" element={<MediaLibrary />} />
           <Route path="/insights" element={<Insights />} />
           <Route path="/recipes/new" element={<RecipeEditor />} />

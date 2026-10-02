@@ -27,6 +27,8 @@ export interface PostListFieldDef {
   itemFields: PostScalarFieldDef[];
   minItems?: number;
   maxItems?: number;
+  /** One item per fixed slot (e.g. one per book on a shelf) - the editor hides add/remove/reorder. */
+  fixed?: boolean;
   hint?: string;
 }
 

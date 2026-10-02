@@ -11,7 +11,7 @@ import { getSettings } from "./settings";
 /**
  * The Media Library (gui /library): lists every generated/uploaded media file
  * the GUI knows about, deletes selected ones, and resets/prunes the render
- * manifest. Everything is scoped to three folders and a fixed set of
+ * manifest. Everything is scoped to four folders and a fixed set of
  * extensions - ids are "<kind>:<file name>", never raw paths, so a request
  * can't reach anything else on disk.
  */
@@ -19,15 +19,17 @@ import { getSettings } from "./settings";
 const ROOT = process.cwd();
 const OUTPUT_DIR = resolve(ROOT, defaultConfig.outputDir);
 const POSTS_DIR = join(OUTPUT_DIR, "posts");
+const ADS_DIR = join(OUTPUT_DIR, "ads");
 const IMAGES_DIR = resolve(ROOT, "assets", "images");
 const MANIFEST_PATH = resolve(ROOT, defaultConfig.manifestPath);
 
-export type LibraryKind = "reel" | "post" | "image";
+export type LibraryKind = "reel" | "post" | "ad" | "image";
 
 const DIRS: Record<LibraryKind, { dir: string; exts: string[]; url: (file: string) => string }> = {
   // /media is Express's static route over output/ (server/index.ts); /images is Vite's publicDir (assets/).
   reel: { dir: OUTPUT_DIR, exts: [".mp4"], url: (f) => `/media/${encodeURIComponent(f)}` },
   post: { dir: POSTS_DIR, exts: [".png", ".mp4"], url: (f) => `/media/posts/${encodeURIComponent(f)}` },
+  ad: { dir: ADS_DIR, exts: [".png", ".mp4"], url: (f) => `/media/ads/${encodeURIComponent(f)}` },
   image: { dir: IMAGES_DIR, exts: [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"], url: (f) => `/images/${encodeURIComponent(f)}` },
 };
 
@@ -102,7 +104,7 @@ export function listLibrary(): { items: LibraryItem[]; manifest: { entries: numb
         item.published = hit ? publications.some((p) => p.batchId === hit[1].batchId && p.template === hit[1].template) : false;
       } else if (kind === "post") {
         item.published = publications.some((p) => p.batchId === `post:${name}`);
-      } else {
+      } else if (kind === "image") {
         const needle = `images/${name}`;
         item.usedBy = refs.filter((r) => r.json.includes(needle)).map((r) => r.label);
       }

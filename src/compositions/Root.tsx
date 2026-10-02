@@ -10,6 +10,7 @@ import { LayerRenderer } from "./recipe/layers/LayerRenderer";
 import { customBeatSchema } from "./recipe/layers/schema";
 import { pocBeat } from "./recipe/layers/poc";
 import { PostStill, calculatePostMetadata, postStillDefaultProps } from "../posts/PostStill";
+import { AdStill, adStillDefaultProps, calculateAdMetadata } from "../ads/AdStill";
 
 // Fires once when the bundle loads; loadFont/loadCustomFont each call
 // Remotion's delayRender/continueRender internally, so this blocks any
@@ -78,6 +79,12 @@ function RemotionRoot() {
         height={1080}
         defaultProps={postStillDefaultProps}
       />
+
+      {/* Facebook/Instagram ads (gui /ad-creator) - one still for every ad
+          template and format (SQ/PT/ST); calculateMetadata sizes it per
+          format. Rendered to PNG by server/adRenderer.ts. See
+          src/ads/registry.ts. */}
+      <Still id="Ad" component={AdStill} calculateMetadata={calculateAdMetadata} width={1080} height={1350} defaultProps={adStillDefaultProps} />
 
       {/* Phase 1 proof of docs/COMPOSITION_DESIGNER.md's draft layer schema
           (recipe/layers/) - a generic LayerRenderer interpreting a
