@@ -569,7 +569,9 @@ previewed in the DOM and rendered with `renderStill`), adapted to the ads plan
   unchanged and GUI styles can't leak in either direction. Templates use `div`s rather than `h1`/`p`, which the
   GUI styles globally.
 - **Text fitting is the HTML's `fitText()`** (`useAdFit`): while `.ad-inner` overflows, every visible
-  `[data-fit]` element shrinks 2px at a time to its `data-min`. An optional `after` pass runs on the final layout
+  `[data-fit]` element shrinks 2px at a time to its `data-min`. "Overflows" also counts content that has run
+  into `.ad-inner`'s bottom padding without passing the edge (e.g. a wrapped CTA), which `scrollHeight` alone
+  misses. An optional `after` pass runs on the final layout
   (C1's vertical spine titles).
 - **Slots are sized with container queries, not JS measurement.** The HTML measured each mockup slot once to
   size the fallback cover and M1's fan, so its layout went stale if web fonts arrived after that measurement.
@@ -581,7 +583,12 @@ previewed in the DOM and rendered with `renderStill`), adapted to the ads plan
 - **Server**: `POST /api/ads/render` and `/api/ads/reel` (`server/adRenderer.ts`) reuse Post Creator's bundle
   (`renderStillPng`), image inlining (`inlineAssetImage`) and ffmpeg encoder (`encodeStillReel`). Files go to
   `output/ads/{TEMPLATE}_{PRODUCT}_{FORMAT}_{VARIANT}.png|.mp4` (the plan's naming convention), so re-exporting a
-  variant replaces it. They show in the Media Library's "Ad exports" tab. Ads aren't wired into the publish
+  variant replaces it. They show in the Media Library's "Ad exports" tab. Presets (per template; `kind`
+  `text` = fields, lists and Ads Manager copy, `colors` = color overrides) live in the `ad_presets` SQLite table
+  via `server/adPresets.ts`: `GET/POST /api/ads/presets`, `DELETE /api/ads/presets/:id`, and
+  `GET /api/ads/presets/export` / `POST /api/ads/presets/import` for a `studypal-ad-presets` JSON file. Import
+  keeps preset ids (`INSERT OR IGNORE`), so re-importing a file skips what's already there. The global
+  `express.json` limit is 5mb for that import. Ads aren't wired into the publish
   panel; they're uploaded in Ads Manager.
 
 ### Publishing (distribution)

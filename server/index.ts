@@ -36,6 +36,7 @@ import { introOutroVideoSpec } from "./videoSpec";
 import { renderPostPng, warmPostBundle } from "./postRenderer";
 import { listMusicTracks, renderPostReel } from "./postReel";
 import { renderAdPng, renderAdReel, type AdRenderInput } from "./adRenderer";
+import { listAdPresets, saveAdPreset, deleteAdPreset, importAdPresets, isPresetKind } from "./adPresets";
 import { listLibrary, deleteLibraryItems, resetManifest, pruneManifest } from "./library";
 import { aiStatus, suggestCaptions } from "./captions";
 import { askAi, getOverview, getReport, linkTikTok, listReports, recentTikTokVideos, refreshStats, startAiReport, startInsightsScheduler } from "./analytics";
@@ -43,7 +44,8 @@ import type { CaptionContext, CaptionMeta, CaptionPlatform, CaptionTone } from "
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+// 5mb (not the 100kb default) so an Ad Creator presets export can be imported in one request.
+app.use(express.json({ limit: "5mb" }));
 
 // Serves rendered reels for inline playback (Monitor page) - manifest
 // outputPath entries look like "output/<file>.mp4", so the GUI just needs
@@ -412,6 +414,43 @@ function adError(res: express.Response, err: unknown) {
   console.error(err);
   res.status((err as { status?: number })?.status ?? 500).json({ error: err instanceof Error ? err.message : String(err) });
 }
+
+// Ad Creator presets - named text or color snapshots per template (server/adPresets.ts).
+app.get("/api/ads/presets", (req, res) => {
+  const templateId = typeof req.query.templateId === "string" ? req.query.templateId : "";
+  const kind = req.query.kind ?? "text";
+  if (!templateId) return res.status(400).json({ error: "templateId is required" });
+  if (!isPresetKind(kind)) return res.status(400).json({ error: "kind must be text or colors" });
+  res.json(listAdPresets(templateId, kind));
+});
+
+// Every preset as one file, to move them to another machine.
+app.get("/api/ads/presets/export", (_req, res) => {
+  res.json({ type: "studypal-ad-presets", version: 1, exportedAt: new Date().toISOString(), presets: listAdPresets() });
+});
+
+app.post("/api/ads/presets/import", (req, res) => {
+  const presets = req.body?.presets;
+  if (req.body?.type !== "studypal-ad-presets" || !Array.isArray(presets)) {
+    return res.status(400).json({ error: "Not an Ad Creator presets file" });
+  }
+  res.json(importAdPresets(presets));
+});
+
+app.post("/api/ads/presets", (req, res) => {
+  const { templateId, name, data } = req.body ?? {};
+  const kind = req.body?.kind ?? "text";
+  if (typeof templateId !== "string" || !templateId) return res.status(400).json({ error: "templateId is required" });
+  if (!isPresetKind(kind)) return res.status(400).json({ error: "kind must be text or colors" });
+  if (typeof name !== "string" || !name.trim()) return res.status(400).json({ error: "name is required" });
+  if (!data || typeof data !== "object") return res.status(400).json({ error: "data is required" });
+  res.status(201).json(saveAdPreset(templateId, kind, name.trim(), data));
+});
+
+app.delete("/api/ads/presets/:id", (req, res) => {
+  if (!deleteAdPreset(req.params.id)) return res.status(404).json({ error: "Preset not found" });
+  res.status(204).end();
+});
 
 app.post("/api/ads/render", async (req, res) => {
   try {

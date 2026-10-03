@@ -47,6 +47,7 @@ const CSS = `
 .ad.s1[data-format="ST"] .stat-label { margin: 0; }
 .ad.s1[data-format="ST"] .bullets { display: none; }
 .ad.s1[data-format="ST"] .cta { margin-left: 0; width: 100%; }
+.ad.s1[data-format="ST"] .cta2 { text-align: left; }
 `;
 
 /** "Covers in the stack" field -> 1..12; anything unparsable = the book's volume count. */
@@ -92,7 +93,7 @@ function AdS1CoverHero({ format, product, fields, lists, colors, mockup }: AdTem
         </div>
         <MockupSlot src={fields.mockup} book={b} tilt adjust={mockup} stack={stackCount(fields.stack, b.volumes)} />
       </div>
-      <OfferBar fields={fields} cta={fields.cta} />
+      <OfferBar fields={fields} cta={fields.cta} cta2={fields.cta2} />
     </AdFrame>
   );
 }
@@ -121,6 +122,7 @@ export const adS1CoverHero: AdTemplateDef = {
     ...offerFields,
     { key: "priceWas", label: "Old price (struck through)", type: "text" },
     { key: "cta", label: "Call to action", type: "text" },
+    { key: "cta2", label: "Second call to action (below it)", type: "text", hint: "e.g. a second WhatsApp number. Empty hides it." },
     { key: "mockup", label: "Mockup", type: "image", hint: "Transparent PNG of this book (e.g. b04-front.png). Empty = the book's flat cover." },
     {
       key: "stack",
@@ -139,6 +141,7 @@ export const adS1CoverHero: AdTemplateDef = {
     ...offerDefaults,
     priceWas: "",
     cta: "Order now · studypal.store",
+    cta2: "",
     mockup: "",
     stack: "",
   },

@@ -83,7 +83,7 @@ function AdM1PackHero({ format, product, fields, colors, mockup }: AdTemplatePro
           </>
         )}
       </div>
-      <OfferBar fields={fields} saveBadge={fields.saveBadge} cta={fields.cta} />
+      <OfferBar fields={fields} saveBadge={fields.saveBadge} cta={fields.cta} cta2={fields.cta2} />
     </AdFrame>
   );
 }
@@ -113,6 +113,7 @@ export const adM1PackHero: AdTemplateDef = {
     { key: "priceWas", label: "Old price (struck through)", type: "text" },
     { key: "saveBadge", label: "Save badge", type: "text", hint: "Empty hides it." },
     { key: "cta", label: "Call to action", type: "text" },
+    { key: "cta2", label: "Second call to action (below it)", type: "text", hint: "e.g. a second WhatsApp number. Empty hides it." },
     { key: "mockup", label: "Composite mockup (all 3 books)", type: "image", hint: "Recommended: one 3D image of the pack. Empty = the three books below, fanned." },
     { key: "mockup1", label: "Book 1 mockup (left)", type: "image", hint: "Only used without a composite. Empty = that book's flat cover." },
     { key: "mockup2", label: "Book 2 mockup (centre)", type: "image" },
@@ -129,6 +130,7 @@ export const adM1PackHero: AdTemplateDef = {
     priceWas: "Rs ____",
     saveBadge: "Save __%",
     cta: "Order now · studypal.store",
+    cta2: "",
     mockup: "",
     mockup1: "",
     mockup2: "",

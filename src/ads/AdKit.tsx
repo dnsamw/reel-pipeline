@@ -107,6 +107,8 @@ const AD_BASE_CSS = `
 .save-badge:empty { display: none; }
 .cta { margin-left: auto; font-weight: 600; font-size: 30px; white-space: nowrap; }
 .cta:empty { display: none; }
+/* A second CTA line (e.g. another WhatsApp number) on its own row just under the first, aligned with it. */
+.cta2 { flex-basis: 100%; margin-left: 0; margin-top: -12px; text-align: right; }
 
 /* Mockup slots. The HTML measured each slot in JS to size the fallback
    cover; here slots are size containers and the cover uses cq units. */
@@ -177,6 +179,7 @@ const AD_BASE_CSS = `
 .purple .price-chip { box-shadow: 0 16px 30px -14px rgba(0,0,0,.5); }
 .purple .price-volumes { color: var(--hi); }
 .ad.purple[data-format="ST"] .cta { margin-left: 0; width: 100%; }
+.ad.purple[data-format="ST"] .cta2 { text-align: left; }
 `;
 
 const scopedBase = scopeCss(AD_BASE_CSS);
@@ -252,7 +255,7 @@ export function BrandBar({ chip, chipClassName }: { chip: string; chipClassName?
 }
 
 /** "All 9 Volumes" line, price chip ("Just Rs 2,490 ~Rs 2,990~"), optional save badge, CTA. Pass the template's resolved fields. */
-export function OfferBar({ fields, saveBadge, cta }: { fields: Record<string, string>; saveBadge?: string; cta: string }) {
+export function OfferBar({ fields, saveBadge, cta, cta2 }: { fields: Record<string, string>; saveBadge?: string; cta: string; cta2?: string }) {
   // A whitespace-only volumes line is how the GUI hides it (empty falls back to the product's count).
   const volumes = (fields.volumesLine ?? "").trim();
   return (
@@ -274,6 +277,11 @@ export function OfferBar({ fields, saveBadge, cta }: { fields: Record<string, st
       <span className="cta" {...siLang(cta)}>
         {cta}
       </span>
+      {cta2 && (
+        <span className="cta cta2" {...siLang(cta2)}>
+          {cta2}
+        </span>
+      )}
     </div>
   );
 }
@@ -304,7 +312,17 @@ export function useAdFit(rootRef: RefObject<HTMLDivElement>, deps: DependencyLis
       const visible = els.filter((e) => e.offsetParent !== null);
       const base = visible.map((e) => parseFloat(getComputedStyle(e).fontSize));
       const min = visible.map((e) => Number(e.dataset.min || 28));
-      const tallOver = () => inner.scrollHeight > inner.clientHeight + 1;
+      // scrollHeight alone misses content that has run into the bottom padding
+      // but not past the ad's edge (e.g. a wrapped CTA sitting on the edge), so
+      // also compare the last in-flow child's bottom against the padding line.
+      const contentLimit = () => inner.clientHeight - (parseFloat(getComputedStyle(inner).paddingBottom) || 0);
+      const contentBottom = () =>
+        Array.from(inner.children as HTMLCollectionOf<HTMLElement>).reduce((max, c) => {
+          const cs = getComputedStyle(c);
+          if (cs.position === "absolute" || cs.position === "fixed" || cs.display === "none") return max;
+          return Math.max(max, c.offsetTop + c.offsetHeight + (parseFloat(cs.marginBottom) || 0));
+        }, 0);
+      const tallOver = () => inner.scrollHeight > inner.clientHeight + 1 || contentBottom() > contentLimit() + 1;
       const ownOver = (e: HTMLElement) => e.scrollWidth > e.clientWidth + 1;
       for (let step = 0; step < 120; step++) {
         const tall = tallOver();

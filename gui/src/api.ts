@@ -41,6 +41,26 @@ export interface AdRenderBody {
   variant: string;
 }
 
+/** Ad Creator presets - see server/adPresets.ts. */
+export type AdPresetKind = "text" | "colors";
+
+export interface AdPresetData {
+  fields?: Record<string, string>;
+  lists?: Record<string, Record<string, string>[]>;
+  headline?: string;
+  primaryText?: string;
+  colors?: Record<string, string>;
+}
+
+export interface AdPreset {
+  id: string;
+  templateId: string;
+  kind: AdPresetKind;
+  name: string;
+  data: AdPresetData;
+  createdAt: string;
+}
+
 /** POSTs JSON to an endpoint whose success response is a file - returns it with the X-Saved-Path header. */
 async function postForFile(url: string, body: unknown): Promise<{ blob: Blob; savedPath: string }> {
   const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -237,6 +257,13 @@ export const api = {
   warmPostRenderer: () => request<void>("/posts/warm", { method: "POST" }),
   // Ad Creator - both answer with the file itself (PNG / MP4), not JSON.
   renderAd: (body: AdRenderBody) => postForFile("/api/ads/render", body),
+  adPresets: (templateId: string, kind: AdPresetKind) =>
+    request<AdPreset[]>(`/ads/presets?templateId=${encodeURIComponent(templateId)}&kind=${kind}`),
+  saveAdPreset: (templateId: string, kind: AdPresetKind, name: string, data: AdPresetData) =>
+    request<AdPreset>("/ads/presets", { method: "POST", body: JSON.stringify({ templateId, kind, name, data }) }),
+  exportAdPresets: () => request<{ type: string; version: number; exportedAt: string; presets: AdPreset[] }>("/ads/presets/export"),
+  importAdPresets: (file: unknown) => request<{ added: number; skipped: number }>("/ads/presets/import", { method: "POST", body: JSON.stringify(file) }),
+  deleteAdPreset: (id: string) => request<void>(`/ads/presets/${encodeURIComponent(id)}`, { method: "DELETE" }),
   renderAdReel: (body: AdRenderBody & { reel: { durationSeconds: number; musicFile: string | null; musicStartSeconds: number; musicVolume: number; frame: "reel" | "original" } }) =>
     postForFile("/api/ads/reel", body),
   // Not through request() - the success response is the PNG itself, not JSON.

@@ -279,6 +279,15 @@ export pick it up automatically.
 - **Mockup**: upload a transparent PNG mockup per product, then nudge it (scale / rotate / move). With no mockup
   the ad shows the book's flat cover (`assets/ads/covers/`) with a 3D tilt. M1 fans the three covers, and C1
   draws a CSS bookshelf of all ten spines, each with an editable English name and the Sinhala name under it.
+- **C1 kicker**: an optional line above the big number ("Phrases & patterns" by default; empty hides it).
+- **Second call to action**: an optional line just under the call to action on every template (e.g. a second
+  WhatsApp number); empty hides it.
+- **Saved text / Saved colors**: save the ad's current words (content fields, spine names, Ads Manager copy) or
+  its color combination under a name and load them back later. Saved per template on the server
+  (`data/gui.db`), so they outlive the browser draft. Loading text keeps the colors and vice versa.
+- **Move presets to another computer**: *Export presets* downloads every saved text and color preset (all
+  templates) as one `.json` file; *Import presets…* on the other computer adds them, skipping any already there.
+  The in-progress draft of each ad still lives only in that browser, so save it as a preset to carry it over.
 - **Export PNG** / **Export all formats** render through Remotion's `renderStill` (same component as the
   preview) into `output/ads/`, named by the plan's convention `{TEMPLATE}_{PRODUCT}_{FORMAT}_{VARIANT}.png`
   (e.g. `S1_B04_PT_v1.png`). Exporting the same variant again replaces the file.

@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Copy } from "lucide-react";
-import { api, type AdRenderBody } from "../api";
+import { api, type AdPreset, type AdPresetData, type AdPresetKind, type AdRenderBody } from "../api";
 import { AdPreview } from "../components/AdPreview";
 import { AdTemplatePicker } from "../components/AdTemplatePicker";
 import { PostFieldInput, PostListInput } from "../components/PostFieldInputs";
@@ -103,6 +103,189 @@ const fileName = (savedPath: string) => savedPath.split("/").pop() ?? savedPath;
 /** output/ads/x.png -> /media/ads/x.png (Express serves output/ at /media). */
 const mediaUrl = (savedPath: string) => `/media/${savedPath.replace(/^output\//, "")}`;
 
+/**
+ * Named presets for this template, kept on the server (data/gui.db) so they
+ * outlive the browser's draft: "text" = the ad's words, "colors" = its color
+ * overrides. Loading one replaces just that part of the current ad.
+ */
+function SavedPresets({
+  def,
+  kind,
+  title,
+  description,
+  placeholder,
+  refreshKey,
+  snapshot,
+  onLoad,
+  onError,
+  swatches,
+}: {
+  def: AdTemplateDef;
+  kind: AdPresetKind;
+  title: string;
+  description: string;
+  placeholder: string;
+  refreshKey: number;
+  snapshot: () => AdPresetData;
+  onLoad: (data: AdPresetData) => void;
+  onError: (msg: string) => void;
+  swatches?: (p: AdPreset) => string[];
+}) {
+  const [presets, setPresets] = useState<AdPreset[]>([]);
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    setPresets([]);
+    api
+      .adPresets(def.id, kind)
+      .then((list) => alive && setPresets(list))
+      .catch((err) => alive && onError(err instanceof Error ? err.message : String(err)));
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [def.id, kind, refreshKey]);
+
+  async function save() {
+    setBusy(true);
+    try {
+      const saved = await api.saveAdPreset(def.id, kind, name.trim(), snapshot());
+      setPresets((cur) => [saved, ...cur]);
+      setName("");
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(p: AdPreset) {
+    if (!window.confirm(`Delete "${p.name}"?`)) return;
+    try {
+      await api.deleteAdPreset(p.id);
+      setPresets((cur) => cur.filter((x) => x.id !== p.id));
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  return (
+    <div className="card">
+      <h2>{title}</h2>
+      <p className="hint" style={{ marginTop: 0 }}>
+        {description}
+      </p>
+      <div className="post-image-field">
+        <input
+          type="text"
+          value={name}
+          placeholder={placeholder}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && name.trim() && !busy && save()}
+        />
+        <button type="button" onClick={save} disabled={!name.trim() || busy}>
+          {busy ? "Saving…" : `Save current ${kind}`}
+        </button>
+      </div>
+      {presets.length > 0 && (
+        <div style={{ display: "grid", gap: 6, marginTop: 12 }}>
+          {presets.map((p) => (
+            <div key={p.id} className="card-heading-row" style={{ margin: 0 }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                {swatches && (
+                  <span style={{ display: "inline-flex", gap: 2 }}>
+                    {swatches(p).map((c, i) => (
+                      <span key={i} style={{ width: 14, height: 14, borderRadius: 3, background: c, border: "1px solid rgba(0,0,0,.15)" }} />
+                    ))}
+                  </span>
+                )}
+                {p.name} <span className="hint">· {new Date(p.createdAt).toLocaleDateString()}</span>
+              </span>
+              <span className="button-row" style={{ margin: 0 }}>
+                <button type="button" className="secondary small" onClick={() => onLoad(p.data)}>
+                  Load
+                </button>
+                <button type="button" className="secondary small" onClick={() => remove(p)}>
+                  Delete
+                </button>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Every saved text and color preset (all templates) as one JSON file, to move them to another computer. */
+function PresetsBackup({ onImported, onError }: { onImported: () => void; onError: (msg: string) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function exportFile() {
+    try {
+      const file = await api.exportAdPresets();
+      const url = URL.createObjectURL(new Blob([JSON.stringify(file, null, 2)], { type: "application/json" }));
+      download(url, `studypal-ad-presets-${file.exportedAt.slice(0, 10)}.json`);
+      URL.revokeObjectURL(url);
+      setMessage(`Exported ${file.presets.length} preset${file.presets.length === 1 ? "" : "s"}.`);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function importFile(file: File) {
+    try {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(await file.text());
+      } catch {
+        throw new Error(`${file.name} isn't a JSON file`);
+      }
+      const { added, skipped } = await api.importAdPresets(parsed);
+      setMessage(`Imported ${added} preset${added === 1 ? "" : "s"}${skipped ? ` (${skipped} already here or unreadable, skipped)` : ""}.`);
+      onImported();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  return (
+    <div className="card">
+      <h2>Move presets to another computer</h2>
+      <p className="hint" style={{ marginTop: 0 }}>
+        Export saves every saved text and saved colors preset (all templates) to one .json file. Import it on the other computer; presets already there are skipped.
+      </p>
+      <div className="button-row">
+        <button type="button" className="secondary" onClick={exportFile}>
+          Export presets (.json)
+        </button>
+        <button type="button" className="secondary" onClick={() => fileRef.current?.click()}>
+          Import presets…
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".json,application/json"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) importFile(f);
+          }}
+        />
+      </div>
+      {message && (
+        <p className="hint" style={{ marginTop: 16, marginBottom: 0 }}>
+          {message}
+        </p>
+      )}
+    </div>
+  );
+}
+
 type BatchRow = { label: string; status: "pending" | "running" | "done" | "error"; savedPath?: string; error?: string };
 
 export function AdCreator() {
@@ -111,6 +294,8 @@ export function AdCreator() {
   const [draft, setDraft] = useState<AdDraft>(() => loadDraft(def, product));
   const [preferredFormat, setPreferredFormat] = useState(initialFormat);
   const [showGuides, setShowGuides] = useState(() => readStorage<boolean>(GUIDES_KEY) ?? false);
+  /** Bumped after an import so the preset lists reload. */
+  const [presetsVersion, setPresetsVersion] = useState(0);
 
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState<false | "one" | "all">(false);
@@ -270,6 +455,25 @@ export function AdCreator() {
             </div>
           </div>
 
+          <SavedPresets
+            def={def}
+            kind="text"
+            title="Saved text"
+            description="Save this ad's words under a name to reuse later. Loading one replaces the current text (colors and mockup stay as they are)."
+            placeholder="e.g. WhatsApp offer, Rs 1000"
+            refreshKey={presetsVersion}
+            snapshot={() => ({ fields: draft.fields, lists: draft.lists, headline: draft.headline, primaryText: draft.primaryText })}
+            onLoad={(data) =>
+              patch({
+                fields: { ...def.defaultFields, ...data.fields },
+                lists: { ...def.defaultLists, ...data.lists },
+                headline: data.headline,
+                primaryText: data.primaryText,
+              })
+            }
+            onError={setError}
+          />
+
           {hasImageField && (
             <div className="card">
               <div className="card-heading-row">
@@ -308,6 +512,21 @@ export function AdCreator() {
               </p>
             )}
           </div>
+
+          <SavedPresets
+            def={def}
+            kind="colors"
+            title="Saved colors"
+            description="Save this color combination to reuse on any product of this template. Only colors you've changed are saved; loading one replaces the current colors."
+            placeholder="e.g. Lilac + white"
+            refreshKey={presetsVersion}
+            snapshot={() => ({ colors: draft.colors })}
+            onLoad={(data) => patch({ colors: { ...data.colors } })}
+            onError={setError}
+            swatches={(p) => def.colors.map((c) => p.data.colors?.[c.key] || resolvedColors[c.key])}
+          />
+
+          <PresetsBackup onImported={() => setPresetsVersion((v) => v + 1)} onError={setError} />
 
           <div className="card">
             <div className="card-heading-row">

@@ -9,13 +9,16 @@ import type { AdTemplateDef, AdTemplateProps } from "../types";
 // the gold/purple literals turned into the --hi/--bg color slots and the
 // JS-measured spine height expressed in container-query units.
 const CSS = `
+.c1 .kicker { margin: 56px 0 0; flex: none; font: 700 46px/1.15 var(--f-display); letter-spacing: -0.01em; color: #fff; }
+.c1 .kicker[lang] { font: 700 40px/1.45 var(--f-si); letter-spacing: normal; }
 .c1 .big { margin: 64px 0 0; flex: none; font: 800 230px/.86 var(--f-display); letter-spacing: -0.05em; color: var(--hi); }
+.c1 .kicker + .big { margin-top: 12px; }
 .c1 .big-label { margin: 22px 0 0; flex: none; font: 700 46px/1.15 var(--f-display); letter-spacing: -0.015em; color: #fff; }
 .c1 .big-label[lang] { font: 700 40px/1.45 var(--f-si); letter-spacing: normal; }
 .c1 .big-si { margin: 14px 0 0; flex: none; font: 600 36px/1.55 var(--f-si); color: rgba(255,255,255,.82); }
 .c1 .big-si:empty { display: none; }
 
-.c1 .shelf-area { position: relative; flex: 1; min-height: 430px; margin: 34px 0 26px; container-type: size; }
+.c1 .shelf-area { position: relative; flex: 1; min-height: 340px; margin: 34px 0 26px; container-type: size; }
 .c1 .shelf-area .mockup-slot { position: absolute; inset: 0; }
 .c1 .shelf { position: absolute; left: 0; right: 0; bottom: 0; top: 0; display: flex; flex-direction: column; justify-content: flex-end; }
 .c1 .spines { display: flex; align-items: flex-end; gap: 8px; padding: 0 14px; }
@@ -38,13 +41,17 @@ const CSS = `
 .c1 .stat { flex: none; margin-bottom: 30px; font: 600 36px/1.3 var(--f-body); color: rgba(255,255,255,.92); }
 .c1 .stat b { color: var(--hi); font-weight: 700; }
 
+.ad.c1[data-format="SQ"] .kicker { margin-top: 32px; font-size: 38px; }
 .ad.c1[data-format="SQ"] .big { margin-top: 40px; font-size: 180px; }
+.ad.c1[data-format="SQ"] .kicker + .big { margin-top: 8px; }
 .ad.c1[data-format="SQ"] .big-label { font-size: 40px; margin-top: 14px; }
 .ad.c1[data-format="SQ"] .big-si { display: none; }
 .ad.c1[data-format="SQ"] .shelf-area { min-height: 330px; margin: 24px 0 18px; }
 .ad.c1[data-format="SQ"] .stat { margin-bottom: 22px; }
 
+.ad.c1[data-format="ST"] .kicker { margin-top: 40px; }
 .ad.c1[data-format="ST"] .big { margin-top: 48px; font-size: 190px; }
+.ad.c1[data-format="ST"] .kicker + .big { margin-top: 10px; }
 .ad.c1[data-format="ST"] .shelf-area { min-height: 520px; }
 .ad.c1[data-format="ST"] .spines { gap: 6px; padding: 0 8px; }
 .ad.c1[data-format="ST"] .spine-num { width: 36px; height: 36px; font-size: 18px; }
@@ -95,6 +102,11 @@ function AdC1TheShelf({ format, fields, lists, colors, mockup }: AdTemplateProps
   return (
     <AdFrame format={format} className="c1 purple" css={CSS} vars={{ "--bg": colors.bg, "--glow": colors.glow, "--hi": colors.hi }} rootRef={rootRef}>
       <BrandBar chip={fields.chip} />
+      {fields.kicker && (
+        <div className="kicker" {...siLang(fields.kicker)} data-fit data-min="28">
+          {fields.kicker}
+        </div>
+      )}
       <div className="big" data-fit data-min="120">
         {fields.bigNumber}
       </div>
@@ -136,7 +148,7 @@ function AdC1TheShelf({ format, fields, lists, colors, mockup }: AdTemplateProps
           </>
         )}
       </div>
-      <OfferBar fields={fields} saveBadge={fields.saveBadge} cta={fields.cta} />
+      <OfferBar fields={fields} saveBadge={fields.saveBadge} cta={fields.cta} cta2={fields.cta2} />
     </AdFrame>
   );
 }
@@ -152,6 +164,7 @@ export const adC1TheShelf: AdTemplateDef = {
   formats: ["PT", "ST", "SQ"],
   fields: [
     { key: "chip", label: "Corner chip", type: "text" },
+    { key: "kicker", label: "Line above the big number", type: "text", hint: "e.g. \"Phrases & patterns\". Empty hides it." },
     { key: "bigNumber", label: "Big number", type: "text" },
     { key: "bigLabel", label: "Label", type: "text" },
     { key: "bigLabelSi", label: "Sinhala line", type: "textarea", lang: "si", hint: "Hidden on SQ. Empty hides it." },
@@ -161,6 +174,7 @@ export const adC1TheShelf: AdTemplateDef = {
     { key: "priceWas", label: "Old price (struck through)", type: "text" },
     { key: "saveBadge", label: "Save badge", type: "text", hint: "Empty hides it." },
     { key: "cta", label: "Call to action", type: "text" },
+    { key: "cta2", label: "Second call to action (below it)", type: "text", hint: "e.g. a second WhatsApp number. Empty hides it." },
     { key: "mockup", label: "Mockup (shelf / box set)", type: "image", hint: "e.g. collection-shelf.png. Empty = a CSS bookshelf of all ten spines." },
     {
       key: "spines",
@@ -179,6 +193,7 @@ export const adC1TheShelf: AdTemplateDef = {
   ],
   defaultFields: {
     chip: "Complete set",
+    kicker: "Phrases & patterns",
     bigNumber: COLLECTION.phrasesLabel,
     bigLabel: "English phrases for every situation, in Sinhala",
     bigLabelSi: VALUE_LINE_SI,
@@ -188,6 +203,7 @@ export const adC1TheShelf: AdTemplateDef = {
     priceWas: "Rs ____",
     saveBadge: "Save __%",
     cta: "Order now · studypal.store",
+    cta2: "",
     mockup: "",
   },
   defaultLists: {

@@ -39,6 +39,7 @@ const CSS = `
 .s2 .title-en { font: 600 30px/1.25 var(--f-display); color: var(--ink-soft); }
 .s2 .info .offer-bar { margin-top: 18px; }
 .s2 .info .cta { margin-left: 0; width: 100%; color: var(--deep); }
+.s2 .info .cta2 { text-align: left; }
 
 .ad.s2[data-format="SQ"] .situation { margin-top: 40px; font-size: 54px; }
 .ad.s2[data-format="SQ"] .entry { margin-top: 26px; padding: 30px 36px; }
@@ -121,7 +122,7 @@ function AdS2PeekInside({ format, product, fields, colors, mockup }: AdTemplateP
             {b.si}
           </div>
           <div className="title-en">{b.en + (b.enSub ? `: ${b.enSub}` : "")}</div>
-          <OfferBar fields={fields} cta={fields.cta} />
+          <OfferBar fields={fields} cta={fields.cta} cta2={fields.cta2} />
         </div>
       </div>
     </AdFrame>
@@ -147,6 +148,7 @@ export const adS2PeekInside: AdTemplateDef = {
     ...offerFields,
     { key: "priceWas", label: "Old price (struck through)", type: "text" },
     { key: "cta", label: "Call to action", type: "text" },
+    { key: "cta2", label: "Second call to action (below it)", type: "text", hint: "e.g. a second WhatsApp number. Empty hides it." },
     { key: "mockup", label: "Mockup", type: "image", hint: "Transparent PNG of this book. Empty = the flat cover with a 3D tilt." },
   ],
   defaultFields: {
@@ -159,6 +161,7 @@ export const adS2PeekInside: AdTemplateDef = {
     ...offerDefaults,
     priceWas: "",
     cta: "Order now · studypal.store",
+    cta2: "",
     mockup: "",
   },
   colors: [
