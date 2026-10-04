@@ -77,6 +77,16 @@ export function PostReelPanel({
 }
 
 /**
+ * URL for a track in assets/music. Vite's static server decodes the path with
+ * decodeURI, which leaves reserved characters like %2B ("+") encoded - so
+ * encodeURIComponent alone makes "Piano - Chill + Happy.wav" miss the file and
+ * fall through to index.html ("no supported sources"). Keep those characters
+ * literal; only "?", "#" and "/" must stay escaped in a path segment.
+ */
+const musicUrl = (file: string) =>
+  `/music/${encodeURIComponent(file).replace(/%(24|26|2B|2C|3A|3B|3D|40)/gi, (_m, hex: string) => String.fromCharCode(parseInt(hex, 16)))}`;
+
+/**
  * A still (post or ad) as an MP4 over a chosen background track. Tracks come
  * from assets/music and can be auditioned here - Vite serves assets/ as the
  * GUI's publicDir, so /music/<file> plays directly without an API round trip.
@@ -219,7 +229,7 @@ export function StillReelPanel<T = undefined>({
             {playing ? <Pause size={16} /> : <Play size={16} />}
           </button>
         </div>
-        {settings.musicFile && <audio ref={audioRef} src={`/music/${encodeURIComponent(settings.musicFile)}`} preload="auto" onTimeUpdate={onTimeUpdate} onEnded={() => setPlaying(false)} />}
+        {settings.musicFile && <audio ref={audioRef} src={musicUrl(settings.musicFile)} preload="auto" onTimeUpdate={onTimeUpdate} onEnded={() => setPlaying(false)} />}
       </div>
 
       <div className="grid" style={{ marginTop: 12 }}>

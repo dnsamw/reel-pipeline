@@ -231,13 +231,31 @@ TikTok, not just the ones this app published.
     TikTok uploads are drafts, so each is matched to the video you post from it; fix a wrong match with the
     dropdown in the Posts table.
 
-**Post Creator page** (`/post-creator`) — static 1080×1080 image posts. Pick a post template from the
+**Post Creator page** (`/post-creator`) — static image posts (1080×1080, or 1080×1350 for the hook photo). Pick a post template from the
 dropdown (each option has a small live preview), edit its text fields and optional background photo, then set
 its colors directly or load them from any reel template on the Templates page (light or dark palette). **Export
 PNG** renders the exact same React component through Remotion's `renderStill`, so the PNG matches the preview,
 downloads it, and keeps a copy in `output/posts/`. The first export after a code change waits for a Remotion
 bundle (~20-30s); later ones take a few seconds. Your in-progress post for each template is remembered in the
 browser.
+
+**Hook photo + long caption** (`studypal-hook-photo`): the Facebook format where the image is just a photo
+with one big yellow Sinhala hook box ("…වාක්‍ය **300** එක්ක…", with `**stars**` marking highlighted words),
+and the content (a long phrase list) plus the offer live in the caption. A pill above and a pill below the
+box move with it as one block; the **Vertical position** slider slides that block from top (0%) to bottom
+(100%) so it doesn't cover the photo's subject. **Photo zoom** (100-400%) and **Photo position** (left/right,
+up/down) pick exactly the part of the photo to show; **Dark overlay** (0-90%, color under Colors → Photo
+overlay, black by default) tones down bright photos so the box and pills stand out. **Hook box opacity** (20-100%) lets the photo show through
+the rounded box. **Hook text size** (36-130px) sets the hook's size; it still shrinks on its own if a line
+wouldn't fit the box. The StudyPal mark sits bottom left and your WhatsApp number
+bottom right (empty hides either). Type line breaks into the hook to keep your lines exactly; it shrinks
+until the widest line fits. **Find a free photo…** under the photo field
+searches Pexels (set `PEXELS_API_KEY` in `.env` — free key at pexels.com/api — and restart the server); a
+click downloads the photo into `assets/images/`. The **Caption** card builds the caption from the "Caption:"
+fields: hook line, a "see below" line, a `[[ POST CONTENT ]]` placeholder for your list, then the StudyPal
+tail (story, what's in the set, price, WhatsApp number and a tappable `wa.me` link that opens WhatsApp with
+a keyword typed in, and a comment question). **Copy caption**, paste it into Facebook, replace the
+placeholder with your list.
 
 **Reels safe zones:** a Reel's top, bottom and right edge are covered by Facebook's UI (icons, caption, the
 like/share column), and tall phones crop its sides. **Keep content inside Reels safe zones** (under the

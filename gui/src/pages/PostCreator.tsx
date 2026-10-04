@@ -195,11 +195,13 @@ export function PostCreator() {
                 f.type === "list" ? (
                   <PostListInput key={`${templateId}-${f.key}`} def={f} items={draft.lists[f.key] ?? []} onChange={(items) => setList(f.key, items)} />
                 ) : (
-                  <PostFieldInput key={`${templateId}-${f.key}`} def={f} value={draft.fields[f.key] ?? ""} onChange={(v) => setField(f.key, v)} onError={setError} />
+                  <PostFieldInput key={`${templateId}-${f.key}`} def={f} value={draft.fields[f.key] ?? ""} onChange={(v) => setField(f.key, v)} onError={setError} stock />
                 ),
               )}
             </div>
           </div>
+
+          {def.suggestCaption && <CaptionCard caption={def.suggestCaption(draft.fields, draft.lists)} />}
 
           <div className="card">
             <div className="card-heading-row">
@@ -305,6 +307,32 @@ export function PostCreator() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** The template's caption, live from the fields, to copy into Facebook by hand (the publish panel only appears after an export). */
+function CaptionCard({ caption }: { caption: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="card">
+      <div className="card-heading-row">
+        <h2>Caption</h2>
+        <button
+          type="button"
+          className="secondary small"
+          onClick={() =>
+            navigator.clipboard.writeText(caption).then(() => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            })
+          }
+        >
+          {copied ? "Copied" : "Copy caption"}
+        </button>
+      </div>
+      <textarea readOnly rows={14} lang="si" value={caption} style={{ width: "100%" }} />
+      <span className="hint">Paste it into the post, then replace the [[ POST CONTENT ]] line with your phrase list. Facebook allows about 63,000 characters.</span>
     </div>
   );
 }

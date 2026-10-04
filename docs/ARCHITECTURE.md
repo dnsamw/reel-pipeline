@@ -534,6 +534,19 @@ can't drift apart. Things worth knowing:
 - **List fields** (`type: "list"`, e.g. the list story's items) hold arrays of sub-field objects in a separate
   `lists` prop, so `fields` stays plain strings. Templates size variable-length content with `useShrinkToFit`
   (a CSS scale variable) instead of assuming a fixed count.
+- **Hook photo** (`StudyPalHookPhoto.tsx`, 1080×1350) places its pills + box block with two flex spacers whose
+  grow factors come from the `offsetY` slider (a `type: "range"` field), so the block stays in normal flow and
+  the fit's overflow check still works at any position. It passes `alsoOver` to `useFitFontSize`: when the hook has
+  typed line breaks it renders `white-space: pre` and also shrinks until no line is wider than the box (the
+  height-only check would wrap them instead). Its `suggestCaption` builds the long-caption tail, including a
+  `wa.me/94…?text=` link from the local WhatsApp number; the Post Creator shows any `suggestCaption` live in a
+  Caption card. Noto Sans Sinhala is loaded with its latin subset so digits in Sinhala text don't fall back
+  to a serif system font.
+- **Stock photos** (`server/stockPhotos.ts`): `GET /api/stock/status|search` proxy the Pexels API with
+  `PEXELS_API_KEY` (never sent to the browser), and `POST /api/stock/import` downloads the picked photo
+  (only from `images.pexels.com`, resized to 1600px by Pexels' CDN) into `assets/images/pexels-<id>.jpg`, so a
+  render never depends on Pexels. The picker (`StockPhotoPicker.tsx`) appears under image fields in Post
+  Creator only - ad mockups are transparent PNGs.
 - **Reel palettes feed posts via `colorsFromPalette`.** Each template maps a reel template's `Palette` (light or
   dark) onto its own color slots, so post colors don't have to mirror `Palette`'s shape.
 - **Reel export skips Remotion's video pipeline.** `POST /api/posts/reel` (`server/postReel.ts`) renders the PNG

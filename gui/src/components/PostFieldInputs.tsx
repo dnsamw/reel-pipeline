@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { api } from "../api";
+import { StockPhotoPicker } from "./StockPhotoPicker";
 import type {
   PostListFieldDef,
   PostListItem,
@@ -16,6 +17,7 @@ export function PostFieldInput({
   onChange,
   onError,
   placeholder,
+  stock,
 }: {
   def: PostScalarFieldDef;
   value: string;
@@ -23,6 +25,8 @@ export function PostFieldInput({
   onError: (message: string) => void;
   /** Shown while empty - e.g. the value an ad template falls back to. */
   placeholder?: string;
+  /** Image fields only: offer a free stock photo search (Post Creator backgrounds, not ad mockups). */
+  stock?: boolean;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -96,6 +100,24 @@ export function PostFieldInput({
           )}
         </div>
       )}
+      {def.type === "range" && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <input
+            type="range"
+            min={def.min ?? 0}
+            max={def.max ?? 100}
+            step={def.step ?? 1}
+            value={value === "" ? (def.min ?? 0) : Number(value)}
+            onChange={(e) => onChange(e.target.value)}
+            style={{ flex: 1 }}
+          />
+          <span style={{ minWidth: 48, textAlign: "right" }}>
+            {value || def.min || 0}
+            {def.unit ?? ""}
+          </span>
+        </div>
+      )}
+      {def.type === "image" && stock && <StockPhotoPicker onPick={onChange} onError={onError} />}
       {def.hint && <span className="hint">{def.hint}</span>}
     </div>
   );
