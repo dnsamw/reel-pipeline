@@ -57,6 +57,28 @@ const CSS = `
 .ad.c1[data-format="ST"] .spine-num { width: 36px; height: 36px; font-size: 18px; }
 .ad.c1[data-format="ST"] .spine-title { font-size: 24px; }
 .ad.c1[data-format="ST"] .spine .sp-logo { width: 30px; height: 30px; }
+
+/* LS 1.91:1 - two columns: number + lines on the left, the shelf over the offer on the right.
+   The shelf spans the left column's rows, so its height follows the text (it's a size container). */
+.ad.c1[data-format="LS"] .ad-inner { display: grid; grid-template-columns: 1fr 520px; grid-template-rows: auto auto auto auto auto auto 1fr;
+  column-gap: 44px; align-content: start; }
+.ad.c1[data-format="LS"] .brand-bar { grid-column: 1 / -1; grid-row: 1; }
+.ad.c1[data-format="LS"] .kicker { grid-column: 1; grid-row: 2; margin-top: 22px; font-size: 26px; }
+.ad.c1[data-format="LS"] .kicker + .big { margin-top: 2px; }
+.ad.c1[data-format="LS"] .big { grid-column: 1; grid-row: 3; margin-top: 22px; font-size: 136px; }
+.ad.c1[data-format="LS"] .big-label { grid-column: 1; grid-row: 4; margin-top: 14px; font-size: 26px; }
+.ad.c1[data-format="LS"] .big-label[lang] { font-size: 24px; }
+.ad.c1[data-format="LS"] .big-si { grid-column: 1; grid-row: 5; margin-top: 8px; font-size: 22px; }
+.ad.c1[data-format="LS"] .stat { grid-column: 1; grid-row: 7; align-self: end; margin: 14px 0 0; font-size: 22px; }
+.ad.c1[data-format="LS"] .shelf-area { grid-column: 2; grid-row: 2 / 6; min-height: 0; margin: 22px 0 0; }
+.ad.c1[data-format="LS"] .spines { gap: 5px; padding: 0 8px; }
+.ad.c1[data-format="LS"] .spine { padding: 8px 0; height: calc(92cqh - 14px); }
+.ad.c1[data-format="LS"] .spine-num { width: 26px; height: 26px; font-size: 13px; }
+.ad.c1[data-format="LS"] .spine-title { font-size: 17px; margin: 8px 0; }
+.ad.c1[data-format="LS"] .spine-si { display: none; }
+.ad.c1[data-format="LS"] .spine .sp-logo { width: 22px; height: 22px; }
+.ad.c1[data-format="LS"] .plank { height: 14px; box-shadow: inset 0 3px 0 var(--hi), 0 14px 20px -8px rgba(0,0,0,.55); }
+.ad.c1[data-format="LS"] .offer-bar { grid-column: 2; grid-row: 6 / 8; align-self: end; margin-top: 18px; }
 `;
 
 /**
@@ -64,7 +86,7 @@ const CSS = `
  * time until it fits along its spine, then shrink both until together they fit
  * across the spine's width.
  */
-function fitSpineTitles(root: HTMLElement) {
+export function fitSpineTitles(root: HTMLElement) {
   root.querySelectorAll<HTMLElement>(".spine-title").forEach((t) => {
     const lines = Array.from(t.children) as HTMLElement[];
     lines.forEach((l) => (l.style.fontSize = ""));
@@ -161,7 +183,7 @@ export const adC1TheShelf: AdTemplateDef = {
   funnel: "Cold",
   productKind: "collection",
   defaultProduct: "ALL",
-  formats: ["PT", "ST", "SQ"],
+  formats: ["PT", "ST", "SQ", "LS"],
   fields: [
     { key: "chip", label: "Corner chip", type: "text" },
     { key: "kicker", label: "Line above the big number", type: "text", hint: "e.g. \"Phrases & patterns\". Empty hides it." },

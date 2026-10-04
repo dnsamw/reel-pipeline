@@ -265,8 +265,13 @@ export pick it up automatically.
 **Ad Creator page** (`/ad-creator`) — Facebook/Instagram ad creatives from the ads plan
 (`study-pal-eng-book/english-book-content/marketing/facebook-ads-plan.md`). Four templates so far, ported from
 `ad-templates/*.html`: **S1 Cover Hero** and **S2 Peek Inside** (single book), **M1 Pack Hero** (3-book pack) and
-**C1 The Shelf** (complete collection). Each renders in three formats: **PT** 1080×1350 (feed, make this first),
-**ST** 1080×1920 (Stories/Reels, content kept inside the safe zones) and **SQ** 1080×1080.
+**C1 The Shelf** (complete collection), plus **C2 The Offer** (complete collection, built in React with no HTML
+original): a boost-ready version of C1 in the dark brand purple, with the deadline in the corner chip, one
+sample entry as proof of the Sinhala pronunciation, "what you get" badges (PDF via WhatsApp), and its own
+WhatsApp-ordering primary text. Its defaults are the live Oct 2026 offer, so it renders ready to boost. Each renders in three formats: **PT** 1080×1350 (feed, make this first),
+**ST** 1080×1920 (Stories/Reels, content kept inside the safe zones) and **SQ** 1080×1080. C1 and C2 also render
+**LS** 1200×628, a two-column layout for Ads Manager's 1.91:1 "Horizontal" crop. Upload it there with
+*Replace* instead of letting Meta auto-crop the portrait ad.
 
 - **Product**: pick the book or pack the ad is for. Book ads take that book's accent and tint colors, and empty
   fields fall back to its copy-bank hook, phrase count and so on (shown as grey placeholders). Each

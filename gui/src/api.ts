@@ -32,7 +32,7 @@ import type {
 
 export interface AdRenderBody {
   templateId: string;
-  format: "SQ" | "PT" | "ST";
+  format: "SQ" | "PT" | "ST" | "LS";
   product: string;
   fields: Record<string, string>;
   lists: Record<string, Record<string, string>[]>;

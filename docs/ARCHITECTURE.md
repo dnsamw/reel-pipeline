@@ -556,7 +556,9 @@ can't drift apart. Things worth knowing:
 previewed in the DOM and rendered with `renderStill`), adapted to the ads plan
 (`study-pal-eng-book/english-book-content/marketing/facebook-ads-plan.md`) and its HTML designs in `ad-templates/`:
 
-- **One def, three formats.** An `AdTemplateDef` lists its `formats` (SQ 1080², PT 1080×1350, ST 1080×1920);
+- **One def, several formats.** An `AdTemplateDef` lists its `formats` (SQ 1080², PT 1080×1350, ST 1080×1920,
+  and LS 1200×628 on C1/C2 - Meta's 1.91:1 Horizontal crop, laid out as a two-column CSS grid on `.ad-inner`
+  where the shelf, a size container, spans the left column's rows so its height follows the text);
   the component gets `format` and switches layout with `[data-format]` CSS like the HTML. ST pads the content
   to the reel safe zones (270/200/380/150) in every render - ads have no on/off toggle.
 - **Products drive defaults.** `productKind` (book / pack / collection) picks the GUI's product list from
@@ -580,6 +582,9 @@ previewed in the DOM and rendered with `renderStill`), adapted to the ads plan
 - **Mockup fallback chain** (`MockupSlot`): the uploaded mockup if it loads → the book's flat cover from
   `assets/ads/covers/` with the CSS 3D tilt → a CSS-drawn cover. `useImageStatus` probes each image and holds the
   render until the outcome is committed.
+- **C2 The Offer** has no HTML original; it reuses C1's `fitSpineTitles`. A template can set
+  `suggestPrimaryText` to replace the shared copy-bank suggestion (C2's ends with WhatsApp ordering and the
+  deadline instead of studypal.store).
 - **Server**: `POST /api/ads/render` and `/api/ads/reel` (`server/adRenderer.ts`) reuse Post Creator's bundle
   (`renderStillPng`), image inlining (`inlineAssetImage`) and ffmpeg encoder (`encodeStillReel`). Files go to
   `output/ads/{TEMPLATE}_{PRODUCT}_{FORMAT}_{VARIANT}.png|.mp4` (the plan's naming convention), so re-exporting a

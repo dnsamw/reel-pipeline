@@ -36,6 +36,7 @@ import { introOutroVideoSpec } from "./videoSpec";
 import { renderPostPng, warmPostBundle } from "./postRenderer";
 import { listMusicTracks, renderPostReel } from "./postReel";
 import { renderAdPng, renderAdReel, type AdRenderInput } from "./adRenderer";
+import { AD_FORMAT_ORDER, isAdFormat } from "../src/ads/types";
 import { listAdPresets, saveAdPreset, deleteAdPreset, importAdPresets, isPresetKind } from "./adPresets";
 import { listLibrary, deleteLibraryItems, resetManifest, pruneManifest } from "./library";
 import { aiStatus, suggestCaptions } from "./captions";
@@ -397,7 +398,7 @@ app.post("/api/posts/reel", async (req, res) => {
 function adInput(body: Record<string, unknown>): AdRenderInput {
   const { templateId, format, product, fields, lists, colors, mockup, variant } = body ?? {};
   if (typeof templateId !== "string") throw Object.assign(new Error("templateId is required"), { status: 400 });
-  if (format !== "SQ" && format !== "PT" && format !== "ST") throw Object.assign(new Error("format must be SQ, PT or ST"), { status: 400 });
+  if (!isAdFormat(format)) throw Object.assign(new Error(`format must be one of ${AD_FORMAT_ORDER.join(", ")}`), { status: 400 });
   return {
     templateId,
     format,

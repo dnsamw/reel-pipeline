@@ -14,6 +14,7 @@ import {
   AD_FORMATS,
   DEFAULT_MOCKUP_ADJUST,
   adFileBase,
+  isAdFormat,
   resolveAdColors,
   resolveAdFields,
   type AdFormat,
@@ -85,7 +86,7 @@ function initialProduct(def: AdTemplateDef): string {
 
 function initialFormat(): AdFormat {
   const saved = readStorage<string>(FORMAT_KEY);
-  return saved === "SQ" || saved === "PT" || saved === "ST" ? saved : "PT";
+  return isAdFormat(saved) ? saved : "PT";
 }
 
 function renderBody(def: AdTemplateDef, product: string, format: AdFormat, d: AdDraft): AdRenderBody {
@@ -380,7 +381,7 @@ export function AdCreator() {
     }
   }
 
-  const copySuggestion = suggestPrimaryText(p, resolvedFields, draft.lists);
+  const copySuggestion = (def.suggestPrimaryText ?? suggestPrimaryText)(p, resolvedFields, draft.lists);
   const headline = draft.headline ?? suggestHeadline(p);
   const primaryText = draft.primaryText ?? copySuggestion;
   const hasImageField = def.fields.some((f) => f.type === "image");
