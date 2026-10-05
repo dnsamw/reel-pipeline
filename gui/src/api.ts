@@ -255,6 +255,8 @@ export const api = {
   resetManifest: () => request<{ cleared: number; backupPath: string | null }>("/library/manifest/reset", { method: "POST" }),
   pruneManifest: () => request<{ removed: number }>("/library/manifest/prune", { method: "POST" }),
   warmPostRenderer: () => request<void>("/posts/warm", { method: "POST" }),
+  generateVocab: (body: { topic: string; count: number; avoid?: string[] }) =>
+    request<{ subtitle: string; items: { word: string; pron: string; meaning: string }[] }>("/vocab/generate", { method: "POST", body: JSON.stringify(body) }),
   // Ad Creator - both answer with the file itself (PNG / MP4), not JSON.
   renderAd: (body: AdRenderBody) => postForFile("/api/ads/render", body),
   adPresets: (templateId: string, kind: AdPresetKind) =>

@@ -35,6 +35,7 @@ import { startRender, getRun, listRuns, cancelRun } from "./renderRunner";
 import { introOutroVideoSpec } from "./videoSpec";
 import { renderPostPng, warmPostBundle } from "./postRenderer";
 import { listMusicTracks, renderPostReel } from "./postReel";
+import { generateVocab } from "./vocab";
 import { renderAdPng, renderAdReel, type AdRenderInput } from "./adRenderer";
 import { listAdPresets, saveAdPreset, deleteAdPreset, importAdPresets, isPresetKind } from "./adPresets";
 import { listLibrary, deleteLibraryItems, resetManifest, pruneManifest } from "./library";
@@ -794,6 +795,20 @@ const CAPTION_PLATFORMS: CaptionPlatform[] = ["facebook", "instagram", "youtube"
 
 app.get("/api/ai/status", (_req, res) => {
   res.json(aiStatus());
+});
+
+// Vocab Post (gui /vocab-post): AI fills the word rows for a topic.
+app.post("/api/vocab/generate", async (req, res) => {
+  try {
+    const { topic, count, avoid } = req.body ?? {};
+    if (typeof topic !== "string" || !topic.trim()) return res.status(400).json({ error: "topic is required" });
+    const n = Math.min(20, Math.max(1, Number.isInteger(count) ? count : 8));
+    const avoidList = (Array.isArray(avoid) ? avoid : []).filter((w: unknown): w is string => typeof w === "string" && !!w.trim());
+    res.json(await generateVocab(topic.trim(), n, avoidList));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
 });
 
 app.post("/api/captions/suggest", async (req, res) => {

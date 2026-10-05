@@ -7,6 +7,7 @@ import {
   FileText,
   FolderOpen,
   ImagePlus,
+  Languages,
   Lightbulb,
   LayoutDashboard,
   Megaphone,
@@ -31,6 +32,7 @@ import { VideoSpecPage } from "./pages/VideoSpecPage";
 import { Settings } from "./pages/Settings";
 import { PostCreator } from "./pages/PostCreator";
 import { AdCreator } from "./pages/AdCreator";
+import { VocabPost } from "./pages/VocabPost";
 import { MediaLibrary } from "./pages/MediaLibrary";
 import { Insights } from "./pages/Insights";
 
@@ -61,6 +63,7 @@ const NAV_SECTIONS = [
     title: "Posts",
     items: [
       { to: "/post-creator", end: false, icon: ImagePlus, label: "Post Creator" },
+      { to: "/vocab-post", end: false, icon: Languages, label: "Vocab Post" },
       { to: "/ad-creator", end: false, icon: Megaphone, label: "Ad Creator" },
     ],
   },
@@ -153,6 +156,7 @@ export function App() {
           <Route path="/templates/:id" element={<TemplateEditor />} />
           <Route path="/recipes" element={<Recipes />} />
           <Route path="/post-creator" element={<PostCreator />} />
+          <Route path="/vocab-post" element={<VocabPost />} />
           <Route path="/ad-creator" element={<AdCreator />} />
           <Route path="/library" element={<MediaLibrary />} />
           <Route path="/insights" element={<Insights />} />

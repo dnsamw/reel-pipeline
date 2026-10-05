@@ -62,6 +62,28 @@ export function PostFieldInput({
           onChange={(e) => onChange(e.target.value)}
         />
       )}
+      {def.type === "range" && (
+        <div className="post-range-field">
+          <input
+            type="range"
+            min={def.min}
+            max={def.max}
+            step={def.step}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+          />
+          <input
+            type="number"
+            className="post-range-number"
+            min={def.min}
+            max={def.max}
+            step={def.step}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+          />
+          {def.unit && <span className="post-range-unit">{def.unit}</span>}
+        </div>
+      )}
       {def.type === "image" && (
         <div className="post-image-field">
           <input

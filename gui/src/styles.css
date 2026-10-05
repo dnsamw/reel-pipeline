@@ -2737,3 +2737,52 @@ button.posts-more {
 .hint.text-danger {
   color: var(--danger);
 }
+
+/* Vocab Post - AI word generator above the Content fields */
+.vocab-ai {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+
+.vocab-ai-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.vocab-ai-row input[type="number"] {
+  width: 64px;
+}
+
+.vocab-ai-row button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Slider field ("range" post fields, e.g. Vocab Post's title size) */
+.post-range-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.post-range-field input[type="range"] {
+  flex: 1;
+}
+
+.post-range-field input.post-range-number {
+  width: 72px;
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.post-range-unit {
+  color: var(--muted);
+}

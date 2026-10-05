@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { api } from "../api";
 import { ColorField } from "../components/ReelConfigFields";
 import { PostPreview } from "../components/PostPreview";
@@ -10,14 +10,12 @@ import { PostTemplatePicker } from "../components/PostTemplatePicker";
 import { PostFieldInput, PostListInput } from "../components/PostFieldInputs";
 import { TemplatePicker } from "../components/TemplatePicker";
 import { getPostTemplate, postTemplates } from "../../../src/posts/registry";
-import type { PostColors, PostFields, PostListItem, PostLists } from "../../../src/posts/types";
+import type { PostColors, PostFields, PostListItem, PostLists, PostTemplateDef } from "../../../src/posts/types";
 import type { ReelTheme, TemplateRecord } from "../types";
 
-const LAST_TEMPLATE_KEY = "studypal-reels:post-creator:last-template";
 const GUIDES_KEY = "studypal-reels:post-creator:show-guides";
-const draftKey = (templateId: string) => `studypal-reels:post-creator:draft:${templateId}`;
 
-interface Draft {
+export interface Draft {
   fields: PostFields;
   lists: PostLists;
   colors: PostColors;
@@ -46,19 +44,19 @@ function writeStorage(key: string, value: unknown) {
   }
 }
 
-function initialTemplateId(): string {
+function initialTemplateId(templates: PostTemplateDef[], lastKey: string): string {
   try {
-    const last = localStorage.getItem(LAST_TEMPLATE_KEY);
-    if (last && getPostTemplate(last)) return last;
+    const last = localStorage.getItem(lastKey);
+    if (last && templates.some((t) => t.id === last)) return last;
   } catch {
     // ignore
   }
-  return postTemplates[0].id;
+  return templates[0].id;
 }
 
-function loadDraft(templateId: string): Draft {
+function loadDraft(templateId: string, key: string): Draft {
   const def = getPostTemplate(templateId)!;
-  const saved = readStorage<Partial<Draft>>(draftKey(templateId));
+  const saved = readStorage<Partial<Draft>>(key);
   return {
     fields: { ...def.defaultFields, ...saved?.fields },
     lists: { ...def.defaultLists, ...saved?.lists },
@@ -69,10 +67,35 @@ function loadDraft(templateId: string): Draft {
   };
 }
 
-export function PostCreator() {
-  const [templateId, setTemplateId] = useState(initialTemplateId);
+export interface PostCreatorProps {
+  title?: string;
+  templates?: PostTemplateDef[];
+  /** localStorage namespace for the last template + drafts - separate pages keep separate drafts. */
+  storagePrefix?: string;
+  templateHeading?: string;
+  /**
+   * One draft shared by every template (they must share field keys) - so
+   * switching template (e.g. Vocab Post's size) keeps the content. Default:
+   * one draft per template.
+   */
+  sharedDraft?: boolean;
+  /** Extra controls at the top of the Content card (e.g. Vocab Post's AI generator). */
+  contentExtras?: (draft: Draft, setDraft: (update: (d: Draft) => Draft) => void, onError: (message: string | null) => void) => ReactNode;
+}
+
+export function PostCreator({
+  title = "Post Creator",
+  templates = postTemplates,
+  storagePrefix = "studypal-reels:post-creator",
+  templateHeading = "Template",
+  sharedDraft = false,
+  contentExtras,
+}: PostCreatorProps = {}) {
+  const lastTemplateKey = `${storagePrefix}:last-template`;
+  const draftKey = (id: string) => (sharedDraft ? `${storagePrefix}:draft` : `${storagePrefix}:draft:${id}`);
+  const [templateId, setTemplateId] = useState(() => initialTemplateId(templates, lastTemplateKey));
   const def = getPostTemplate(templateId)!;
-  const [draft, setDraft] = useState<Draft>(() => loadDraft(templateId));
+  const [draft, setDraft] = useState<Draft>(() => loadDraft(templateId, draftKey(templateId)));
   const [showGuides, setShowGuides] = useState(() => readStorage<boolean>(GUIDES_KEY) ?? false);
   const [paletteSource, setPaletteSource] = useState<"template" | "reel">("template");
 
@@ -104,9 +127,15 @@ export function PostCreator() {
   }
 
   function switchTemplate(id: string) {
-    writeStorage(LAST_TEMPLATE_KEY, id);
+    writeStorage(lastTemplateKey, id);
     setTemplateId(id);
-    setDraft(loadDraft(id));
+    // Shared draft: keep what's being edited, but re-apply the new size's safe-zone default.
+    if (sharedDraft) {
+      const next = getPostTemplate(id)!;
+      setDraft((d) => ({ ...d, safeZones: next.width * 16 === next.height * 9 }));
+    } else {
+      setDraft(loadDraft(id, draftKey(id)));
+    }
   }
 
   function setField(key: string, value: string) {
@@ -173,14 +202,14 @@ export function PostCreator() {
 
   return (
     <div>
-      <h1>Post Creator</h1>
+      <h1>{title}</h1>
       {error && <div className="error-banner">{error}</div>}
 
       <div className="editor-layout">
         <div className="editor-form">
           <div className="card">
-            <h2>Template</h2>
-            <PostTemplatePicker templates={postTemplates} value={templateId} onChange={switchTemplate} />
+            <h2>{templateHeading}</h2>
+            <PostTemplatePicker templates={templates} value={templateId} onChange={switchTemplate} />
           </div>
 
           <div className="card">
@@ -190,6 +219,7 @@ export function PostCreator() {
                 Reset content
               </button>
             </div>
+            {contentExtras?.(draft, setDraft, setError)}
             <div className="grid">
               {def.fields.map((f) =>
                 f.type === "list" ? (

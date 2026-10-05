@@ -1,5 +1,6 @@
 import { studyPalQuote } from "./templates/StudyPalQuote";
 import { studyPalListStory } from "./templates/StudyPalListStory";
+import { studyPalVocabFeed, studyPalVocabStory } from "./templates/StudyPalVocab";
 import type { PostTemplateDef } from "./types";
 
 /**
@@ -10,6 +11,9 @@ import type { PostTemplateDef } from "./types";
  */
 export const postTemplates: PostTemplateDef[] = [studyPalQuote, studyPalListStory];
 
+/** The Vocab Post page's sizes (gui /vocab-post) - kept out of Post Creator's picker, but rendered by the same "Post" still. */
+export const vocabPostTemplates: PostTemplateDef[] = [studyPalVocabStory, studyPalVocabFeed];
+
 export function getPostTemplate(id: string): PostTemplateDef | undefined {
-  return postTemplates.find((t) => t.id === id);
+  return postTemplates.find((t) => t.id === id) ?? vocabPostTemplates.find((t) => t.id === id);
 }
