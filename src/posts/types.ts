@@ -19,12 +19,6 @@ export interface PostScalarFieldDef {
   unit?: string;
   /** e.g. "si" - set on the input so Sinhala gets the right IME/shaping hints. */
   lang?: string;
-  /** "range" only. */
-  min?: number;
-  max?: number;
-  step?: number;
-  /** "range" only - shown after the value, e.g. "%". */
-  unit?: string;
   hint?: string;
 }
 

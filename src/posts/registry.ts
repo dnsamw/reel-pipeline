@@ -1,6 +1,7 @@
 import { studyPalQuote } from "./templates/StudyPalQuote";
 import { studyPalListStory } from "./templates/StudyPalListStory";
 import { studyPalHookPhoto } from "./templates/StudyPalHookPhoto";
+import { studyPalVocabStory, studyPalVocabFeed } from "./templates/StudyPalVocab";
 import type { PostTemplateDef } from "./types";
 
 /**
