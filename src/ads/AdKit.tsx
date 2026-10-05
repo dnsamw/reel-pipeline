@@ -71,6 +71,7 @@ const AD_BASE_CSS = `
 .ad * { box-sizing: border-box; }
 .ad[data-format="SQ"] { height: 1080px; }
 .ad[data-format="ST"] { height: 1920px; }
+.ad[data-format="LS"] { width: 1200px; height: 628px; }
 .ad-inner { position: absolute; inset: 0; padding: 72px; display: flex; flex-direction: column; }
 .ad[data-format="ST"] .ad-inner { padding: 270px 200px 380px 150px; }
 
@@ -84,6 +85,23 @@ const AD_BASE_CSS = `
 .chip:empty { display: none; }
 .ad[data-format="ST"] .sp-logo { width: 64px; height: 64px; }
 .ad[data-format="ST"] .brand-name { font-size: 32px; }
+
+/* LS (1200x628, Meta's 1.91:1 crop): a short, wide canvas - smaller chrome everywhere.
+   Templates that offer LS lay their own content out in two columns. */
+.ad[data-format="LS"] .ad-inner { padding: 34px 48px 36px; }
+.ad[data-format="LS"] .sp-logo { width: 46px; height: 46px; }
+.ad[data-format="LS"] .brand-bar { gap: 14px; }
+.ad[data-format="LS"] .brand-name { font-size: 26px; }
+.ad[data-format="LS"] .chip { font-size: 20px; padding: 5px 16px; border-width: 2px; }
+.ad[data-format="LS"] .offer-bar { gap: 12px 14px; }
+.ad[data-format="LS"] .price-volumes { font-size: 24px; margin-bottom: -4px; }
+.ad[data-format="LS"] .price-chip { padding: 9px 20px; gap: 12px; border-radius: 16px; }
+.ad[data-format="LS"] .price { font-size: 42px; }
+.ad[data-format="LS"] .price-prefix, .ad[data-format="LS"] .price-suffix { font-size: 24px; }
+.ad[data-format="LS"] .price-was { font-size: 22px; text-decoration-thickness: 2px; }
+.ad[data-format="LS"] .save-badge { font-size: 22px; padding: 8px 14px; border-radius: 12px; }
+.ad[data-format="LS"] .cta { font-size: 24px; }
+.ad[data-format="LS"] .cta2 { margin-top: -8px; }
 
 .offer-bar { display: flex; align-items: center; gap: 20px; flex: none; flex-wrap: wrap; }
 /* "All 9 Volumes" sits on its own row above the chip (flex-basis 100% in the wrapping offer bar). */
@@ -249,7 +267,9 @@ export function BrandBar({ chip, chipClassName }: { chip: string; chipClassName?
     <div className="brand-bar">
       <AdLogo />
       <span className="brand-name">StudyPal</span>
-      <span className={`chip${chipClassName ? ` ${chipClassName}` : ""}`}>{chip}</span>
+      <span className={`chip${chipClassName ? ` ${chipClassName}` : ""}`} {...siLang(chip)}>
+        {chip}
+      </span>
     </div>
   );
 }

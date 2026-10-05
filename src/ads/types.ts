@@ -2,16 +2,23 @@ import type { ComponentType } from "react";
 import type { PostColorDef, PostFields, PostListFieldDef, PostLists, PostScalarFieldDef } from "../posts/types";
 import type { AdProduct, AdProductKind } from "./products";
 
-/** Ad sizes from the ads plan (Part 5) - the code is also the file-name format code. */
-export type AdFormat = "SQ" | "PT" | "ST";
+/**
+ * Ad sizes from the ads plan (Part 5) - the code is also the file-name format
+ * code. LS (1.91:1) is Meta's "Horizontal" placement crop (right column,
+ * search, some feeds), added after Ads Manager auto-cropped a PT ad badly.
+ */
+export type AdFormat = "SQ" | "PT" | "ST" | "LS";
 
 export const AD_FORMATS: Record<AdFormat, { width: number; height: number; label: string }> = {
   SQ: { width: 1080, height: 1080, label: "Square 1:1" },
   PT: { width: 1080, height: 1350, label: "Portrait 4:5" },
   ST: { width: 1080, height: 1920, label: "Story 9:16" },
+  LS: { width: 1200, height: 628, label: "Landscape 1.91:1" },
 };
 
-export const AD_FORMAT_ORDER: AdFormat[] = ["PT", "ST", "SQ"];
+export const AD_FORMAT_ORDER: AdFormat[] = ["PT", "ST", "SQ", "LS"];
+
+export const isAdFormat = (f: unknown): f is AdFormat => typeof f === "string" && f in AD_FORMATS;
 
 /**
  * A field whose empty value falls back to something derived from the product
@@ -67,6 +74,8 @@ export interface AdTemplateDef {
   colors: PostColorDef[];
   /** The colors an ad starts with for a product - overrides in the GUI sit on top. */
   colorsFor: (product: AdProduct) => Record<string, string>;
+  /** Ads Manager primary text for this template, when the shared copy-bank suggestion (adCopy.ts) doesn't fit it. */
+  suggestPrimaryText?: (product: AdProduct, fields: PostFields, lists: PostLists) => string;
   /** Fill for the letterbox bars when a non-9:16 ad is exported as a 9:16 video. */
   backgroundColor: (colors: Record<string, string>) => string;
   component: ComponentType<AdTemplateProps>;

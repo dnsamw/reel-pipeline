@@ -37,6 +37,8 @@ import { renderPostPng, warmPostBundle } from "./postRenderer";
 import { listMusicTracks, renderPostReel } from "./postReel";
 import { generateVocab } from "./vocab";
 import { renderAdPng, renderAdReel, type AdRenderInput } from "./adRenderer";
+import { AD_FORMAT_ORDER, isAdFormat } from "../src/ads/types";
+import { importStockPhoto, searchStockPhotos, stockStatus } from "./stockPhotos";
 import { listAdPresets, saveAdPreset, deleteAdPreset, importAdPresets, isPresetKind } from "./adPresets";
 import { listLibrary, deleteLibraryItems, resetManifest, pruneManifest } from "./library";
 import { aiStatus, suggestCaptions } from "./captions";
@@ -335,6 +337,30 @@ app.post("/api/assets/images", express.raw({ type: () => true, limit: "15mb" }),
   }
 });
 
+// Free stock photos (Pexels) for post backgrounds - server/stockPhotos.ts.
+app.get("/api/stock/status", (_req, res) => res.json(stockStatus()));
+
+app.get("/api/stock/search", async (req, res) => {
+  try {
+    const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    if (!q) return res.status(400).json({ error: "q is required" });
+    const page = Math.max(1, Number(req.query.page) || 1);
+    res.json(await searchStockPhotos(q, page, typeof req.query.orientation === "string" ? req.query.orientation : undefined));
+  } catch (err) {
+    res.status((err as { status?: number })?.status ?? 500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.post("/api/stock/import", async (req, res) => {
+  try {
+    const { id, src } = req.body ?? {};
+    if (typeof src !== "string") return res.status(400).json({ error: "src is required" });
+    res.json(await importStockPhoto(Number(id), src));
+  } catch (err) {
+    res.status((err as { status?: number })?.status ?? 500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // --- Post Creator (gui /post-creator): static image posts rendered to PNG ---
 // Renders the "Post" still (src/posts/PostStill.tsx) with renderStill - same
 // React template the GUI previews, so the PNG matches it exactly. Also saves
@@ -398,7 +424,7 @@ app.post("/api/posts/reel", async (req, res) => {
 function adInput(body: Record<string, unknown>): AdRenderInput {
   const { templateId, format, product, fields, lists, colors, mockup, variant } = body ?? {};
   if (typeof templateId !== "string") throw Object.assign(new Error("templateId is required"), { status: 400 });
-  if (format !== "SQ" && format !== "PT" && format !== "ST") throw Object.assign(new Error("format must be SQ, PT or ST"), { status: 400 });
+  if (!isAdFormat(format)) throw Object.assign(new Error(`format must be one of ${AD_FORMAT_ORDER.join(", ")}`), { status: 400 });
   return {
     templateId,
     format,

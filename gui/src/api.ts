@@ -32,13 +32,25 @@ import type {
 
 export interface AdRenderBody {
   templateId: string;
-  format: "SQ" | "PT" | "ST";
+  format: "SQ" | "PT" | "ST" | "LS";
   product: string;
   fields: Record<string, string>;
   lists: Record<string, Record<string, string>[]>;
   colors: Record<string, string>;
   mockup: { scale: number; x: number; y: number; rotate: number };
   variant: string;
+}
+
+/** A free stock photo search result - see server/stockPhotos.ts. */
+export interface StockPhoto {
+  id: number;
+  width: number;
+  height: number;
+  alt: string;
+  photographer: string;
+  pageUrl: string;
+  thumb: string;
+  src: string;
 }
 
 /** Ad Creator presets - see server/adPresets.ts. */
@@ -160,6 +172,12 @@ export const api = {
 
   // Not through request() - this sends the raw File as the body, not JSON
   // (matching server/index.ts's express.raw() route, not express.json()).
+  stockStatus: () => request<{ available: boolean; provider: string }>("/stock/status"),
+  searchStock: (q: string, page: number, orientation?: string) =>
+    request<{ photos: StockPhoto[]; hasMore: boolean }>(
+      `/stock/search?q=${encodeURIComponent(q)}&page=${page}${orientation ? `&orientation=${orientation}` : ""}`,
+    ),
+  importStock: (photo: StockPhoto) => request<{ path: string }>("/stock/import", { method: "POST", body: JSON.stringify({ id: photo.id, src: photo.src }) }),
   uploadImage: async (file: File) => {
     const res = await fetch(`/api/assets/images?filename=${encodeURIComponent(file.name)}`, {
       method: "POST",

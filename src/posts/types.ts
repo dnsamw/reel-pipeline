@@ -6,9 +6,17 @@ import type { Palette } from "../theme/tokens";
 export interface PostScalarFieldDef {
   key: string;
   label: string;
-  /** "image" values are an assets/-relative path ("images/x.png"), an http(s) URL, or a data: URI - see resolvePostAsset. Empty string = no image. */
-  /** "range" values are a number as a string, edited with a slider between min and max. */
+  /**
+   * "image" values are an assets/-relative path ("images/x.png"), an http(s) URL, or a data: URI - see resolvePostAsset. Empty string = no image.
+   * "range" is a slider; its value is still stored as a string (e.g. "50").
+   */
   type: "text" | "textarea" | "image" | "range";
+  /** "range" only. */
+  min?: number;
+  max?: number;
+  step?: number;
+  /** "range" only: shown after the value, e.g. "%". */
+  unit?: string;
   /** e.g. "si" - set on the input so Sinhala gets the right IME/shaping hints. */
   lang?: string;
   /** "range" only. */

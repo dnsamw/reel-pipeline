@@ -534,6 +534,19 @@ can't drift apart. Things worth knowing:
 - **List fields** (`type: "list"`, e.g. the list story's items) hold arrays of sub-field objects in a separate
   `lists` prop, so `fields` stays plain strings. Templates size variable-length content with `useShrinkToFit`
   (a CSS scale variable) instead of assuming a fixed count.
+- **Hook photo** (`StudyPalHookPhoto.tsx`, 1080×1350) places its pills + box block with two flex spacers whose
+  grow factors come from the `offsetY` slider (a `type: "range"` field), so the block stays in normal flow and
+  the fit's overflow check still works at any position. It passes `alsoOver` to `useFitFontSize`: when the hook has
+  typed line breaks it renders `white-space: pre` and also shrinks until no line is wider than the box (the
+  height-only check would wrap them instead). Its `suggestCaption` builds the long-caption tail, including a
+  `wa.me/94…?text=` link from the local WhatsApp number; the Post Creator shows any `suggestCaption` live in a
+  Caption card. Noto Sans Sinhala is loaded with its latin subset so digits in Sinhala text don't fall back
+  to a serif system font.
+- **Stock photos** (`server/stockPhotos.ts`): `GET /api/stock/status|search` proxy the Pexels API with
+  `PEXELS_API_KEY` (never sent to the browser), and `POST /api/stock/import` downloads the picked photo
+  (only from `images.pexels.com`, resized to 1600px by Pexels' CDN) into `assets/images/pexels-<id>.jpg`, so a
+  render never depends on Pexels. The picker (`StockPhotoPicker.tsx`) appears under image fields in Post
+  Creator only - ad mockups are transparent PNGs.
 - **Reel palettes feed posts via `colorsFromPalette`.** Each template maps a reel template's `Palette` (light or
   dark) onto its own color slots, so post colors don't have to mirror `Palette`'s shape.
 - **Reel export skips Remotion's video pipeline.** `POST /api/posts/reel` (`server/postReel.ts`) renders the PNG
@@ -556,7 +569,9 @@ can't drift apart. Things worth knowing:
 previewed in the DOM and rendered with `renderStill`), adapted to the ads plan
 (`study-pal-eng-book/english-book-content/marketing/facebook-ads-plan.md`) and its HTML designs in `ad-templates/`:
 
-- **One def, three formats.** An `AdTemplateDef` lists its `formats` (SQ 1080², PT 1080×1350, ST 1080×1920);
+- **One def, several formats.** An `AdTemplateDef` lists its `formats` (SQ 1080², PT 1080×1350, ST 1080×1920,
+  and LS 1200×628 on C1/C2 - Meta's 1.91:1 Horizontal crop, laid out as a two-column CSS grid on `.ad-inner`
+  where the shelf, a size container, spans the left column's rows so its height follows the text);
   the component gets `format` and switches layout with `[data-format]` CSS like the HTML. ST pads the content
   to the reel safe zones (270/200/380/150) in every render - ads have no on/off toggle.
 - **Products drive defaults.** `productKind` (book / pack / collection) picks the GUI's product list from
@@ -580,6 +595,9 @@ previewed in the DOM and rendered with `renderStill`), adapted to the ads plan
 - **Mockup fallback chain** (`MockupSlot`): the uploaded mockup if it loads → the book's flat cover from
   `assets/ads/covers/` with the CSS 3D tilt → a CSS-drawn cover. `useImageStatus` probes each image and holds the
   render until the outcome is committed.
+- **C2 The Offer** has no HTML original; it reuses C1's `fitSpineTitles`. A template can set
+  `suggestPrimaryText` to replace the shared copy-bank suggestion (C2's ends with WhatsApp ordering and the
+  deadline instead of studypal.store).
 - **Server**: `POST /api/ads/render` and `/api/ads/reel` (`server/adRenderer.ts`) reuse Post Creator's bundle
   (`renderStillPng`), image inlining (`inlineAssetImage`) and ffmpeg encoder (`encodeStillReel`). Files go to
   `output/ads/{TEMPLATE}_{PRODUCT}_{FORMAT}_{VARIANT}.png|.mp4` (the plan's naming convention), so re-exporting a

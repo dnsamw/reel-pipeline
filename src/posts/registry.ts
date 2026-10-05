@@ -1,6 +1,6 @@
 import { studyPalQuote } from "./templates/StudyPalQuote";
 import { studyPalListStory } from "./templates/StudyPalListStory";
-import { studyPalVocabFeed, studyPalVocabStory } from "./templates/StudyPalVocab";
+import { studyPalHookPhoto } from "./templates/StudyPalHookPhoto";
 import type { PostTemplateDef } from "./types";
 
 /**
@@ -9,7 +9,7 @@ import type { PostTemplateDef } from "./types";
  * port the HTML design from post-templates/ into templates/<Name>.tsx
  * exporting a PostTemplateDef, then append it here - nothing else changes.
  */
-export const postTemplates: PostTemplateDef[] = [studyPalQuote, studyPalListStory];
+export const postTemplates: PostTemplateDef[] = [studyPalQuote, studyPalListStory, studyPalHookPhoto];
 
 /** The Vocab Post page's sizes (gui /vocab-post) - kept out of Post Creator's picker, but rendered by the same "Post" still. */
 export const vocabPostTemplates: PostTemplateDef[] = [studyPalVocabStory, studyPalVocabFeed];
