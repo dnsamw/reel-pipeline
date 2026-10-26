@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { PostColors, PostFields, PostLists, PostTemplateDef } from "../../../src/posts/types";
 import { postInsets, reelSafeInsets } from "../../../src/posts/safeZones";
+import { ContactBadge } from "../../../src/posts/ContactBadge";
 
 /**
  * Renders a post template's real component (the same one renderStill
@@ -58,7 +59,7 @@ export function PostPreview({
   return (
     <div
       ref={outerRef}
-      className="post-preview"
+      className={def.transparentBackground ? "post-preview transparent-bg" : "post-preview"}
       style={{ width: width ?? "100%", aspectRatio: `${def.width} / ${def.height}` }}
     >
       {fontsReady && w > 0 ? (
@@ -66,6 +67,7 @@ export function PostPreview({
           <Component fields={{ ...def.defaultFields, ...fields }} lists={{ ...def.defaultLists, ...lists }} colors={{ ...def.defaultColors, ...colors }}
             insets={postInsets(def.width, def.height, safeZones)}
           />
+          <ContactBadge fields={fields} />
           {showGuides && <SafeZoneGuides width={def.width} height={def.height} />}
         </div>
       ) : (

@@ -150,10 +150,6 @@ function topicHashtag(topic: string): string | null {
   return tag.length >= 3 && tag.length <= 25 && /\p{L}/u.test(tag) ? `#${tag}` : null;
 }
 
-function webUrl(ctaUrl: string): string {
-  return /^https?:\/\//.test(ctaUrl) ? ctaUrl : `https://${ctaUrl}`;
-}
-
 function bareUrl(ctaUrl: string): string {
   return ctaUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
 }
@@ -191,7 +187,20 @@ function promoLine(platform: CaptionPlatform, ctaUrl: string): string {
     case "tiktok":
       return `📘 Full phrasebook: ${bareUrl(ctaUrl)}`;
     default:
-      return `📘 Learn 200+ everyday English phrases with Sinhala meanings and pronunciation: ${webUrl(ctaUrl)}`;
+      return [
+        "ඔයාගේ English Level එක Next Level එකට ගේන්න කැමතිද? 🚀",
+        "",
+        "📚 StudyPal ඉංග්‍රීසි පොත් කට්ටලය",
+        "",
+        "✅ පොත් 69 · වාක්‍ය 21,000+",
+        "✅ හැම වාක්‍යයකටම සිංහල අකුරෙන් උච්චාරණය සහ තේරුම",
+        "✅ ගෙදරට, රස්සාවට, විදේශ ගමනට - හැම තැනටම",
+        "✅ PDF පොත් WhatsApp එකෙන්ම ලැබේ",
+        "",
+        "සම්පූර්ණ කට්ටලයම රු. 1000යි!",
+        "",
+        "📲 WhatsApp: 078 448 9045",
+      ].join("\n");
   }
 }
 

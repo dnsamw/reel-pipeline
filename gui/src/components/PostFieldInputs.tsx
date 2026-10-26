@@ -45,6 +45,18 @@ export function PostFieldInput({
     }
   }
 
+  if (def.type === "checkbox") {
+    return (
+      <div className="field" style={{ gridColumn: "1 / -1" }}>
+        <label className="post-checkbox-field">
+          <input type="checkbox" checked={value === "1"} onChange={(e) => onChange(e.target.checked ? "1" : "")} />
+          {def.label}
+        </label>
+        {def.hint && <span className="hint">{def.hint}</span>}
+      </div>
+    );
+  }
+
   return (
     <div className="field" style={{ gridColumn: "1 / -1" }}>
       <label>{def.label}</label>
@@ -66,6 +78,15 @@ export function PostFieldInput({
           onChange={(e) => onChange(e.target.value)}
         />
       )}
+      {def.type === "select" && (
+        <select value={value} onChange={(e) => onChange(e.target.value)}>
+          {def.options?.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      )}
       {def.type === "range" && (
         <div className="post-range-field">
           <input
@@ -86,6 +107,18 @@ export function PostFieldInput({
             onChange={(e) => onChange(e.target.value)}
           />
           {def.unit && <span className="post-range-unit">{def.unit}</span>}
+        </div>
+      )}
+      {def.type === "color" && (
+        <div className="color-input-row">
+          <input type="text" value={value} onChange={(e) => onChange(e.target.value)} placeholder="#ffffff" spellCheck={false} className="color-hex-input" />
+          <input
+            type="color"
+            value={/^#[0-9a-fA-F]{6}$/.test(value) ? value : "#ffffff"}
+            onChange={(e) => onChange(e.target.value)}
+            title="Pick visually"
+            className="color-swatch-input"
+          />
         </div>
       )}
       {def.type === "image" && (
@@ -122,23 +155,6 @@ export function PostFieldInput({
           )}
         </div>
       )}
-      {def.type === "range" && (
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <input
-            type="range"
-            min={def.min ?? 0}
-            max={def.max ?? 100}
-            step={def.step ?? 1}
-            value={value === "" ? (def.min ?? 0) : Number(value)}
-            onChange={(e) => onChange(e.target.value)}
-            style={{ flex: 1 }}
-          />
-          <span style={{ minWidth: 48, textAlign: "right" }}>
-            {value || def.min || 0}
-            {def.unit ?? ""}
-          </span>
-        </div>
-      )}
       {def.type === "image" && stock && <StockPhotoPicker onPick={onChange} onError={onError} />}
       {def.hint && <span className="hint">{def.hint}</span>}
     </div>
@@ -150,10 +166,13 @@ export function PostListInput({
   def,
   items,
   onChange,
+  onError = () => {},
 }: {
   def: PostListFieldDef;
   items: PostListItem[];
   onChange: (items: PostListItem[]) => void;
+  /** Image sub-fields only: an upload failed. */
+  onError?: (message: string) => void;
 }) {
   const min = def.minItems ?? 0;
   const max = def.maxItems ?? Infinity;
@@ -224,7 +243,10 @@ export function PostListInput({
               )}
             </div>
             <div className="post-list-item-fields">
-              {def.itemFields.map((f) => (
+              {def.itemFields.map((f) =>
+                f.type !== "text" && f.type !== "textarea" ? (
+                  <PostFieldInput key={f.key} def={f} value={item[f.key] ?? ""} onChange={(v) => update(i, f.key, v)} onError={onError} stock={f.type === "image"} />
+                ) : (
                 <div className="field" key={f.key}>
                   <label>{f.label}</label>
                   {f.type === "textarea" ? (
@@ -243,7 +265,8 @@ export function PostListInput({
                     />
                   )}
                 </div>
-              ))}
+                ),
+              )}
             </div>
           </div>
         ))}

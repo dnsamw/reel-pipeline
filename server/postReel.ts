@@ -88,8 +88,9 @@ export async function renderPostReel(
   const musicPath = resolveMusicTrack(opts.musicFile);
   const { savedPath: pngPath, width, height } = await renderPostPng(post);
   // Merged with the template defaults - the request may only carry overrides.
-  const colors = { ...getPostTemplate(post.templateId)?.defaultColors, ...post.colors };
-  return encodeStillReel({ pngPath, width, height, background: colors.background ?? "#000000" }, opts, musicPath);
+  const def = getPostTemplate(post.templateId);
+  const colors = { ...def?.defaultColors, ...post.colors };
+  return encodeStillReel({ pngPath, width, height, background: colors.background ?? "#000000", flatten: !!def?.transparentBackground }, opts, musicPath);
 }
 
 /** Absolute path of a track in assets/music, or null for none - throws for anything outside it or missing. Check before rendering, so a bad track fails fast. */
@@ -103,10 +104,12 @@ export function resolveMusicTrack(musicFile: string | null): string | null {
 /**
  * Loops one still for `durationSeconds` over the music track into an MP4 next
  * to the PNG (same name, .mp4). Shared by Post Creator and Ad Creator reels.
- * `background` fills the letterbox bars when a non-9:16 still is framed as a reel.
+ * `background` fills the letterbox bars when a non-9:16 still is framed as a reel,
+ * and - with `flatten` (Vocab Photo's transparent background) - any transparent
+ * parts of the PNG: video has no alpha, so without it they'd come out black.
  */
 export async function encodeStillReel(
-  still: { pngPath: string; width: number; height: number; background: string },
+  still: { pngPath: string; width: number; height: number; background: string; flatten?: boolean },
   opts: PostReelOptions,
   musicPath: string | null,
 ): Promise<{ mp4Path: string }> {
@@ -117,6 +120,10 @@ export async function encodeStillReel(
   const mp4Path = pngPath.replace(/\.png$/i, ".mp4");
   const ffmpeg = resolveTool("ffmpeg");
   const bg = still.background.replace(/[^#0-9a-fA-F]/g, "") || "#000000";
+  // Put the PNG on the background color first, so its transparent parts take that color.
+  const flatten = still.flatten
+    ? `[0:v]format=rgba,split[fg][base];[base]drawbox=x=0:y=0:w=iw:h=ih:color=${bg}:t=fill[bgfill];[bgfill][fg]overlay,`
+    : "[0:v]";
   const videoFilter =
     opts.frame === "reel" && width * REEL_H !== height * REEL_W
       ? `scale=${REEL_W}:${REEL_H}:force_original_aspect_ratio=decrease,pad=${REEL_W}:${REEL_H}:(ow-iw)/2:(oh-ih)/2:color=${bg},format=yuv420p`
@@ -133,9 +140,9 @@ export async function encodeStillReel(
       ? ["-stream_loop", "-1", "-ss", String(start), "-i", musicPath]
       : ["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"]),
     "-t", String(duration),
-    "-vf", videoFilter,
+    "-filter_complex", `${flatten}${videoFilter}[v]`,
     ...(musicPath ? ["-af", audioFilter] : []),
-    "-map", "0:v", "-map", "1:a",
+    "-map", "[v]", "-map", "1:a",
     "-c:v", "libx264", "-tune", "stillimage", "-preset", "medium", "-crf", "18", "-r", String(FPS),
     "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
     "-movflags", "+faststart",

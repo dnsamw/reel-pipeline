@@ -75,6 +75,23 @@ function inlineAssetImages(templateId: string, fields: PostFields): PostFields {
   return out;
 }
 
+/** Same for image sub-fields of "list" items (Vocab List's per-word photos). */
+function inlineListImages(templateId: string, lists: PostLists): PostLists {
+  const def = getPostTemplate(templateId)!;
+  const out = { ...lists };
+  for (const f of def.fields) {
+    if (f.type !== "list") continue;
+    const imageKeys = f.itemFields.filter((sf) => sf.type === "image").map((sf) => sf.key);
+    if (imageKeys.length === 0 || !out[f.key]) continue;
+    out[f.key] = out[f.key].map((item) => {
+      const next = { ...item };
+      for (const k of imageKeys) next[k] = inlineAssetImage(next[k] ?? "");
+      return next;
+    });
+  }
+  return out;
+}
+
 /** Renders one of Root.tsx's <Still>s to a PNG buffer - shared by post and ad exports. */
 export async function renderStillPng(compositionId: string, inputProps: Record<string, unknown>): Promise<{ png: Buffer; width: number; height: number }> {
   const serveUrl = await getBundle();
@@ -91,7 +108,7 @@ export async function renderPostPng(input: { templateId: string; fields: PostFie
   const inputProps = {
     templateId: def.id,
     fields: inlineAssetImages(def.id, { ...def.defaultFields, ...input.fields }),
-    lists: { ...def.defaultLists, ...input.lists },
+    lists: inlineListImages(def.id, { ...def.defaultLists, ...input.lists }),
     colors: { ...def.defaultColors, ...input.colors },
     safeZones: !!input.safeZones,
   };

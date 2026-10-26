@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { api } from "../api";
 import { ColorField } from "../components/ReelConfigFields";
 import { PostPreview } from "../components/PostPreview";
+import { DrawingOverlay, DrawingToolbar } from "../components/DrawingPad";
 import { PostReelPanel } from "../components/PostReelPanel";
 import { PublishPanel } from "../components/PublishPanel";
 import { postCaptionContext, suggestPostCaption } from "../lib/postCaption";
@@ -10,10 +11,46 @@ import { PostTemplatePicker } from "../components/PostTemplatePicker";
 import { PostFieldInput, PostListInput } from "../components/PostFieldInputs";
 import { TemplatePicker } from "../components/TemplatePicker";
 import { getPostTemplate, postTemplates } from "../../../src/posts/registry";
-import type { PostColors, PostFields, PostListItem, PostLists, PostTemplateDef } from "../../../src/posts/types";
+import { contactBrandColors, contactDefaults, contactOldDefaultColors } from "../../../src/posts/ContactBadge";
+import type { PostColors, PostFields, PostListItem, PostLists, PostScalarFieldDef, PostTemplateDef } from "../../../src/posts/types";
 import type { ReelTheme, TemplateRecord } from "../types";
 
 const GUIDES_KEY = "studypal-reels:post-creator:show-guides";
+/**
+ * The mobile number on posts: the number, text and colors are one setting for
+ * every post page (Post Creator, Vocab Post, Sentence Post); position and size
+ * are kept per page (`${storagePrefix}:contact-layout`), since each page's
+ * templates have their logo and title in different places.
+ */
+const CONTACT_KEY = "studypal-reels:post-contact";
+const CONTACT_LAYOUT_KEYS = ["contactX", "contactY", "contactSize"];
+
+const pick = (f: PostFields, keys: string[]) => Object.fromEntries(Object.entries(f).filter(([k]) => keys.includes(k)));
+const omit = (f: PostFields, keys: string[]) => Object.fromEntries(Object.entries(f).filter(([k]) => !keys.includes(k)));
+
+/** Saved contact settings, with colors still on the first (pre-brand) defaults moved to the brand colors - colors you picked yourself are kept. */
+function loadContactShared(): PostFields {
+  const saved = omit(readStorage<PostFields>(CONTACT_KEY) ?? {}, CONTACT_LAYOUT_KEYS);
+  const untouched = Object.keys(contactOldDefaultColors).every((k) => saved[k] === undefined || saved[k].toUpperCase() === contactOldDefaultColors[k].toUpperCase());
+  return untouched ? omit(saved, Object.keys(contactBrandColors)) : saved;
+}
+
+const CONTACT_FIELDS: PostScalarFieldDef[] = [
+  { key: "contactPhone", label: "Mobile number", type: "text", hint: "Shown on every post and its reel, on all post pages. Empty hides it." },
+  { key: "contactLabel", label: "Text before the number", type: "text", hint: "e.g. WhatsApp or Call. Empty = the number only." },
+  { key: "contactSize", label: "Size", type: "range", min: 20, max: 90, unit: "px", hint: "Size and position are remembered separately on each post page." },
+  { key: "contactX", label: "Position - left / right", type: "range", min: 0, max: 100, unit: "%", hint: "0 = left, 50 = center, 100 = right." },
+  { key: "contactY", label: "Position - up / down", type: "range", min: 0, max: 100, unit: "%", hint: "0 = top edge, 100 = bottom edge of the post. Turn on \"Show safe-zone guides\" to see where the Reels caption and buttons cover it." },
+  { key: "contactBgOpacity", label: "Background opacity", type: "range", min: 0, max: 100, unit: "%", hint: "0 = no box - just the icon and text on the image, like the StudyPal logo." },
+];
+
+const CONTACT_COLORS = [
+  { key: "contactBg", label: "Background" },
+  { key: "contactIconBg", label: "Icon bubble" },
+  { key: "contactIconInk", label: "Icon phone" },
+  { key: "contactLabelColor", label: "Text before the number" },
+  { key: "contactText", label: "Number" },
+];
 
 export interface Draft {
   fields: PostFields;
@@ -81,6 +118,8 @@ export interface PostCreatorProps {
   sharedDraft?: boolean;
   /** Extra controls at the top of the Content card (e.g. Vocab Post's AI generator). */
   contentExtras?: (draft: Draft, setDraft: (update: (d: Draft) => Draft) => void, onError: (message: string | null) => void) => ReactNode;
+  /** A field holding pencil strokes (src/posts/Drawing.tsx) - adds a Paint-style pencil over the preview. The template must draw them. */
+  drawField?: string;
 }
 
 export function PostCreator({
@@ -90,6 +129,7 @@ export function PostCreator({
   templateHeading = "Template",
   sharedDraft = false,
   contentExtras,
+  drawField,
 }: PostCreatorProps = {}) {
   const lastTemplateKey = `${storagePrefix}:last-template`;
   const draftKey = (id: string) => (sharedDraft ? `${storagePrefix}:draft` : `${storagePrefix}:draft:${id}`);
@@ -98,6 +138,17 @@ export function PostCreator({
   const [draft, setDraft] = useState<Draft>(() => loadDraft(templateId, draftKey(templateId)));
   const [showGuides, setShowGuides] = useState(() => readStorage<boolean>(GUIDES_KEY) ?? false);
   const [paletteSource, setPaletteSource] = useState<"template" | "reel">("template");
+  const [drawing, setDrawing] = useState(false);
+  const [penColor, setPenColor] = useState("#FF2D2D");
+  const [penSize, setPenSize] = useState(8);
+  const contactLayoutKey = `${storagePrefix}:contact-layout`;
+  const [contact, setContact] = useState<PostFields>(() => ({
+    ...contactDefaults,
+    ...loadContactShared(),
+    ...readStorage<PostFields>(contactLayoutKey),
+  }));
+  // What gets rendered: the post's own fields plus the shared mobile number.
+  const fields = { ...draft.fields, ...contact };
 
   const [reelTemplates, setReelTemplates] = useState<TemplateRecord[]>([]);
   const [defaultTheme, setDefaultTheme] = useState<ReelTheme | null>(null);
@@ -116,6 +167,11 @@ export function PostCreator({
   useEffect(() => {
     writeStorage(draftKey(templateId), draft);
   }, [templateId, draft]);
+
+  useEffect(() => {
+    writeStorage(CONTACT_KEY, omit(contact, CONTACT_LAYOUT_KEYS));
+    writeStorage(contactLayoutKey, pick(contact, CONTACT_LAYOUT_KEYS));
+  }, [contact]);
 
   useEffect(() => () => {
     if (lastExport) URL.revokeObjectURL(lastExport.url);
@@ -179,13 +235,13 @@ export function PostCreator({
 
   // What an export was made from - compared later to warn that publishing
   // would post an out-of-date file.
-  const contentSnapshot = JSON.stringify({ templateId, fields: draft.fields, lists: draft.lists, colors: draft.colors, safeZones: draft.safeZones });
+  const contentSnapshot = JSON.stringify({ templateId, fields, lists: draft.lists, colors: draft.colors, safeZones: draft.safeZones });
 
   async function onExport() {
     setError(null);
     setExporting(true);
     try {
-      const { blob, savedPath } = await api.renderPost({ templateId, fields: draft.fields, lists: draft.lists, colors: draft.colors, safeZones: draft.safeZones });
+      const { blob, savedPath } = await api.renderPost({ templateId, fields, lists: draft.lists, colors: draft.colors, safeZones: draft.safeZones });
       const url = URL.createObjectURL(blob);
       const filename = savedPath.split("/").pop() || `${templateId}.png`;
       setLastExport({ url, savedPath, filename, snapshot: contentSnapshot, caption: suggestPostCaption(def, draft.fields, draft.lists), context: postCaptionContext(def, draft.fields, draft.lists, "image") });
@@ -223,11 +279,28 @@ export function PostCreator({
             <div className="grid">
               {def.fields.map((f) =>
                 f.type === "list" ? (
-                  <PostListInput key={`${templateId}-${f.key}`} def={f} items={draft.lists[f.key] ?? []} onChange={(items) => setList(f.key, items)} />
+                  <PostListInput key={`${templateId}-${f.key}`} def={f} items={draft.lists[f.key] ?? []} onChange={(items) => setList(f.key, items)} onError={setError} />
                 ) : (
                   <PostFieldInput key={`${templateId}-${f.key}`} def={f} value={draft.fields[f.key] ?? ""} onChange={(v) => setField(f.key, v)} onError={setError} stock />
                 ),
               )}
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-heading-row">
+              <h2>Mobile number</h2>
+              <button type="button" className="secondary small" onClick={() => setContact((c) => ({ ...c, ...contactBrandColors }))}>
+                Reset to brand colors
+              </button>
+            </div>
+            <div className="grid">
+              {CONTACT_FIELDS.map((f) => (
+                <PostFieldInput key={f.key} def={f} value={contact[f.key] ?? ""} onChange={(v) => setContact((c) => ({ ...c, [f.key]: v }))} onError={setError} />
+              ))}
+              {CONTACT_COLORS.map((c) => (
+                <ColorField key={c.key} label={c.label} value={contact[c.key] ?? ""} onChange={(v) => setContact((cur) => ({ ...cur, [c.key]: v }))} />
+              ))}
             </div>
           </div>
 
@@ -295,15 +368,38 @@ export function PostCreator({
             </div>
           )}
 
-          <PostReelPanel def={def} fields={draft.fields} lists={draft.lists} colors={draft.colors} safeZones={draft.safeZones} onError={setError} />
+          <PostReelPanel def={def} fields={fields} lists={draft.lists} colors={draft.colors} safeZones={draft.safeZones} onError={setError} />
         </div>
 
         <div className="editor-preview post-creator-preview">
           <div className="card preview-card">
             <h2>Preview</h2>
+            {drawField && (
+              <DrawingToolbar
+                value={draft.fields[drawField] ?? ""}
+                onChange={(v) => setField(drawField, v)}
+                active={drawing}
+                onActiveChange={setDrawing}
+                color={penColor}
+                onColorChange={setPenColor}
+                size={penSize}
+                onSizeChange={setPenSize}
+              />
+            )}
             {/* Tall formats (stories) are capped by viewport height, not just column width */}
-            <div style={{ width: `min(100%, calc(72vh * ${def.width / def.height}))`, margin: "0 auto" }}>
-              <PostPreview def={def} fields={draft.fields} lists={draft.lists} colors={draft.colors} safeZones={draft.safeZones} showGuides={showGuides} />
+            <div style={{ position: "relative", width: `min(100%, calc(72vh * ${def.width / def.height}))`, margin: "0 auto" }}>
+              <PostPreview def={def} fields={fields} lists={draft.lists} colors={draft.colors} safeZones={draft.safeZones} showGuides={showGuides} />
+              {drawField && (
+                <DrawingOverlay
+                  width={def.width}
+                  height={def.height}
+                  value={draft.fields[drawField] ?? ""}
+                  onChange={(v) => setField(drawField, v)}
+                  active={drawing}
+                  color={penColor}
+                  size={penSize}
+                />
+              )}
             </div>
             <p className="hint" style={{ marginTop: 8 }}>
               {def.width}×{def.height} PNG

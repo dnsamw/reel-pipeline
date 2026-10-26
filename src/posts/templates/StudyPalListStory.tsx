@@ -18,6 +18,11 @@ const PHOTO_HEIGHT = 1120;
  * to 0.4x until the list fits (hence maxItems 10 - more than that can't fit). The optional photo variant isn't in the HTML
  * mock - it's this port's addition, mirroring StudyPalQuote's image mode.
  */
+/** Shows every "( ... )" part of a meaning - brackets included - in `color` and bold; the rest keeps the line's own style. */
+function highlightBrackets(text: string, color: string) {
+  return text.split(/(\([^)]*\))/).map((part, i) => (/^\(.*\)$/.test(part) ? <span key={i} style={{ color, fontWeight: 800 }}>{part}</span> : part));
+}
+
 function StudyPalListStory({ fields, lists, colors, insets }: PostTemplateProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLOListElement>(null);
@@ -215,7 +220,7 @@ function StudyPalListStory({ fields, lists, colors, insets }: PostTemplateProps)
                 </div>
                 {it.meaning && (
                   <div lang="si" style={{ marginTop: s(12), fontFamily: postFonts.sinhala, fontWeight: 500, fontSize: s(42), lineHeight: 1.45, color: c.text }}>
-                    {it.meaning}
+                    {highlightBrackets(it.meaning, c.bracket)}
                   </div>
                 )}
                 {it.pron && (
@@ -285,6 +290,7 @@ export const studyPalListStory: PostTemplateDef = {
     { key: "onAccent", label: "Text on accent" },
     { key: "text", label: "Text" },
     { key: "pronunciation", label: "Pronunciation" },
+    { key: "bracket", label: "Meaning words in ( )" },
     { key: "mutedText", label: "Footer text" },
   ],
   defaultFields: {
@@ -311,6 +317,7 @@ export const studyPalListStory: PostTemplateDef = {
     onAccent: "#3b1259",
     text: "#ffffff",
     pronunciation: "#d3bde6",
+    bracket: "#ff4d4d",
     // rgba(255,255,255,.85) pre-blended over the purple, as in StudyPalQuote
     mutedText: "#e6ddec",
   },
@@ -324,6 +331,7 @@ export const studyPalListStory: PostTemplateDef = {
         onAccent: deep,
         text: "#ffffff",
         pronunciation: mixHex("#ffffff", p.primary, 0.25),
+        bracket: "#ff4d4d",
         mutedText: mixHex("#ffffff", p.primary, 0.15),
       };
     }
@@ -334,6 +342,7 @@ export const studyPalListStory: PostTemplateDef = {
       onAccent: p.background,
       text: p.foreground,
       pronunciation: mixHex(p.primary, p.foreground, 0.45),
+      bracket: "#e02424",
       mutedText: p.mutedForeground,
     };
   },

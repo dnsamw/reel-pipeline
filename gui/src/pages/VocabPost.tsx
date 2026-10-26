@@ -22,7 +22,8 @@ export function VocabPost() {
   );
 }
 
-function AiGenerate({
+/** AI word generator for the Content card - shared by Vocab Post and Vocab Photo (VocabPhotoPost.tsx). */
+export function AiGenerate({
   draft,
   setDraft,
   onError,

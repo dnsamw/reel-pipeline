@@ -1363,6 +1363,11 @@ th {
   background: #1a1024;
 }
 
+/* Templates with a transparent background (Vocab Photo) - a checkerboard shows which parts are transparent */
+.post-preview.transparent-bg {
+  background: repeating-conic-gradient(#d9d9d9 0% 25%, #ffffff 0% 50%) 0 0 / 20px 20px;
+}
+
 .post-preview-loading {
   position: absolute;
   inset: 0;
@@ -2766,6 +2771,31 @@ button.posts-more {
   gap: 6px;
 }
 
+/* Pencil toolbar over the post preview (DrawingPad.tsx, Sentence Post) */
+.drawing-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.drawing-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.drawing-toolbar input[type="color"] {
+  width: 34px;
+  height: 30px;
+  padding: 0;
+}
+
+.drawing-toolbar input[type="range"] {
+  width: 90px;
+}
+
 /* Slider field ("range" post fields, e.g. Vocab Post's title size) */
 .post-range-field {
   display: flex;
@@ -2785,4 +2815,16 @@ button.posts-more {
 
 .post-range-unit {
   color: var(--muted);
+}
+
+.post-checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.post-checkbox-field input {
+  width: auto;
+  margin: 0;
 }

@@ -11,6 +11,13 @@ import {
   Lightbulb,
   LayoutDashboard,
   Megaphone,
+  Images,
+  ArrowRightLeft,
+  TrendingUp,
+  MessagesSquare,
+  MessageCircleQuestion,
+  LayoutList,
+  MessageSquareQuote,
   ListChecks,
   Monitor,
   Moon,
@@ -33,6 +40,12 @@ import { Settings } from "./pages/Settings";
 import { PostCreator } from "./pages/PostCreator";
 import { AdCreator } from "./pages/AdCreator";
 import { VocabPost } from "./pages/VocabPost";
+import { VocabPhotoPost } from "./pages/VocabPhotoPost";
+import { SentencePost } from "./pages/SentencePost";
+import { VocabListPost } from "./pages/VocabListPost";
+import { WordChartPost } from "./pages/WordChartPost";
+import { WordUpgradePost } from "./pages/WordUpgradePost";
+import { QnAPost, QnAMeaningPost } from "./pages/QnAPost";
 import { MediaLibrary } from "./pages/MediaLibrary";
 import { Insights } from "./pages/Insights";
 
@@ -64,7 +77,19 @@ const NAV_SECTIONS = [
     items: [
       { to: "/post-creator", end: false, icon: ImagePlus, label: "Post Creator" },
       { to: "/vocab-post", end: false, icon: Languages, label: "Vocab Post" },
+      { to: "/vocab-photo-post", end: false, icon: Images, label: "Vocab Photo" },
+      { to: "/vocab-list-post", end: false, icon: LayoutList, label: "Vocab List" },
+      { to: "/qna-meaning-post", end: false, icon: MessageCircleQuestion, label: "Q&A with Meaning" },
+      { to: "/sentence-post", end: false, icon: MessageSquareQuote, label: "Sentence Post" },
       { to: "/ad-creator", end: false, icon: Megaphone, label: "Ad Creator" },
+    ],
+  },
+  {
+    title: "English",
+    items: [
+      { to: "/word-chart", end: false, icon: ArrowRightLeft, label: "Word Chart" },
+      { to: "/word-upgrade", end: false, icon: TrendingUp, label: "Basic → Advanced" },
+      { to: "/qna-post", end: false, icon: MessagesSquare, label: "Questions vs Answers" },
     ],
   },
   { title: "Grow", items: [{ to: "/insights", end: false, icon: Lightbulb, label: "Insights" }] },
@@ -157,6 +182,13 @@ export function App() {
           <Route path="/recipes" element={<Recipes />} />
           <Route path="/post-creator" element={<PostCreator />} />
           <Route path="/vocab-post" element={<VocabPost />} />
+          <Route path="/vocab-photo-post" element={<VocabPhotoPost />} />
+          <Route path="/word-chart" element={<WordChartPost />} />
+          <Route path="/word-upgrade" element={<WordUpgradePost />} />
+          <Route path="/qna-post" element={<QnAPost />} />
+          <Route path="/qna-meaning-post" element={<QnAMeaningPost />} />
+          <Route path="/vocab-list-post" element={<VocabListPost />} />
+          <Route path="/sentence-post" element={<SentencePost />} />
           <Route path="/ad-creator" element={<AdCreator />} />
           <Route path="/library" element={<MediaLibrary />} />
           <Route path="/insights" element={<Insights />} />

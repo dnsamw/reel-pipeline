@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { continueRender, delayRender, type CalculateMetadataFunction } from "remotion";
 import { PostHoldContext, type HoldFn } from "./PostReady";
+import { ContactBadge } from "./ContactBadge";
 import { getPostTemplate, postTemplates } from "./registry";
 import { postInsets } from "./safeZones";
 import type { PostColors, PostFields, PostLists } from "./types";
@@ -72,11 +73,13 @@ export function PostStill({ templateId, fields, lists, colors, safeZones }: Post
   if (!fontsReady) return null;
 
   const Component = def.component;
+  const insets = postInsets(def.width, def.height, !!safeZones);
   return (
     <PostHoldContext.Provider value={hold}>
-      <Component fields={{ ...def.defaultFields, ...fields }} lists={{ ...def.defaultLists, ...lists }} colors={{ ...def.defaultColors, ...colors }}
-        insets={postInsets(def.width, def.height, !!safeZones)}
-      />
+      <div style={{ position: "relative", width: def.width, height: def.height }}>
+        <Component fields={{ ...def.defaultFields, ...fields }} lists={{ ...def.defaultLists, ...lists }} colors={{ ...def.defaultColors, ...colors }} insets={insets} />
+        <ContactBadge fields={fields} />
+      </div>
     </PostHoldContext.Provider>
   );
 }

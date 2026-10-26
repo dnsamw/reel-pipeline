@@ -9,8 +9,13 @@ export interface PostScalarFieldDef {
   /**
    * "image" values are an assets/-relative path ("images/x.png"), an http(s) URL, or a data: URI - see resolvePostAsset. Empty string = no image.
    * "range" is a slider; its value is still stored as a string (e.g. "50").
+   * "color" is a #rrggbb color picker - for a color that belongs next to its own setting in the Content form rather than the Colors card.
+   * "checkbox" is an on/off switch, stored as "1" (on) or "" (off).
+   * "select" is a dropdown of `options`; the value is the chosen option's value.
    */
-  type: "text" | "textarea" | "image" | "range";
+  type: "text" | "textarea" | "image" | "range" | "color" | "checkbox" | "select";
+  /** "select" only. */
+  options?: readonly { value: string; label: string }[];
   /** "range" only. */
   min?: number;
   max?: number;
@@ -99,6 +104,12 @@ export interface PostTemplateDef {
   suggestCaption?: (fields: PostFields, lists: PostLists) => string;
   /** What the post says, for the caption engines (server/captions/) - omit to fall back to the text fields as free text. */
   captionContext?: (fields: PostFields, lists: PostLists) => Omit<CaptionContext, "kind">;
+  /**
+   * The post can have transparent parts (Vocab Photo's background opacity) -
+   * the GUI preview shows a checkerboard behind it, and the reel export fills
+   * them with the Background color (video has no alpha). Omit for opaque posts.
+   */
+  transparentBackground?: boolean;
   /** Resolves once every font the component uses is loaded - awaited before the fit measurements and before renderStill captures. */
   loadFonts: () => Promise<unknown>;
   component: ComponentType<PostTemplateProps>;
