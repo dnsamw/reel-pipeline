@@ -48,6 +48,7 @@ import {
   createPost,
   deletePost,
   fillFromReserve,
+  getPost,
   isDate,
   listPillars,
   listPosts,
@@ -64,6 +65,9 @@ import {
   updatePost,
 } from "./planner";
 import { bookOutline, listCatalogBooks, SOURCE_LINE_KINDS } from "./lmsCatalog";
+import { importFacebookCsv, matchPublished, plannerPostStats } from "./plannerStats";
+import { exportWeekPack, planWeekPack, showDir } from "./weekPack";
+import { facebookPostingOn } from "./distribution";
 
 const app = express();
 app.use(cors());
@@ -1008,13 +1012,16 @@ app.get("/api/planner", (req, res) => {
     const today = todaySriLanka();
     const from = isDate(req.query.from) ? req.query.from : today;
     const to = isDate(req.query.to) ? req.query.to : addDays(from, STOCK_TARGET_DAYS - 1);
+    const posts = listPosts(from, to);
     res.json({
       today,
       from,
       to,
       slots: listSlots(),
       pillars: listPillars(),
-      posts: listPosts(from, to),
+      posts,
+      stats: plannerPostStats(posts),
+      facebookPosting: facebookPostingOn(),
       reserve: listReserve(),
       stock: stockLevel(today),
       mix: pillarMix(from, to),
@@ -1068,6 +1075,69 @@ app.put("/api/planner/slots/:id", (req, res) => {
     res.json(saveSlot({ ...(req.body ?? {}), id: req.params.id }));
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// --- Planner: week pack + stats matching (docs/16 §7, P3). Nothing here posts to Facebook. ---
+
+const packRange = (q: Record<string, unknown>) => {
+  if (!isDate(q.from) || !isDate(q.to) || q.to < q.from) throw new Error("from and to must be YYYY-MM-DD, from <= to");
+  if (addDays(q.from, 31) < q.to) throw new Error("A pack covers at most 31 days");
+  return { from: q.from, to: q.to };
+};
+const packOut = <T extends { items: { media: string }[] }>(p: T) => ({ ...p, items: p.items.map((it) => ({ ...it, media: showDir(it.media) })) });
+
+/** Preview: what a pack for ?from&to would hold. Writes nothing. */
+app.get("/api/planner/week-pack", (req, res) => {
+  try {
+    const { from, to } = packRange(req.query);
+    res.json(packOut(planWeekPack(from, to)));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.post("/api/planner/week-pack", (req, res) => {
+  try {
+    const { from, to } = packRange(req.body ?? {});
+    const r = exportWeekPack(from, to);
+    res.json({ ...packOut(r), dir: showDir(r.dir) });
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+/** { ids } of rendered posts the owner has loaded into Business Suite → scheduled. */
+app.post("/api/planner/mark-scheduled", (req, res) => {
+  try {
+    const ids: unknown = req.body?.ids;
+    if (!Array.isArray(ids) || !ids.every((x) => typeof x === "string")) throw new Error("ids must be a list of post ids");
+    const done = [];
+    for (const id of ids as string[]) {
+      const p = getPost(id);
+      if (p?.status === "rendered") done.push(updatePost(id, { status: "scheduled", statusReason: "" }));
+    }
+    res.json({ scheduled: done.length });
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+/** Body: the posts CSV from Meta Business Suite (Insights → Content → Export). */
+app.post("/api/planner/stats/import", express.text({ type: () => true, limit: "25mb" }), (req, res) => {
+  try {
+    if (typeof req.body !== "string" || !req.body.trim()) throw new Error("Send the CSV file as the request body");
+    res.json(importFacebookCsv(req.body));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.post("/api/planner/stats/match", (_req, res) => {
+  try {
+    res.json(matchPublished());
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 

@@ -2882,3 +2882,23 @@ button.posts-more {
 .planner-source-wrong { color: var(--danger); font-size: 12px; }
 .planner-source .text-danger { color: var(--danger); }
 .link-button { background: none; border: none; padding: 0; color: var(--primary); cursor: pointer; font: inherit; text-decoration: underline; }
+
+/* Planner week pack + stats (P3) */
+.planner-pack { display: flex; flex-direction: column; gap: 14px; }
+.planner-pack h2 { margin-top: 0; }
+.planner-pack-range { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin: 8px 0; }
+.planner-pack-range .field { flex: 0 0 170px; }
+.planner-pack-range button, .planner-file { display: inline-flex; align-items: center; gap: 6px; }
+.planner-pack-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+.planner-pack-table th { text-align: left; color: var(--muted); font-weight: 600; padding: 6px; border-bottom: 1px solid var(--border); }
+.planner-pack-table td { padding: 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.planner-pack-missing { font-size: 13px; padding-left: 18px; }
+.planner-pack-done { background: var(--ok-bg); border-radius: 10px; padding: 10px 12px; margin: 8px 0; }
+.planner-pack-done p { margin: 0 0 8px; }
+.planner-file { cursor: pointer; position: relative; font-size: 14px; font-weight: 600; padding: 9px 16px; border-radius: 6px; border: 1px solid var(--primary); background: var(--surface); color: var(--primary); }
+.planner-file:focus-within { outline: 2px solid var(--gold); outline-offset: 2px; }
+.planner-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.planner-fb { border: 1px solid var(--border); border-left: 3px solid #1877f2; border-radius: 10px; padding: 8px 10px; font-size: 13px; }
+.planner-fb-head { display: flex; gap: 10px; align-items: baseline; margin-bottom: 4px; }
+.planner-fb-metrics { display: flex; gap: 14px; flex-wrap: wrap; }
+.planner-badge-views { background: #e7f0fd; color: #1877f2; }

@@ -15,6 +15,16 @@ import type { CaptionMeta } from "../../src/captions/types";
  */
 const adapters: PlatformAdapter[] = [facebookAdapter, instagramAdapter, youtubeAdapter, tiktokAdapter];
 
+/**
+ * Posting to the Facebook Page through the API is OFF (owner decision
+ * 2026-11-18, studypal-lms docs/16 §7): posts are scheduled by hand in Meta
+ * Business Suite from the Planner's week pack. Reading stats stays on, so the
+ * Page connection is kept. FACEBOOK_POSTING=on in .env turns posting back on.
+ */
+export const facebookPostingOn = (): boolean => process.env.FACEBOOK_POSTING === "on";
+export const FACEBOOK_POSTING_OFF =
+  "Off: schedule Facebook posts by hand in Meta Business Suite (Planner → week pack). Set FACEBOOK_POSTING=on in .env to post from Studio.";
+
 /** Planned next - listed so Settings can show them, but not publishable yet. */
 const upcoming: PlatformStatus[] = [
 ];
@@ -41,6 +51,7 @@ export function targetsFor(source: PublishSource): { media: Omit<MediaFile, "abs
     let unavailableReason: string | null = null;
     // "Can this platform take this file at all?" beats "is it connected?" - no point connecting YouTube for an image.
     if (!status.available) unavailableReason = "Coming soon";
+    else if (status.platform === "facebook" && !facebookPostingOn()) unavailableReason = FACEBOOK_POSTING_OFF;
     else unavailableReason = adapterFor(status.platform).unsupportedReason(media) ?? (status.connected ? null : "Not connected - connect it in Settings");
     return { ...status, unavailableReason };
   });
@@ -70,6 +81,7 @@ export function startPublishing(source: PublishSource, targets: PublishTarget[])
 
   const planned = targets.map((t) => {
     const adapter = adapterFor(t.platform);
+    if (adapter.platform === "facebook" && !facebookPostingOn()) throw new Error(FACEBOOK_POSTING_OFF);
     const status = adapter.status();
     if (!status.connected) throw new Error(`${adapter.label} isn't connected - connect it in Settings`);
     const reason = adapter.unsupportedReason(media);

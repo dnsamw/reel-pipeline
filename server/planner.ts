@@ -100,6 +100,8 @@ export interface PlannerPost {
   statusReason: string;
   autoApproved: boolean;
   notes: string;
+  /** The Facebook post it went out as (platform_posts.remote_id), once matched from the stats (P3). */
+  remoteId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -167,6 +169,10 @@ db.exec(`
   );
 `);
 
+// P3: the Facebook post a Planner post went out as.
+if (!(db.prepare("PRAGMA table_info(planner_posts)").all() as { name: string }[]).some((c) => c.name === "remote_id"))
+  db.exec("ALTER TABLE planner_posts ADD COLUMN remote_id TEXT");
+
 // --- Defaults (docs/16 §3), seeded once into empty tables ---
 
 const DEFAULT_SLOTS: Omit<Slot, "active">[] = [
@@ -213,7 +219,7 @@ interface PillarRow { id: string; name: string; subject: string; color: string; 
 interface PostRow {
   id: string; date: string | null; slot_id: string | null; reserve: number; pillar_id: string | null; book: string; kind: string;
   title: string; hook: string; caption: string; photo: string; media_path: string; source_json: string; status: string;
-  status_reason: string; auto_approved: number; notes: string; created_at: string; updated_at: string;
+  status_reason: string; auto_approved: number; notes: string; remote_id: string | null; created_at: string; updated_at: string;
 }
 
 const toSlot = (r: SlotRow): Slot => ({
@@ -231,7 +237,7 @@ const toPost = (r: PostRow): PlannerPost => ({
   id: r.id, date: r.date, slotId: r.slot_id, reserve: r.reserve === 1, pillarId: r.pillar_id, book: r.book,
   kind: isPostKind(r.kind) ? r.kind : "image", title: r.title, hook: r.hook, caption: r.caption, photo: r.photo,
   mediaPath: r.media_path, source: JSON.parse(r.source_json), status: isPostStatus(r.status) ? r.status : "idea",
-  statusReason: r.status_reason, autoApproved: r.auto_approved === 1, notes: r.notes, createdAt: r.created_at, updatedAt: r.updated_at,
+  statusReason: r.status_reason, autoApproved: r.auto_approved === 1, notes: r.notes, remoteId: r.remote_id ?? null, createdAt: r.created_at, updatedAt: r.updated_at,
 });
 
 // --- Dates (Sri Lanka) ---
@@ -355,12 +361,12 @@ function logEvent(postId: string, from: PostStatus | null, to: PostStatus, reaso
 function write(p: PlannerPost): void {
   db.prepare(
     `INSERT INTO planner_posts (id, date, slot_id, reserve, pillar_id, book, kind, title, hook, caption, photo, media_path, source_json,
-       status, status_reason, auto_approved, notes, created_at, updated_at)
+       status, status_reason, auto_approved, notes, remote_id, created_at, updated_at)
      VALUES (@id, @date, @slotId, @reserve, @pillarId, @book, @kind, @title, @hook, @caption, @photo, @mediaPath, @source,
-       @status, @statusReason, @autoApproved, @notes, @createdAt, @updatedAt)
+       @status, @statusReason, @autoApproved, @notes, @remoteId, @createdAt, @updatedAt)
      ON CONFLICT(id) DO UPDATE SET date=@date, slot_id=@slotId, reserve=@reserve, pillar_id=@pillarId, book=@book, kind=@kind,
        title=@title, hook=@hook, caption=@caption, photo=@photo, media_path=@mediaPath, source_json=@source, status=@status,
-       status_reason=@statusReason, auto_approved=@autoApproved, notes=@notes, updated_at=@updatedAt`,
+       status_reason=@statusReason, auto_approved=@autoApproved, notes=@notes, remote_id=@remoteId, updated_at=@updatedAt`,
   ).run({ ...p, reserve: p.reserve ? 1 : 0, autoApproved: p.autoApproved ? 1 : 0, source: JSON.stringify(p.source) });
 }
 
@@ -386,6 +392,7 @@ export function createPost(input: PostInput, by = "owner"): PlannerPost {
     statusReason: input.statusReason ?? "",
     autoApproved: false,
     notes: input.notes ?? "",
+    remoteId: input.remoteId ?? null,
     createdAt: now,
     updatedAt: now,
   };

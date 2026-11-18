@@ -31,6 +31,9 @@ import type {
 } from "./types";
 import type {
   BookOutline,
+  CsvImportResult,
+  MatchResult,
+  PackPlan,
   Pillar,
   PlannerPost,
   PlannerPostInput,
@@ -326,6 +329,11 @@ export const api = {
     request<Pillar>(`/planner/pillars/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(body) }),
   saveSlot: (id: string, body: Partial<PlannerSlot>) =>
     request<PlannerSlot>(`/planner/slots/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(body) }),
+  weekPackPreview: (from: string, to: string) => request<PackPlan>(`/planner/week-pack?${new URLSearchParams({ from, to })}`),
+  exportWeekPack: (from: string, to: string) => request<PackPlan>("/planner/week-pack", { method: "POST", body: JSON.stringify({ from, to }) }),
+  markScheduled: (ids: string[]) => request<{ scheduled: number }>("/planner/mark-scheduled", { method: "POST", body: JSON.stringify({ ids }) }),
+  importStatsCsv: (csv: string) => request<CsvImportResult>("/planner/stats/import", { method: "POST", headers: { "Content-Type": "text/csv" }, body: csv }),
+  matchStats: () => request<MatchResult>("/planner/stats/match", { method: "POST" }),
   plannerSource: (book: string) => request<BookOutline>(`/planner/source/${encodeURIComponent(book)}`),
   plannerSourceLines: (book: string, unit: string, date: string | null, postId?: string) => {
     const q = new URLSearchParams({ unit });

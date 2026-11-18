@@ -14,6 +14,7 @@ import {
   type PostStatus,
 } from "../plannerTypes";
 import { SourcePicker } from "./PlannerSource";
+import { WeekPack } from "./PlannerWeekPack";
 
 /**
  * Planner: every social post on one calendar (docs/16-social-content-pipeline.md
@@ -49,7 +50,7 @@ function dayLabel(date: string): { weekday: string; day: string } {
   };
 }
 
-type Tab = "calendar" | "reserve" | "pillars" | "slots";
+type Tab = "calendar" | "reserve" | "pack" | "pillars" | "slots";
 
 type Editing = { post: PlannerPostInput & { id?: string } } | null;
 
@@ -104,9 +105,9 @@ export function Planner() {
       <div className="planner-head">
         <h1>Planner</h1>
         <div className="segmented">
-          {(["calendar", "reserve", "pillars", "slots"] as Tab[]).map((t) => (
+          {(["calendar", "reserve", "pack", "pillars", "slots"] as Tab[]).map((t) => (
             <button key={t} type="button" className={tab === t ? "active" : ""} onClick={() => setTab(t)}>
-              {t === "calendar" ? "Calendar" : t === "reserve" ? `Reserve (${view.reserve.length})` : t === "pillars" ? "Pillars" : "Slots"}
+              {t === "calendar" ? "Calendar" : t === "reserve" ? `Reserve (${view.reserve.length})` : t === "pack" ? "Week pack & stats" : t === "pillars" ? "Pillars" : "Slots"}
             </button>
           ))}
         </div>
@@ -163,7 +164,7 @@ export function Planner() {
                         return (
                           <td key={slot.id} className="planner-cell">
                             {cellPosts.map((p) => (
-                              <PostChip key={p.id} post={p} pillar={p.pillarId ? pillarById.get(p.pillarId) : undefined} onClick={() => setEditing({ post: p })} />
+                              <PostChip key={p.id} post={p} views={p.remoteId ? view.stats[p.remoteId]?.metrics.views : undefined} pillar={p.pillarId ? pillarById.get(p.pillarId) : undefined} onClick={() => setEditing({ post: p })} />
                             ))}
                             {cellPosts.length === 0 && (
                               <button
@@ -205,13 +206,14 @@ export function Planner() {
           ) : (
             <div className="planner-reserve">
               {view.reserve.map((p) => (
-                <PostChip key={p.id} post={p} pillar={p.pillarId ? pillarById.get(p.pillarId) : undefined} onClick={() => setEditing({ post: p })} />
+                <PostChip key={p.id} post={p} views={p.remoteId ? view.stats[p.remoteId]?.metrics.views : undefined} pillar={p.pillarId ? pillarById.get(p.pillarId) : undefined} onClick={() => setEditing({ post: p })} />
               ))}
             </div>
           )}
         </div>
       )}
 
+      {tab === "pack" && <WeekPack view={view} onChanged={() => reload()} />}
       {tab === "pillars" && <PillarsEditor pillars={view.pillars} slots={view.slots} onSaved={() => reload()} onError={setError} />}
       {tab === "slots" && <SlotsEditor slots={view.slots} onSaved={() => reload()} onError={setError} />}
 
@@ -293,7 +295,7 @@ function MixCard({ view }: { view: PlannerView }) {
   );
 }
 
-function PostChip({ post, pillar, onClick }: { post: PlannerPost; pillar?: Pillar; onClick: () => void }) {
+function PostChip({ post, pillar, views, onClick }: { post: PlannerPost; pillar?: Pillar; views?: number | null; onClick: () => void }) {
   const stock = STOCK_STATUSES.includes(post.status);
   return (
     <button
@@ -311,6 +313,7 @@ function PostChip({ post, pillar, onClick }: { post: PlannerPost; pillar?: Pilla
       <span className="planner-chip-badges">
         <span className={`badge planner-badge-${post.status}`}>{STATUS_LABEL[post.status]}</span>
         {post.autoApproved && <span className="badge planner-badge-auto">auto</span>}
+        {views != null && <span className="badge planner-badge-views">{views.toLocaleString()} views</span>}
       </span>
     </button>
   );
@@ -547,6 +550,45 @@ function PostEditor({ initial, view, onClose, onSaved }: { initial: PlannerPostI
             <input type="text" value={post.mediaPath ?? ""} placeholder="output/…" onChange={(e) => set("mediaPath", e.target.value)} />
           </div>
         </div>
+        {post.remoteId && (
+          <div className="planner-fb">
+            <div className="planner-fb-head">
+              <strong>On Facebook</strong>
+              {view.stats[post.remoteId]?.permalink && (
+                <a href={view.stats[post.remoteId]!.permalink!} target="_blank" rel="noreferrer">
+                  open post
+                </a>
+              )}
+              <button
+                type="button"
+                className="link-button"
+                title="Wrong match? Unlink it; Match now won't link it again unless the caption and day fit."
+                onClick={() => save({ remoteId: null })}
+              >
+                unlink
+              </button>
+            </div>
+            {view.stats[post.remoteId] ? (
+              <div className="planner-fb-metrics">
+                {(
+                  [
+                    ["views", "Views"],
+                    ["reach", "Reach"],
+                    ["likes", "Reactions"],
+                    ["comments", "Comments"],
+                    ["shares", "Shares"],
+                  ] as const
+                ).map(([k, label]) => (
+                  <span key={k}>
+                    <b>{view.stats[post.remoteId!]!.metrics[k]?.toLocaleString() ?? "–"}</b> {label}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="hint">Linked to {post.remoteId}; no numbers yet (refresh Insights or import the CSV).</p>
+            )}
+          </div>
+        )}
         <div className="planner-editor-row">
           <div className="field">
             <label>Status</label>

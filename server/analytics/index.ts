@@ -19,6 +19,7 @@ import {
 } from "./store";
 import type { AiReportRecord, InsightsOverview, StatsAccess, StatsPlatform } from "../../src/analytics/types";
 import type { Phrase } from "../../src/data/getPhrases";
+import { matchPublished } from "../plannerStats";
 
 /**
  * Insights: reads every post on each connected account (not only the ones
@@ -77,6 +78,12 @@ async function doRefresh(): Promise<void> {
   const fetchedAt = new Date().toISOString();
   for (const r of results) if (r.posts.length || r.complete) savePlatformPosts(r.access.platform, r.posts, r.complete, fetchedAt);
   autoLinkTikTok();
+  // Planner (P3): link the fresh Facebook posts to the posts planned for them.
+  try {
+    matchPublished();
+  } catch (err) {
+    console.error("[planner] matching after stats refresh failed:", err);
+  }
   saveState({ refreshedAt: fetchedAt, access: results.map((r) => r.access), notes: {} });
 }
 

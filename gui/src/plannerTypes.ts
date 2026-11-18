@@ -60,6 +60,8 @@ export interface PlannerPost {
   statusReason: string;
   autoApproved: boolean;
   notes: string;
+  /** The Facebook post it went out as, once matched from the stats (P3). */
+  remoteId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -94,6 +96,10 @@ export interface PlannerView {
   stock: StockLevel;
   mix: { pillarId: string; posts: number; pct: number; targetPct: number }[];
   books: CatalogBook[];
+  /** Linked Facebook posts' numbers, by remoteId. */
+  stats: Record<string, PostStats>;
+  /** False = posting to Facebook from Studio is off (docs/16 §7). */
+  facebookPosting: boolean;
 }
 
 export type PlannerPostInput = Partial<Omit<PlannerPost, "id" | "createdAt" | "updatedAt" | "autoApproved">>;
@@ -144,4 +150,60 @@ export interface SourcePick {
   unitTitle: string;
   free: boolean;
   lines: SourceLine[];
+}
+
+// --- Week pack + stats (P3) ---
+
+export interface PostStats {
+  permalink: string | null;
+  createdAt: string;
+  metrics: {
+    views: number | null;
+    reach: number | null;
+    likes: number | null;
+    comments: number | null;
+    shares: number | null;
+    saves: number | null;
+    avgWatchSeconds: number | null;
+    avgWatchPct: number | null;
+    followsGained: number | null;
+  };
+}
+
+export interface PackItem {
+  n: number;
+  postId: string;
+  date: string;
+  time: string;
+  slotId: string;
+  kind: string;
+  title: string;
+  caption: string;
+  media: string;
+  file: string;
+  comment: { variant: string; text: string; image: string | null } | null;
+}
+
+export interface PackPlan {
+  from: string;
+  to: string;
+  items: PackItem[];
+  missing: { postId: string; date: string; slotId: string | null; title: string; reason: string }[];
+  alreadyScheduled: number;
+  /** Set once written. */
+  dir?: string;
+}
+
+export interface MatchResult {
+  linked: { postId: string; remoteId: string; score: number }[];
+  updated: number;
+  missing: { postId: string; date: string; slotId: string | null; title: string }[];
+}
+
+export interface CsvImportResult {
+  rows: number;
+  imported: number;
+  known: number;
+  skipped: number;
+  match: MatchResult;
 }
