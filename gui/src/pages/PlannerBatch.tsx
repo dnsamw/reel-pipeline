@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Bot, ImageOff, Radar, Sparkles, Trash2, X } from "lucide-react";
+import { Bot, ImageOff, Images, Radar, Sparkles, Trash2, X } from "lucide-react";
 import { api } from "../api";
-import type { AiInfo, BatchEstimate, BatchJob, PhotoStock, PlannerPost, PlannerView, ScoutView } from "../plannerTypes";
+import type { AiInfo, BatchEstimate, BatchJob, PhotoStock, PlannerPost, PlannerView, PlannerRenderRun, ScoutView } from "../plannerTypes";
 
 /**
  * The weekly batch (docs/16 §2, P4): Claude plans and writes the empty slots,
@@ -29,12 +29,14 @@ export function Batch({ view, onChanged, onOpen }: { view: PlannerView; onChange
   const [notes, setNotes] = useState<ScoutView | null>(null);
   const [photos, setPhotos] = useState<PhotoStock[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [renderRun, setRenderRun] = useState<PlannerRenderRun | null>(null);
 
   useEffect(() => {
     api.plannerAi().then(setAi).catch(() => {});
     api.batchStatus().then(setJob).catch(() => {});
     api.scout().then(setNotes).catch(() => {});
     api.photoStock().then(setPhotos).catch(() => {});
+    api.plannerRenderStatus().then(setRenderRun).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -47,7 +49,7 @@ export function Batch({ view, onChanged, onOpen }: { view: PlannerView; onChange
   }, [from, to, scout, job?.state]);
 
   // Poll while the batch or the scout runs.
-  const busy = job?.state === "running" || !!notes?.running;
+  const busy = job?.state === "running" || !!notes?.running || (!!renderRun && !renderRun.done);
   useEffect(() => {
     if (!busy) return;
     const t = setInterval(() => {
@@ -56,6 +58,10 @@ export function Batch({ view, onChanged, onOpen }: { view: PlannerView; onChange
         if (j && j.state !== "running") onChanged();
       });
       api.scout().then(setNotes);
+      api.plannerRenderStatus().then((r) => {
+        setRenderRun(r);
+        if (r?.done) onChanged();
+      });
     }, 2500);
     return () => clearInterval(t);
   }, [busy]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -83,6 +89,14 @@ export function Batch({ view, onChanged, onOpen }: { view: PlannerView; onChange
     }
   }
 
+  async function renderAll() {
+    try {
+      setRenderRun(await api.plannerRenderApproved(view.today, to));
+    } catch (err) {
+      setError(errText(err));
+    }
+  }
+
   async function runScout() {
     try {
       await api.startScout();
@@ -104,7 +118,8 @@ export function Batch({ view, onChanged, onOpen }: { view: PlannerView; onChange
     }
   }
 
-  const auto = view.posts.filter((p) => p.autoApproved && p.status === "approved" && p.date! >= view.today);
+  const toRender = view.posts.filter((p) => p.status === "approved" && p.kind === "image" && p.date! >= view.today).length;
+  const auto = view.posts.filter((p) => p.autoApproved && (p.status === "approved" || p.status === "rendered") && p.date! >= view.today);
   const needs = view.posts.filter((p) => p.status === "drafted" && p.date! >= view.today);
   const low = (photos ?? []).filter((p) => p.low);
   const calls = (t: string) => ai?.calls.find((c) => c.tool === t)?.calls ?? 0;
@@ -151,6 +166,9 @@ export function Batch({ view, onChanged, onOpen }: { view: PlannerView; onChange
           <button type="button" className="secondary" onClick={cleanup} disabled={busy} title="Removes ideas the batch created but couldn't write">
             <Trash2 size={14} /> Clean up
           </button>
+          <button type="button" className="secondary" onClick={renderAll} disabled={busy || toRender === 0} title="Hook photo template, with each post's stock photo. Reels are rendered by hand.">
+            <Images size={14} /> Render approved ({toRender})
+          </button>
         </div>
         {est && (
           <p className="hint">
@@ -160,13 +178,22 @@ export function Batch({ view, onChanged, onOpen }: { view: PlannerView; onChange
               .join(", ")}
           </p>
         )}
+        {renderRun && (
+          <div className={`planner-batch-job planner-batch-${renderRun.done ? "done" : "running"}`}>
+            <strong>{renderRun.done ? "Rendered" : "Rendering…"}</strong>{" "}
+            <span className="hint">
+              {renderRun.rendered} rendered{renderRun.skipped.length ? `, ${renderRun.skipped.length} skipped (${[...new Set(renderRun.skipped.map((x) => x.reason))].join("; ")})` : ""}
+            </span>
+            {renderRun.log.length > 0 && <pre>{renderRun.log.slice(-6).join("\n")}</pre>}
+          </div>
+        )}
         {job && (
           <div className={`planner-batch-job planner-batch-${job.state}`}>
             <strong>
               {job.state === "running" ? "Running…" : job.state === "done" ? "Done" : "Failed"}: {job.from} to {job.to}
             </strong>{" "}
             <span className="hint">
-              {job.created} planned · {job.drafted} written · {job.approved} approved on their own · {job.needsYou} need you
+              {job.created} planned · {job.drafted} written · {job.approved} approved on their own ({job.rendered ?? 0} rendered) · {job.needsYou} need you
             </span>
             <pre>{job.log.slice(-12).join("\n")}</pre>
           </div>
@@ -183,8 +210,14 @@ export function Batch({ view, onChanged, onOpen }: { view: PlannerView; onChange
             {auto.map((p) => (
               <div key={p.id} className="planner-thumb">
                 <button type="button" className="planner-thumb-img" onClick={() => onOpen(p)} title="Open">
-                  {p.photo ? <img src={api.stockImageUrl(p.photo)} alt="" loading="lazy" /> : <ImageOff size={28} />}
-                  <span className="planner-thumb-hook">{p.hook}</span>
+                  {api.mediaUrl(p.mediaPath) ? (
+                    <img src={api.mediaUrl(p.mediaPath)!} alt="" loading="lazy" />
+                  ) : p.photo ? (
+                    <img src={api.stockImageUrl(p.photo)} alt="" loading="lazy" />
+                  ) : (
+                    <ImageOff size={28} />
+                  )}
+                  {!api.mediaUrl(p.mediaPath) && <span className="planner-thumb-hook">{p.hook}</span>}
                 </button>
                 <div className="planner-thumb-meta">
                   {p.date} {p.slotId} · {p.kind}

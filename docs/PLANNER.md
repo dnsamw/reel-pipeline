@@ -2,7 +2,7 @@
 
 The Planner page (`/planner` in the GUI, "Plan → Planner" in the sidebar) is the one calendar for every social
 post. The plan behind it is `studypal-lms/docs/16-social-content-pipeline.md` in the StudyPal workspace; this
-file only covers the code. Status: **P1** (calendar, stock, pillars, slots, reserve), **P2** (book lines as post source, repeat guard), **P3** (week pack, stats matching, Facebook posting off) and **P4** (Claude drafts the empty slots, auto-approval, Grok scout, stock-photo picker, Insights on Claude). Rendering approved posts is still done by hand in Studio.
+file only covers the code. Status: **P1** (calendar, stock, pillars, slots, reserve), **P2** (book lines as post source, repeat guard), **P3** (week pack, stats matching, Facebook posting off) and **P4** (Claude drafts the empty slots, auto-approval, Grok scout, stock-photo picker, Insights on Claude). Approved **image** posts are rendered automatically (Hook photo template); reels are still rendered by hand.
 
 ## Rules it enforces
 
@@ -25,7 +25,14 @@ file only covers the code. Status: **P1** (calendar, stock, pillars, slots, rese
   from `products.ts`), no typed prices or links, no banned words / bait / lifetime / access length, hook ≤ 12
   words, no repeat, image posts have a stock photo that exists, the slot fits the pillar and the type. Always need
   the owner: brand and launch pillars, the 18+ book, `ai-grok-` photos, a claim the critic finds that isn't in the
-  book. Template checks come with automatic rendering (not built yet).
+  book. Template: image posts must use a known template, and until the owner has scheduled one post made with
+  the Hook photo template, every image post waits for them ("a template's first use").
+- **Rendering:** approved image posts are rendered with `studypal-hook-photo` (1080×1350): the post's stock photo
+  (loaded through `/api/planner/stock-image`, nothing copied), its hook in the box, the book in the top pill
+  (no arrow, `topPillArrow: none`), "N lines below" in the bottom pill. The batch renders what it approves; the
+  Weekly batch tab has **Render approved**, the editor **Render**. PNGs go to `output/posts/`, the post becomes
+  `rendered` with that `mediaPath`. Reels aren't rendered here (the reel renderer reads the legacy phrase DB and
+  spends TTS quota).
 - **Captions:** Claude writes hook + body + hashtags only; the code adds the sales block (`server/salesBlock.ts`):
   line 1 the offer with prices read from `studypal-lms-api/src/config/products.ts` (or "details in the first
   comment" for English/grammar image posts), line 2 the link (`app.studypal.store/learn/<book>/<vol>/<n>` for a
@@ -49,6 +56,7 @@ file only covers the code. Status: **P1** (calendar, stock, pillars, slots, rese
 | `server/ai/client.ts` | `chat()` used by Insights and AI captions: **Claude by default**; `AI_PROVIDER=nvidia` goes back to Kimi on NVIDIA |
 | `server/planWeek.ts` | The batch: `planSlots()` (empty slots → the pillar furthest behind its share, allowed in that slot, not twice a day), books least used in 30 days (never the 18+ book), lines via `suggestSource()` (grammar: mistakes), photo via the picker, `idea` posts → Claude writes 6 per call → `drafted` → review. `estimateBatch()`, `startBatch()` (one at a time, background), `dropUnwrittenIdeas()` |
 | `server/planReview.ts` | Code checks + Claude critic (a separate call, 6 posts per call) → `saveReview()`; `composeCaption()`, `expectedSales()`, `BANNED` (add a rule here when a rejection shows a gap) |
+| `server/planRender.ts` | `renderPlannerPost()`, `renderApproved()`, `renderBlocker()`, `templateUsedBefore()`; routes `POST /api/planner/posts/:id/render`, `GET/POST /api/planner/render` (background run over a range) |
 | `server/salesBlock.ts` | Prices from `products.ts`, the 2-line sales block per subject, `learnPath()` |
 | `server/photoPicker.ts` | `stock-images/<subject>/<book folder>` (book 4 → `english/04-…`, J3 → `japanese/n5-j2-j4`, K4 → `korean/k4-…`) then `_shared`; not used in 30 days, least used first, `ai-grok-` last; `photoStock()` (under 6 free = low); `stockPhotoPath()` for serving |
 | `server/scout.ts` | Grok scout: topics `jobs-abroad`, `dates`, `english-trends` (all name Sri Lanka); notes in `planner_scout_notes`; the writer reads the newest per topic (≤ 10 days old). Runs in the background (a topic can take minutes) |
@@ -68,4 +76,4 @@ file only covers the code. Status: **P1** (calendar, stock, pillars, slots, rese
 
 ## Next phases (docs/16 §11)
 
-~~P2~~ · ~~P3~~ · ~~P4 Claude + Grok batch~~ (done) · **Next:** rendering approved posts automatically with a template (so the batch ends in `rendered`, and template checks join the review) · P5 feedback loop · P6 more platforms.
+~~P2~~ · ~~P3~~ · ~~P4 Claude + Grok batch~~ (done) · ~~image post rendering~~ · **Next:** reels for the Planner (needs a reel template that takes book lines, and TTS quota) · P5 feedback loop · P6 more platforms.

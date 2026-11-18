@@ -175,9 +175,9 @@ function StudyPalHookPhoto({ fields, colors: c, insets }: PostTemplateProps) {
         <div style={{ flex: `${posY} 1 0`, minHeight: 0 }} />
         <div style={{ flex: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 24 }}>
           {fields.topPill?.trim() && (
-            <div lang="si" style={{ ...pill, paddingRight: 30 }}>
+            <div lang="si" style={{ ...pill, ...(fields.topPillArrow === "none" ? {} : { paddingRight: 30 }) }}>
               {fields.topPill}
-              {UP_ARROW}
+              {fields.topPillArrow === "none" ? null : UP_ARROW}
             </div>
           )}
           <div
@@ -300,6 +300,7 @@ export const studyPalHookPhoto: PostTemplateDef = {
     { key: "overlayOpacity", label: "Dark overlay", type: "range", min: 0, max: 90, unit: "%", hint: "Darkens a bright photo so the box and pills stand out. Color under Colors (Photo overlay)." },
     { key: "offsetY", label: "Vertical position", type: "range", min: 0, max: 100, unit: "%", hint: "Moves the pills and the box together: 0 = top, 100 = bottom. Keep the photo's subject clear." },
     { key: "topPill", label: "Top pill (above the box)", type: "text", lang: "si", hint: "Empty hides it." },
+    { key: "topPillArrow", label: "Top pill arrow", type: "text", hint: "up (default) or none - none for a label such as the book's name." },
     { key: "boxOpacity", label: "Hook box opacity", type: "range", min: 20, max: 100, unit: "%", hint: "Lower lets the photo show through the box." },
     { key: "hookSize", label: "Hook text size", type: "range", min: 36, max: 130, unit: "px", hint: "Shrinks automatically if a line wouldn't fit the box at this size." },
     { key: "hook", label: "Hook (in the box)", type: "textarea", lang: "si", hint: "Wrap a word in **double stars** to highlight it, e.g. **300**. Auto-shrinks to fit." },

@@ -419,6 +419,22 @@ function PostEditor({ initial, view, onClose, onSaved }: { initial: PlannerPostI
     }
   }
 
+  async function renderNow() {
+    if (!post.id) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { id, ...body } = post;
+      await api.updatePlannerPost(id!, body);
+      const r = await api.plannerRenderPost(id!);
+      setPost((cur) => ({ ...cur, status: r.status, mediaPath: r.mediaPath }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function pickPhoto() {
     const subject = view.pillars.find((p) => p.id === post.pillarId)?.subject ?? view.books.find((b) => b.slug === post.book)?.subject ?? "";
     if (!subject) return setError("Pick a pillar or book first");
@@ -599,6 +615,11 @@ function PostEditor({ initial, view, onClose, onSaved }: { initial: PlannerPostI
           <div className="field">
             <label>Rendered file</label>
             <input type="text" value={post.mediaPath ?? ""} placeholder="output/…" onChange={(e) => set("mediaPath", e.target.value)} />
+            {post.mediaPath && api.mediaUrl(post.mediaPath) && /\.png$/i.test(post.mediaPath) && (
+              <a href={api.mediaUrl(post.mediaPath)!} target="_blank" rel="noreferrer">
+                <img className="planner-photo-preview" src={api.mediaUrl(post.mediaPath)!} alt="Rendered post" />
+              </a>
+            )}
           </div>
         </div>
         {(review || post.status === "drafted") && post.id && (
@@ -699,6 +720,11 @@ function PostEditor({ initial, view, onClose, onSaved }: { initial: PlannerPostI
           {!isNew && post.status !== "approved" && (
             <button type="button" className="secondary" disabled={busy} onClick={() => save({ status: "approved", statusReason: "" })}>
               Approve
+            </button>
+          )}
+          {!isNew && post.kind === "image" && (post.status === "approved" || post.status === "rendered") && (
+            <button type="button" className="secondary" disabled={busy || !post.photo} onClick={renderNow} title="Hook photo template with this post's photo and hook (saves your edits first)">
+              {post.status === "rendered" ? "Render again" : "Render"}
             </button>
           )}
           {!isNew && post.status === "rendered" && (

@@ -70,6 +70,7 @@ import { importFacebookCsv, matchPublished, plannerPostStats } from "./plannerSt
 import { exportWeekPack, planWeekPack, showDir } from "./weekPack";
 import { batchJob, dropUnwrittenIdeas, estimateBatch, startBatch } from "./planWeek";
 import { checkPost, reviewPosts } from "./planReview";
+import { renderApproved, renderPlannerPost } from "./planRender";
 import { pickPhoto, photoStock, stockPhotoPath } from "./photoPicker";
 import { latestScoutNotes, SCOUT_TOPICS, scoutRunning, startScout } from "./scout";
 import { aiCallCounts, cliVersion } from "./ai/cli";
@@ -1252,6 +1253,38 @@ app.post("/api/planner/posts/:id/review", async (req, res) => {
   } catch (err) {
     fail400(res, err);
   }
+});
+
+/** Renders one approved image post with the Hook photo template → status rendered. */
+app.post("/api/planner/posts/:id/render", async (req, res) => {
+  try {
+    res.json(await renderPlannerPost(req.params.id, "owner"));
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+let renderRun: { from: string; to: string; startedAt: string; log: string[]; done: boolean; rendered: number; skipped: { id: string; reason: string }[] } | null = null;
+
+/** { from, to } → renders every approved image post in the range, in the background; poll GET. */
+app.post("/api/planner/render", (req, res) => {
+  try {
+    const { from, to } = batchRange(req.body ?? {});
+    if (renderRun && !renderRun.done) throw new Error("A render run is already going");
+    const run = { from, to, startedAt: new Date().toISOString(), log: [] as string[], done: false, rendered: 0, skipped: [] as { id: string; reason: string }[] };
+    renderRun = run;
+    void renderApproved(from, to, (l) => run.log.push(l))
+      .then((r) => Object.assign(run, r))
+      .catch((err) => run.log.push(`failed: ${err instanceof Error ? err.message : String(err)}`))
+      .finally(() => (run.done = true));
+    res.json(run);
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+app.get("/api/planner/render", (_req, res) => {
+  res.json(renderRun);
 });
 
 /** { reason } → rejected (reason kept for next week's drafts) + a ready reserve post moved into its slot. */

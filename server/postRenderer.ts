@@ -1,13 +1,16 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { extname, join, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import { bundle } from "@remotion/bundler";
 import { renderStill, selectComposition } from "@remotion/renderer";
 import { getPostTemplate } from "../src/posts/registry";
 import type { PostColors, PostFields, PostLists } from "../src/posts/types";
 
 const ROOT = process.cwd();
-const SRC_DIR = join(ROOT, "src");
-const ASSETS_DIR = join(ROOT, "assets");
+// src/ and assets/ are found next to this file, so a server started from another folder still renders.
+const REPO = fileURLToPath(new URL("..", import.meta.url));
+const SRC_DIR = join(REPO, "src");
+const ASSETS_DIR = join(REPO, "assets");
 export const POSTS_OUTPUT_DIR = join(ROOT, "output", "posts");
 
 // bundle() is the slow part (webpack, ~10-30s) - reuse it across renders and

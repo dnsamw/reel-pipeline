@@ -39,6 +39,7 @@ import type {
   BatchJob,
   PhotoStock,
   ScoutView,
+  PlannerRenderRun,
   Pillar,
   PlannerPost,
   PlannerPostInput,
@@ -355,6 +356,11 @@ export const api = {
     return request<{ photo: string | null }>(`/planner/photo-pick?${p}`);
   },
   stockImageUrl: (path: string) => `/api/planner/stock-image?${new URLSearchParams({ path })}`,
+  plannerRenderPost: (id: string) => request<PlannerPost>(`/planner/posts/${encodeURIComponent(id)}/render`, { method: "POST" }),
+  plannerRenderApproved: (from: string, to: string) => request<PlannerRenderRun>("/planner/render", { method: "POST", body: JSON.stringify({ from, to }) }),
+  plannerRenderStatus: () => request<PlannerRenderRun | null>("/planner/render"),
+  /** output/posts/x.png → /media/posts/x.png (the server serves output/ as /media). */
+  mediaUrl: (mediaPath: string) => (mediaPath.startsWith("output/") ? `/media/${mediaPath.slice("output/".length)}` : null),
   reviewPost: (id: string) => request<PlannerPost>(`/planner/posts/${encodeURIComponent(id)}/review`, { method: "POST" }),
   rejectPost: (id: string, reason: string) =>
     request<{ rejected: PlannerPost; filled: PlannerPost | null }>(`/planner/posts/${encodeURIComponent(id)}/reject`, { method: "POST", body: JSON.stringify({ reason }) }),

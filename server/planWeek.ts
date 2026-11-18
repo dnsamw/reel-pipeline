@@ -20,6 +20,7 @@ import {
 } from "./planner";
 import { ADULT_BOOK, composeCaption, expectedSales, reviewPosts } from "./planReview";
 import { pickPhoto } from "./photoPicker";
+import { renderBlocker, renderPlannerPost } from "./planRender";
 import { latestScoutNotes, runScout } from "./scout";
 
 /**
@@ -284,6 +285,7 @@ export interface BatchJob {
   drafted: number;
   approved: number;
   needsYou: number;
+  rendered: number;
   error: string | null;
 }
 
@@ -306,6 +308,7 @@ export function startBatch(from: string, to: string, opts: { scout?: boolean; li
     drafted: 0,
     approved: 0,
     needsYou: 0,
+    rendered: 0,
     error: null,
   };
   current = job;
@@ -328,8 +331,20 @@ export function startBatch(from: string, to: string, opts: { scout?: boolean; li
       const r = await reviewPosts(drafted, log, REVIEW_CHUNK);
       job.approved = r.approved;
       job.needsYou = r.needsYou;
+      // Approved image posts are rendered right away (reels stay for Studio's reel renderer).
+      for (const id of drafted) {
+        const p = getPost(id);
+        if (!p || p.status !== "approved" || renderBlocker(p)) continue;
+        try {
+          await renderPlannerPost(id);
+          job.rendered++;
+          log(`rendered ${p.date} ${p.slotId}`);
+        } catch (err) {
+          log(`render failed ${p.date} ${p.slotId}: ${(err instanceof Error ? err.message : String(err)).slice(0, 160)}`);
+        }
+      }
       job.state = "done";
-      log(`done: ${r.approved} approved on their own, ${r.needsYou} need you`);
+      log(`done: ${r.approved} approved on their own (${job.rendered} rendered), ${r.needsYou} need you`);
     } catch (err) {
       job.state = "failed";
       job.error = err instanceof Error ? err.message : String(err);

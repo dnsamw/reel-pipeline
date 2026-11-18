@@ -243,6 +243,7 @@ export interface BatchJob {
   drafted: number;
   approved: number;
   needsYou: number;
+  rendered: number;
   error: string | null;
 }
 
@@ -270,4 +271,14 @@ export interface AiInfo {
   claude: { ok: boolean; version?: string; error?: string };
   grok: { ok: boolean; version?: string; error?: string };
   calls: { tool: string; calls: number; failed: number }[];
+}
+
+export interface PlannerRenderRun {
+  from: string;
+  to: string;
+  startedAt: string;
+  log: string[];
+  done: boolean;
+  rendered: number;
+  skipped: { id: string; reason: string }[];
 }

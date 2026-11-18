@@ -3,6 +3,8 @@ import { listCatalogBooks, unitLines } from "./lmsCatalog";
 import { findRepeats, getPost, listPillars, listSlots, normLine, saveReview, type PlannerPost, type PostReview } from "./planner";
 import { stockPhotoPath } from "./photoPicker";
 import { APP_HOST, knownPriceStrings, salesBlock } from "./salesBlock";
+import { PLANNER_IMAGE_TEMPLATE, templateUsedBefore } from "./planRender";
+import { getPostTemplate } from "../src/posts/registry";
 
 /**
  * Auto-approval (studypal-lms docs/16 §10.1): a drafted post becomes
@@ -67,7 +69,8 @@ export function mentionsAccessLength(text: string): boolean {
   return false;
 }
 
-const PRICE_RE = /(?:රු\.?|Rs\.?|LKR)\s*[\d,]+/gi;
+/** A price: රු / Rs / LKR followed by a number ("Rs" must start a word, so "others," isn't one). */
+const PRICE_RE = /(?:රු\.?|\bRs\.?|\bLKR)\s*\d[\d,]*/gi;
 
 const sinhalaWords = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 
@@ -134,6 +137,12 @@ function codeChecks(post: PlannerPost): { checks: PostReview["checks"]; needsOwn
   }
   if (post.photo.split("/").pop()?.startsWith("ai-grok-")) needsOwner.push("AI-generated background (Grok)");
 
+  // Template (image posts are rendered automatically with a known Post Creator template)
+  if (post.kind === "image") {
+    add("template", "Known Studio template", !!getPostTemplate(PLANNER_IMAGE_TEMPLATE), getPostTemplate(PLANNER_IMAGE_TEMPLATE) ? undefined : `${PLANNER_IMAGE_TEMPLATE} is missing`);
+    if (!templateUsedBefore()) needsOwner.push("first use of the Hook photo template (schedule one post made with it and later ones can go through on their own)");
+  }
+
   // Slot, pillar
   const slotOk = !!slot && (!pillar || pillar.slotIds.length === 0 || pillar.slotIds.includes(slot.id));
   add("slot", "Slot fits the pillar", slotOk, slotOk ? undefined : `${pillar?.name} is planned for ${pillar?.slotIds.join("/")}`);
@@ -188,6 +197,7 @@ const CRITIC_SYSTEM = [
   "- accuracy: are the book lines quoted exactly as given, and are the meanings and explanations right? Each book line comes with the book's own Sinhala pronunciation, meaning, note and (for grammar mistakes) the wrong sentence: those are from the book and may be used. Any invented example line, a meaning or pronunciation that differs from the book's, or a wrong explanation is ≤ 2.",
   "- rules: no prices or links in the body (the code adds them), no like/comment/share bait, no promise of results, no lifetime or access-length claims, nothing sexual, polite.",
   "claims = true when the post claims something not in the given book lines or facts: results ('you will get the job'), numbers, testimonials, reviews, people presented as real users.",
+  "The last lines of each caption that start with 📚 and 👉 (and the hashtags after them) are the sales block, added by the code from the product config: never judge or mention them.",
   "notes: one or two short English sentences: what to fix, or what is good. Be concrete.",
 ].join("\n");
 
