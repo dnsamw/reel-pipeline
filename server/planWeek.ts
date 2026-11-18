@@ -331,12 +331,12 @@ export function startBatch(from: string, to: string, opts: { scout?: boolean; li
       const r = await reviewPosts(drafted, log, REVIEW_CHUNK);
       job.approved = r.approved;
       job.needsYou = r.needsYou;
-      // Approved image posts are rendered right away (reels stay for Studio's reel renderer).
+      // Approved posts are rendered right away: image posts with the Hook photo template, reels silent with music.
       for (const id of drafted) {
         const p = getPost(id);
         if (!p || p.status !== "approved" || renderBlocker(p)) continue;
         try {
-          await renderPlannerPost(id);
+          await renderPlannerPost(id, "auto", log);
           job.rendered++;
           log(`rendered ${p.date} ${p.slotId}`);
         } catch (err) {

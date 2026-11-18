@@ -1,3 +1,4 @@
+import { useBrandText } from "./brandText";
 import type { ReactNode } from "react";
 import { AbsoluteFill } from "remotion";
 import { fontFamily } from "../../theme/tokens";
@@ -21,6 +22,7 @@ export function SceneFrame({
   progress?: { current: number; total: number };
 }) {
   const c = usePalette(theme);
+  const brand = useBrandText();
   const pTint = c.primaryTint;
   const gTint = c.goldTint;
 
@@ -60,7 +62,7 @@ export function SceneFrame({
             textTransform: "uppercase",
           }}
         >
-          StudyPal Phrasebook
+          {brand.label}
         </span>
       </div>
 

@@ -3,7 +3,7 @@ import { listCatalogBooks, unitLines } from "./lmsCatalog";
 import { findRepeats, getPost, listPillars, listSlots, normLine, saveReview, type PlannerPost, type PostReview } from "./planner";
 import { stockPhotoPath } from "./photoPicker";
 import { APP_HOST, knownPriceStrings, salesBlock } from "./salesBlock";
-import { PLANNER_IMAGE_TEMPLATE, templateUsedBefore } from "./planRender";
+import { PLANNER_IMAGE_TEMPLATE, PLANNER_REEL_TEMPLATE, templateUsedBefore } from "./planRender";
 import { getPostTemplate } from "../src/posts/registry";
 
 /**
@@ -141,6 +141,10 @@ function codeChecks(post: PlannerPost): { checks: PostReview["checks"]; needsOwn
   if (post.kind === "image") {
     add("template", "Known Studio template", !!getPostTemplate(PLANNER_IMAGE_TEMPLATE), getPostTemplate(PLANNER_IMAGE_TEMPLATE) ? undefined : `${PLANNER_IMAGE_TEMPLATE} is missing`);
     if (!templateUsedBefore()) needsOwner.push("first use of the Hook photo template (schedule one post made with it and later ones can go through on their own)");
+  }
+  if (post.kind === "reel") {
+    if (!templateUsedBefore(PLANNER_REEL_TEMPLATE)) needsOwner.push("first use of the silent Planner reel (schedule one and later ones can go through on their own)");
+    if ((post.source.lines?.length ?? 0) > 6) add("reel-lines", "A reel holds at most 6 lines", false, `${post.source.lines!.length} lines`);
   }
 
   // Slot, pillar

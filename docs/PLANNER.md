@@ -2,7 +2,7 @@
 
 The Planner page (`/planner` in the GUI, "Plan → Planner" in the sidebar) is the one calendar for every social
 post. The plan behind it is `studypal-lms/docs/16-social-content-pipeline.md` in the StudyPal workspace; this
-file only covers the code. Status: **P1** (calendar, stock, pillars, slots, reserve), **P2** (book lines as post source, repeat guard), **P3** (week pack, stats matching, Facebook posting off) and **P4** (Claude drafts the empty slots, auto-approval, Grok scout, stock-photo picker, Insights on Claude). Approved **image** posts are rendered automatically (Hook photo template); reels are still rendered by hand.
+file only covers the code. Status: **P1** (calendar, stock, pillars, slots, reserve), **P2** (book lines as post source, repeat guard), **P3** (week pack, stats matching, Facebook posting off) and **P4** (Claude drafts the empty slots, auto-approval, Grok scout, stock-photo picker, Insights on Claude). Approved posts are rendered automatically: image posts with the Hook photo template, reels **silent with music only** (owner 2026-11-18).
 
 ## Rules it enforces
 
@@ -31,8 +31,17 @@ file only covers the code. Status: **P1** (calendar, stock, pillars, slots, rese
   (loaded through `/api/planner/stock-image`, nothing copied), its hook in the box, the book in the top pill
   (no arrow, `topPillArrow: none`), "N lines below" in the bottom pill. The batch renders what it approves; the
   Weekly batch tab has **Render approved**, the editor **Render**. PNGs go to `output/posts/`, the post becomes
-  `rendered` with that `mediaPath`. Reels aren't rendered here (the reel renderer reads the legacy phrase DB and
-  spends TTS quota).
+  `rendered` with that `mediaPath`.
+- **Reels** (`server/planReel.ts`): the post's book lines (up to 6) go into the default reel composition
+  (Settings → Composition) as its phrases: text → phrase, Sinhala meaning → the answer, Sinhala pronunciation,
+  English note. **No voice-over, no intro voice, no tick or reveal sounds: only a music track**, so no TTS quota
+  is spent. The track and its start come from the post id (same on a re-render) and the start stays inside the
+  track. `assets/music/planner-music.txt` (one file name per line), when it exists, limits which tracks the
+  Planner may use. The reel's fixed words (header label, outro heading and line, outro link) are set per
+  subject (`reelTexts()`): e.g. "StudyPal Japanese" / "Learn Japanese in Sinhala" / app.studypal.store/japanese.
+  Studio's own English reels keep their old texts (they are the defaults of `brandLabel`, `outroHeading`,
+  `outroSub` in the reel config, `src/compositions/scenes/brandText.tsx`). Output: `output/planner-reels/`.
+  The first use of the Planner reel waits for the owner, like the image template.
 - **Captions:** Claude writes hook + body + hashtags only; the code adds the sales block (`server/salesBlock.ts`):
   line 1 the offer with prices read from `studypal-lms-api/src/config/products.ts` (or "details in the first
   comment" for English/grammar image posts), line 2 the link (`app.studypal.store/learn/<book>/<vol>/<n>` for a
@@ -57,6 +66,7 @@ file only covers the code. Status: **P1** (calendar, stock, pillars, slots, rese
 | `server/planWeek.ts` | The batch: `planSlots()` (empty slots → the pillar furthest behind its share, allowed in that slot, not twice a day), books least used in 30 days (never the 18+ book), lines via `suggestSource()` (grammar: mistakes), photo via the picker, `idea` posts → Claude writes 6 per call → `drafted` → review. `estimateBatch()`, `startBatch()` (one at a time, background), `dropUnwrittenIdeas()` |
 | `server/planReview.ts` | Code checks + Claude critic (a separate call, 6 posts per call) → `saveReview()`; `composeCaption()`, `expectedSales()`, `BANNED` (add a rule here when a rejection shows a gap) |
 | `server/planRender.ts` | `renderPlannerPost()`, `renderApproved()`, `renderBlocker()`, `templateUsedBefore()`; routes `POST /api/planner/posts/:id/render`, `GET/POST /api/planner/render` (background run over a range) |
+| `server/planReel.ts` | `renderPlannerReel()`, `reelPhrases()`, `reelTexts()`, `plannerMusic()`, `musicStart()` (ffprobe) |
 | `server/salesBlock.ts` | Prices from `products.ts`, the 2-line sales block per subject, `learnPath()` |
 | `server/photoPicker.ts` | `stock-images/<subject>/<book folder>` (book 4 → `english/04-…`, J3 → `japanese/n5-j2-j4`, K4 → `korean/k4-…`) then `_shared`; not used in 30 days, least used first, `ai-grok-` last; `photoStock()` (under 6 free = low); `stockPhotoPath()` for serving |
 | `server/scout.ts` | Grok scout: topics `jobs-abroad`, `dates`, `english-trends` (all name Sri Lanka); notes in `planner_scout_notes`; the writer reads the newest per topic (≤ 10 days old). Runs in the background (a topic can take minutes) |
@@ -76,4 +86,4 @@ file only covers the code. Status: **P1** (calendar, stock, pillars, slots, rese
 
 ## Next phases (docs/16 §11)
 
-~~P2~~ · ~~P3~~ · ~~P4 Claude + Grok batch~~ (done) · ~~image post rendering~~ · **Next:** reels for the Planner (needs a reel template that takes book lines, and TTS quota) · P5 feedback loop · P6 more platforms.
+~~P2~~ · ~~P3~~ · ~~P4 Claude + Grok batch~~ (done) · ~~image post rendering~~ · ~~silent Planner reels~~ · **Next:** P5 feedback loop · later: reels with voice-over (TTS quota) · P6 more platforms.

@@ -620,6 +620,9 @@ function PostEditor({ initial, view, onClose, onSaved }: { initial: PlannerPostI
                 <img className="planner-photo-preview" src={api.mediaUrl(post.mediaPath)!} alt="Rendered post" />
               </a>
             )}
+            {post.mediaPath && api.mediaUrl(post.mediaPath) && /\.mp4$/i.test(post.mediaPath) && (
+              <video className="planner-photo-preview planner-reel-preview" src={api.mediaUrl(post.mediaPath)!} controls preload="metadata" />
+            )}
           </div>
         </div>
         {(review || post.status === "drafted") && post.id && (
@@ -722,7 +725,7 @@ function PostEditor({ initial, view, onClose, onSaved }: { initial: PlannerPostI
               Approve
             </button>
           )}
-          {!isNew && post.kind === "image" && (post.status === "approved" || post.status === "rendered") && (
+          {!isNew && (post.kind === "image" || post.kind === "reel") && (post.status === "approved" || post.status === "rendered") && (
             <button type="button" className="secondary" disabled={busy || !post.photo} onClick={renderNow} title="Hook photo template with this post's photo and hook (saves your edits first)">
               {post.status === "rendered" ? "Render again" : "Render"}
             </button>

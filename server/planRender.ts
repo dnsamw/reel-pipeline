@@ -3,6 +3,7 @@ import { listCatalogBooks } from "./lmsCatalog";
 import { renderPostPng } from "./postRenderer";
 import { getPost, listPosts, updatePost, type PlannerPost } from "./planner";
 import { stockPhotoPath } from "./photoPicker";
+import { renderPlannerReel } from "./planReel";
 
 /**
  * Automatic rendering of approved Planner image posts (docs/16 §2 step 6):
@@ -13,7 +14,9 @@ import { stockPhotoPath } from "./photoPicker";
  */
 
 export const PLANNER_IMAGE_TEMPLATE = "studypal-hook-photo";
-export const RENDERABLE_KINDS = new Set(["image"]);
+/** Rendered reels are stored here; the folder name is how a reel's "template" is recognised. */
+export const PLANNER_REEL_TEMPLATE = "planner-reels/";
+export const RENDERABLE_KINDS = new Set(["image", "reel"]);
 
 /** The stock photo through this server, so the render's Chrome loads it from disk without copying. */
 const photoUrl = (photo: string) =>
@@ -32,16 +35,22 @@ function bookPill(slug: string): string {
 export function renderBlocker(p: PlannerPost): string | null {
   if (!RENDERABLE_KINDS.has(p.kind)) return `${p.kind} posts are rendered by hand`;
   if (p.status !== "approved" && p.status !== "rendered") return `status is ${p.status}`;
+  if (p.kind === "reel") return (p.source.lines?.length ?? 0) > 0 ? null : "no book lines";
   if (!p.photo || !stockPhotoPath(p.photo)) return "no stock photo";
   if (!p.hook.trim()) return "no hook";
   return null;
 }
 
-export async function renderPlannerPost(id: string, by = "auto"): Promise<PlannerPost> {
+export async function renderPlannerPost(id: string, by = "auto", log: (l: string) => void = () => {}): Promise<PlannerPost> {
   const p = getPost(id);
   if (!p) throw new Error("Post not found");
   const blocker = renderBlocker(p);
   if (blocker) throw new Error(`Can't render: ${blocker}`);
+  if (p.kind === "reel") {
+    // Silent reel with music only (owner 2026-11-18): no TTS quota is spent.
+    const mediaPath = await renderPlannerReel(p, log);
+    return updatePost(id, { mediaPath, status: "rendered", statusReason: "" }, by);
+  }
   const lines = p.source.lines?.length ?? 0;
   const { savedPath } = await renderPostPng({
     templateId: PLANNER_IMAGE_TEMPLATE,
@@ -74,7 +83,7 @@ export async function renderApproved(from: string, to: string, log: (l: string) 
       continue;
     }
     try {
-      await renderPlannerPost(p.id);
+      await renderPlannerPost(p.id, "auto", log);
       rendered++;
       log(`rendered ${p.date} ${p.slotId}`);
     } catch (err) {
@@ -85,8 +94,12 @@ export async function renderApproved(from: string, to: string, log: (l: string) 
   return { rendered, skipped };
 }
 
-/** Has the owner ever scheduled a post made with this template? If not, its first use needs them (docs/16 §10.1). */
-export function templateUsedBefore(templateId = PLANNER_IMAGE_TEMPLATE): boolean {
+/**
+ * Has the owner ever scheduled a post made with this template (the image
+ * template's id, or the reel folder)? If not, its first use needs them
+ * (docs/16 §10.1).
+ */
+export function templateUsedBefore(marker = `${PLANNER_IMAGE_TEMPLATE}-`): boolean {
   const all = listPosts("2000-01-01", "2999-12-31");
-  return all.some((p) => p.mediaPath.includes(`${templateId}-`) && ["scheduled", "published", "measured"].includes(p.status));
+  return all.some((p) => p.mediaPath.includes(marker) && ["scheduled", "published", "measured"].includes(p.status));
 }

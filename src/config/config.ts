@@ -53,6 +53,9 @@ export const configSchema = z.object({
   manifestPath: z.string(),
   ctaUrl: z.string().describe("Shown on the outro CTA scene - set to StudyPal's actual public URL"),
   introText: z.string().describe("On-screen text for the intro scene, spoken by the intro voice-over"),
+  brandLabel: z.string().optional().describe("Label at the top of every scene (default: StudyPal Phrasebook)"),
+  outroHeading: z.string().optional().describe("Outro heading (default: Get the full phrasebook)"),
+  outroSub: z.string().optional().describe("Outro line under the heading (default: the English phrasebook line)"),
 });
 
 export type ReelConfig = z.infer<typeof configSchema>;

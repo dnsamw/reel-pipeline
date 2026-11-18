@@ -1,3 +1,4 @@
+import { useBrandText } from "./brandText";
 import { AbsoluteFill } from "remotion";
 import { fontFamily } from "../../theme/tokens";
 import { usePalette } from "../../theme/ThemeContext";
@@ -16,6 +17,7 @@ const logoViewBox = "3 28 95 46";
  * theme="light" for the same contrast effect in reverse.
  */
 export function OutroScene({ ctaUrl, theme = "dark" }: { ctaUrl: string; theme?: "light" | "dark" }) {
+  const brand = useBrandText();
   // Both palettes are needed regardless of `theme` - the contrast effect
   // deliberately borrows from the *other* palette (e.g. "light" mode uses
   // the dark palette's primary as an accent) rather than just inverting one.
@@ -87,7 +89,7 @@ export function OutroScene({ ctaUrl, theme = "dark" }: { ctaUrl: string; theme?:
               margin: 0,
             }}
           >
-            Get the full phrasebook
+            {brand.outroHeading}
           </p>
           <p
             style={{
@@ -99,7 +101,7 @@ export function OutroScene({ ctaUrl, theme = "dark" }: { ctaUrl: string; theme?:
               maxWidth: 620,
             }}
           >
-            200+ everyday English phrases with Sinhala pronunciation &amp; meaning
+            {brand.outroSub}
           </p>
           <div
             style={{

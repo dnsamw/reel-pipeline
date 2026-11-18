@@ -118,7 +118,7 @@ export function Batch({ view, onChanged, onOpen }: { view: PlannerView; onChange
     }
   }
 
-  const toRender = view.posts.filter((p) => p.status === "approved" && p.kind === "image" && p.date! >= view.today).length;
+  const toRender = view.posts.filter((p) => p.status === "approved" && (p.kind === "image" || p.kind === "reel") && p.date! >= view.today).length;
   const auto = view.posts.filter((p) => p.autoApproved && (p.status === "approved" || p.status === "rendered") && p.date! >= view.today);
   const needs = view.posts.filter((p) => p.status === "drafted" && p.date! >= view.today);
   const low = (photos ?? []).filter((p) => p.low);
@@ -211,7 +211,11 @@ export function Batch({ view, onChanged, onOpen }: { view: PlannerView; onChange
               <div key={p.id} className="planner-thumb">
                 <button type="button" className="planner-thumb-img" onClick={() => onOpen(p)} title="Open">
                   {api.mediaUrl(p.mediaPath) ? (
-                    <img src={api.mediaUrl(p.mediaPath)!} alt="" loading="lazy" />
+                    /\.mp4$/i.test(p.mediaPath) ? (
+                      <video src={api.mediaUrl(p.mediaPath)!} muted preload="metadata" />
+                    ) : (
+                      <img src={api.mediaUrl(p.mediaPath)!} alt="" loading="lazy" />
+                    )
                   ) : p.photo ? (
                     <img src={api.stockImageUrl(p.photo)} alt="" loading="lazy" />
                   ) : (

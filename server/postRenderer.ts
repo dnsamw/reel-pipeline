@@ -27,7 +27,8 @@ function newestMtime(dir: string): number {
   return newest;
 }
 
-function getBundle(): Promise<string> {
+/** The Remotion bundle of src/compositions/Root.tsx (every still and reel composition), rebuilt when src/ changes. */
+export function getBundle(): Promise<string> {
   const stamp = newestMtime(SRC_DIR);
   if (!cached || cached.stamp !== stamp) {
     const location = bundle({
