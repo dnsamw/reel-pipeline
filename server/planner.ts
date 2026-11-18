@@ -102,8 +102,24 @@ export interface PlannerPost {
   notes: string;
   /** The Facebook post it went out as (platform_posts.remote_id), once matched from the stats (P3). */
   remoteId: string | null;
+  /** The last auto-approval review (P4): code checks, critic scores, why it needs the owner. */
+  review: PostReview | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** One auto-approval review (docs/16 §10.1). Approved on its own only when every check passes and nothing needs the owner. */
+export interface PostReview {
+  at: string;
+  checks: { id: string; label: string; ok: boolean; detail?: string }[];
+  /** Claude critic scores 1-5 (null when the critic didn't run). */
+  scores: { hook: number; sinhala: number; accuracy: number; rules: number } | null;
+  criticNotes: string;
+  /** Things that always need the owner (brand post, AI image, a claim not in the book…). */
+  needsOwner: string[];
+  /** Grok's critique, attached as a note; never a gate. */
+  grokNote?: string;
+  approved: boolean;
 }
 
 db.exec(`
@@ -172,6 +188,9 @@ db.exec(`
 // P3: the Facebook post a Planner post went out as.
 if (!(db.prepare("PRAGMA table_info(planner_posts)").all() as { name: string }[]).some((c) => c.name === "remote_id"))
   db.exec("ALTER TABLE planner_posts ADD COLUMN remote_id TEXT");
+// P4: the last auto-approval review.
+if (!(db.prepare("PRAGMA table_info(planner_posts)").all() as { name: string }[]).some((c) => c.name === "review_json"))
+  db.exec("ALTER TABLE planner_posts ADD COLUMN review_json TEXT");
 
 // --- Defaults (docs/16 §3), seeded once into empty tables ---
 
@@ -219,7 +238,7 @@ interface PillarRow { id: string; name: string; subject: string; color: string; 
 interface PostRow {
   id: string; date: string | null; slot_id: string | null; reserve: number; pillar_id: string | null; book: string; kind: string;
   title: string; hook: string; caption: string; photo: string; media_path: string; source_json: string; status: string;
-  status_reason: string; auto_approved: number; notes: string; remote_id: string | null; created_at: string; updated_at: string;
+  status_reason: string; auto_approved: number; notes: string; remote_id: string | null; review_json: string | null; created_at: string; updated_at: string;
 }
 
 const toSlot = (r: SlotRow): Slot => ({
@@ -237,7 +256,7 @@ const toPost = (r: PostRow): PlannerPost => ({
   id: r.id, date: r.date, slotId: r.slot_id, reserve: r.reserve === 1, pillarId: r.pillar_id, book: r.book,
   kind: isPostKind(r.kind) ? r.kind : "image", title: r.title, hook: r.hook, caption: r.caption, photo: r.photo,
   mediaPath: r.media_path, source: JSON.parse(r.source_json), status: isPostStatus(r.status) ? r.status : "idea",
-  statusReason: r.status_reason, autoApproved: r.auto_approved === 1, notes: r.notes, remoteId: r.remote_id ?? null, createdAt: r.created_at, updatedAt: r.updated_at,
+  statusReason: r.status_reason, autoApproved: r.auto_approved === 1, notes: r.notes, remoteId: r.remote_id ?? null, review: r.review_json ? (JSON.parse(r.review_json) as PostReview) : null, createdAt: r.created_at, updatedAt: r.updated_at,
 });
 
 // --- Dates (Sri Lanka) ---
@@ -336,7 +355,7 @@ export function getPost(id: string): PlannerPost | null {
   return r ? toPost(r) : null;
 }
 
-export type PostInput = Partial<Omit<PlannerPost, "id" | "createdAt" | "updatedAt" | "autoApproved">>;
+export type PostInput = Partial<Omit<PlannerPost, "id" | "createdAt" | "updatedAt" | "autoApproved" | "review">>;
 
 function validate(p: PlannerPost): void {
   if (p.reserve) {
@@ -393,6 +412,7 @@ export function createPost(input: PostInput, by = "owner"): PlannerPost {
     autoApproved: false,
     notes: input.notes ?? "",
     remoteId: input.remoteId ?? null,
+    review: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -535,6 +555,59 @@ export function suggestSource(
     return { book, unit: u.id, unitTitle: u.title, free: u.free, lines };
   }
   return null;
+}
+
+/**
+ * Stores a review (P4). When it approves, a `drafted` post becomes `approved`
+ * with the auto flag; otherwise it stays `drafted` and the reasons go into
+ * statusReason, so it shows under "needs you".
+ */
+export function saveReview(id: string, review: PostReview): PlannerPost {
+  const cur = getPost(id);
+  if (!cur) throw new Error("Post not found");
+  db.prepare("UPDATE planner_posts SET review_json = ? WHERE id = ?").run(JSON.stringify(review), id);
+  if (cur.status !== "drafted") return getPost(id)!;
+  if (review.approved) {
+    const next = updatePost(id, { status: "approved", statusReason: "" }, "auto");
+    db.prepare("UPDATE planner_posts SET auto_approved = 1 WHERE id = ?").run(id);
+    return { ...next, autoApproved: true };
+  }
+  const failed = review.checks.filter((c) => !c.ok).map((c) => c.label + (c.detail ? ` (${c.detail})` : ""));
+  const reasons = [...review.needsOwner.map((n) => `Needs you: ${n}`), ...failed];
+  return updatePost(id, { statusReason: reasons.join("; ").slice(0, 1000) }, "auto");
+}
+
+/**
+ * Rejects a post with a reason (kept for next week's drafts) and, when the
+ * reserve has a ready post, moves it into the same day and slot (docs/16 §10.1).
+ */
+export function rejectAndRefill(id: string, reason: string): { rejected: PlannerPost; filled: PlannerPost | null } {
+  const cur = getPost(id);
+  if (!cur) throw new Error("Post not found");
+  if (!reason.trim()) throw new Error("Say why it is rejected: Claude reads the reason next week");
+  const rejected = updatePost(id, { status: "rejected", statusReason: reason.trim() });
+  let filled: PlannerPost | null = null;
+  if (cur.date && cur.slotId && STOCK_STATUSES.includes(cur.status)) {
+    for (const r of listReserve().filter((x) => STOCK_STATUSES.includes(x.status))) {
+      try {
+        filled = fillFromReserve(r.id, cur.date, cur.slotId);
+        break;
+      } catch {
+        // that reserve post repeats a line or photo near this day: try the next one
+      }
+    }
+  }
+  return { rejected, filled };
+}
+
+/** The latest rejection reasons, for the writer prompt ("the rules get tighter over time"). */
+export function recentRejections(limit = 30): { title: string; book: string; reason: string; at: string }[] {
+  return db
+    .prepare(
+      `SELECT p.title AS title, p.book AS book, e.reason AS reason, e.at AS at FROM planner_post_events e
+       JOIN planner_posts p ON p.id = e.post_id WHERE e.to_status = 'rejected' AND e.reason != '' ORDER BY e.at DESC LIMIT ?`,
+    )
+    .all(limit) as { title: string; book: string; reason: string; at: string }[];
 }
 
 export function deletePost(id: string): void {

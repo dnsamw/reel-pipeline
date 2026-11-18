@@ -1,6 +1,11 @@
+import { claude, cliVersion } from "./cli";
+
 /**
- * Optional AI helper (NVIDIA's hosted API, OpenAI-compatible chat
- * completions - Kimi K3 by default). Everything that uses it must have a
+ * Optional AI helper. Default: Claude Code (`claude -p`) on the owner's own
+ * login (decided 2026-11-18, studypal-lms docs/16 §5: Claude replaces Kimi,
+ * whose free NVIDIA key is low priority and unreliable). AI_PROVIDER=nvidia
+ * goes back to NVIDIA's hosted API (OpenAI-compatible chat completions -
+ * Kimi K3 by default). Everything that uses it must have a
  * non-AI path: the key may be missing, expired or rate-limited, so callers
  * treat any throw from here as "fall back to the built-in way".
  *
@@ -17,9 +22,22 @@ export interface AiStatus {
   model: string | null;
 }
 
+const useNvidia = () => process.env.AI_PROVIDER?.trim().toLowerCase() === "nvidia";
+
 export function aiStatus(): AiStatus {
+  if (!useNvidia()) {
+    const v = cliVersion("claude");
+    return { available: v.ok, model: v.ok ? "Claude (Claude Code)" : null };
+  }
   const available = !!process.env.NVIDIA_API_KEY?.trim();
   return { available, model: available ? aiModel() : null };
+}
+
+/** What to fix when aiStatus() says unavailable. */
+export function aiSetupHint(): string {
+  return useNvidia()
+    ? "No AI key is set - add NVIDIA_API_KEY to .env and restart the server"
+    : "Claude Code isn't available - install it and log in (claude --version must work), then restart the server";
 }
 
 function aiModel(): string {
@@ -55,8 +73,27 @@ class AiEmptyError extends Error {
   }
 }
 
-/** One chat completion; an empty reply is retried once, since it's usually a passing hiccup on the hosted API. */
+/** One answer from the AI (Claude by default, see top). */
 export async function chat(messages: ChatMessage[], options: ChatOptions = {}): Promise<string> {
+  if (!useNvidia()) return claudeChat(messages, options);
+  return nvidiaChat(messages, options);
+}
+
+async function claudeChat(messages: ChatMessage[], options: ChatOptions): Promise<string> {
+  const system = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
+  const turns = messages.filter((m) => m.role !== "system");
+  const prompt =
+    turns.length === 1
+      ? turns[0].content
+      : turns.map((m) => `${m.role === "user" ? "USER" : "ASSISTANT"}:\n${m.content}`).join("\n\n") + "\n\nAnswer the last USER message.";
+  const r = await claude(prompt, { label: "chat", system: system || undefined, timeoutMs: Math.max(options.timeoutMs ?? 0, 300_000) });
+  const text = r.text.trim();
+  if (!text) throw new Error("AI returned an empty answer - try again");
+  return text;
+}
+
+/** One NVIDIA chat completion; an empty reply is retried once, since it's usually a passing hiccup on the hosted API. */
+async function nvidiaChat(messages: ChatMessage[], options: ChatOptions = {}): Promise<string> {
   try {
     return await chatOnce(messages, options);
   } catch (err) {

@@ -1,5 +1,5 @@
 import { listPublications } from "../publications";
-import { aiStatus } from "../ai/client";
+import { aiSetupHint, aiStatus } from "../ai/client";
 import { collectFacebook, collectInstagram, collectTikTok, collectYouTube, type CollectResult, type TikTokVideo } from "./collectors";
 import { allPhrases, buildContentPieces, durationOf, usedPhraseIds } from "./content";
 import { compare, coverage, predict, scorePieces, suggest } from "./analysis";
@@ -149,7 +149,7 @@ export function linkTikTok(publicationId: string, videoId: string | null): void 
 
 export function startAiReport(focus: string | null): AiReportRecord {
   const status = aiStatus();
-  if (!status.available) throw new Error("No AI key is set - add NVIDIA_API_KEY to .env and restart the server. The built-in analysis below works without it.");
+  if (!status.available) throw new Error(`${aiSetupHint()}. The built-in analysis below works without it.`);
   if (listReports(1)[0]?.status === "running") throw new Error("A report is already being written - wait for it to finish");
 
   // The record is created before the (async) overview so the GUI can start polling at once.
@@ -169,7 +169,7 @@ export function startAiReport(focus: string | null): AiReportRecord {
 }
 
 export async function askAi(question: string): Promise<string> {
-  if (!aiStatus().available) throw new Error("No AI key is set - add NVIDIA_API_KEY to .env and restart the server");
+  if (!aiStatus().available) throw new Error(aiSetupHint());
   const overview = await getOverview();
   const phrases = await phrasesOrEmpty();
   return aiAsk(overview, phrases, usedPhraseIds(listPublications(), listPlatformPosts(), phrases), question);

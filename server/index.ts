@@ -48,6 +48,7 @@ import {
   createPost,
   deletePost,
   fillFromReserve,
+  rejectAndRefill,
   getPost,
   isDate,
   listPillars,
@@ -67,6 +68,11 @@ import {
 import { bookOutline, listCatalogBooks, SOURCE_LINE_KINDS } from "./lmsCatalog";
 import { importFacebookCsv, matchPublished, plannerPostStats } from "./plannerStats";
 import { exportWeekPack, planWeekPack, showDir } from "./weekPack";
+import { batchJob, dropUnwrittenIdeas, estimateBatch, startBatch } from "./planWeek";
+import { checkPost, reviewPosts } from "./planReview";
+import { pickPhoto, photoStock, stockPhotoPath } from "./photoPicker";
+import { latestScoutNotes, SCOUT_TOPICS, scoutRunning, startScout } from "./scout";
+import { aiCallCounts, cliVersion } from "./ai/cli";
 import { facebookPostingOn } from "./distribution";
 
 const app = express();
@@ -1138,6 +1144,122 @@ app.post("/api/planner/stats/match", (_req, res) => {
     res.json(matchPublished());
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// --- Planner: Claude + Grok batch, auto-approval, photos (docs/16 §2, §10.1, P4) ---
+
+const fail400 = (res: express.Response, err: unknown) => res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+const batchRange = (q: Record<string, unknown>) => {
+  if (!isDate(q.from) || !isDate(q.to) || q.to < q.from) throw new Error("from and to must be YYYY-MM-DD, from <= to");
+  if (addDays(q.from, 31) < q.to) throw new Error("A batch covers at most 31 days");
+  return { from: q.from, to: q.to };
+};
+
+/** Claude Code / Grok CLI availability and calls in the last 7 days. */
+app.get("/api/planner/ai", (_req, res) => {
+  res.json({ claude: cliVersion("claude"), grok: cliVersion("grok"), calls: aiCallCounts() });
+});
+
+app.get("/api/planner/batch/estimate", (req, res) => {
+  try {
+    const { from, to } = batchRange(req.query);
+    res.json(estimateBatch(from, to, req.query.scout === "1"));
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+app.get("/api/planner/batch", (_req, res) => {
+  res.json(batchJob());
+});
+
+/** { from, to, scout?, limit? } → starts the batch in the background; poll GET /api/planner/batch. */
+app.post("/api/planner/batch", (req, res) => {
+  try {
+    const { from, to } = batchRange(req.body ?? {});
+    const limit = req.body?.limit === undefined || req.body?.limit === null ? undefined : Number(req.body.limit);
+    if (limit !== undefined && (!Number.isInteger(limit) || limit < 0)) throw new Error("limit must be a whole number");
+    res.json(startBatch(from, to, { scout: req.body?.scout === true, limit }));
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+app.post("/api/planner/batch/cleanup", (req, res) => {
+  try {
+    const { from, to } = batchRange(req.body ?? {});
+    res.json({ removed: dropUnwrittenIdeas(from, to) });
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+app.get("/api/planner/scout", (_req, res) => {
+  res.json({ notes: latestScoutNotes(30), topics: Object.entries(SCOUT_TOPICS).map(([id, t]) => ({ id, label: t.label })), running: scoutRunning() });
+});
+
+/** { topics? } → starts one Grok call per topic in the background (a few minutes each); poll GET /api/planner/scout. */
+app.post("/api/planner/scout", (req, res) => {
+  try {
+    const topics: unknown = req.body?.topics;
+    if (topics !== undefined && (!Array.isArray(topics) || !topics.every((t) => typeof t === "string" && t in SCOUT_TOPICS))) throw new Error("Unknown topic");
+    startScout(topics as string[] | undefined);
+    res.json({ running: scoutRunning() });
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+app.get("/api/planner/photos", (_req, res) => {
+  try {
+    res.json(photoStock());
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+/** ?subject&book&date&post → a free stock photo (relative to stock-images/) or null. */
+app.get("/api/planner/photo-pick", (req, res) => {
+  try {
+    const cur = typeof req.query.current === "string" ? [req.query.current] : [];
+    res.json({ photo: pickPhoto(qStr(req.query.subject), qStr(req.query.book), qDate(req.query.date), { exclude: cur }) });
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+app.get("/api/planner/stock-image", (req, res) => {
+  const abs = typeof req.query.path === "string" ? stockPhotoPath(req.query.path) : null;
+  if (!abs) return res.status(404).json({ error: "Not a photo in stock-images/" });
+  res.sendFile(abs);
+});
+
+/** Code checks only, no AI call. */
+app.get("/api/planner/posts/:id/check", (req, res) => {
+  try {
+    res.json(checkPost(req.params.id));
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+/** Review a drafted post again (code checks + one critic call) after an edit. */
+app.post("/api/planner/posts/:id/review", async (req, res) => {
+  try {
+    await reviewPosts([req.params.id]);
+    res.json(getPost(req.params.id));
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+/** { reason } → rejected (reason kept for next week's drafts) + a ready reserve post moved into its slot. */
+app.post("/api/planner/posts/:id/reject", (req, res) => {
+  try {
+    res.json(rejectAndRefill(req.params.id, String(req.body?.reason ?? "")));
+  } catch (err) {
+    fail400(res, err);
   }
 });
 

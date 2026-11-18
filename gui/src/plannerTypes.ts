@@ -62,6 +62,8 @@ export interface PlannerPost {
   notes: string;
   /** The Facebook post it went out as, once matched from the stats (P3). */
   remoteId: string | null;
+  /** The last auto-approval review (P4). */
+  review: PostReview | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -206,4 +208,66 @@ export interface CsvImportResult {
   known: number;
   skipped: number;
   match: MatchResult;
+}
+
+// --- Claude + Grok batch, auto-approval, photos (P4) ---
+
+export interface PostReview {
+  at: string;
+  checks: { id: string; label: string; ok: boolean; detail?: string }[];
+  scores: { hook: number; sinhala: number; accuracy: number; rules: number } | null;
+  criticNotes: string;
+  needsOwner: string[];
+  grokNote?: string;
+  approved: boolean;
+}
+
+export interface BatchEstimate {
+  from: string;
+  to: string;
+  slots: number;
+  claudeCalls: number;
+  grokCalls: number;
+  byPillar: Record<string, number>;
+}
+
+export interface BatchJob {
+  id: string;
+  from: string;
+  to: string;
+  state: "running" | "done" | "failed";
+  startedAt: string;
+  finishedAt: string | null;
+  log: string[];
+  created: number;
+  drafted: number;
+  approved: number;
+  needsYou: number;
+  error: string | null;
+}
+
+export interface ScoutNote {
+  id: string;
+  topic: string;
+  at: string;
+  text: string;
+}
+
+export interface ScoutView {
+  notes: ScoutNote[];
+  topics: { id: string; label: string }[];
+  running: { startedAt: string; log: string[] } | null;
+}
+
+export interface PhotoStock {
+  folder: string;
+  total: number;
+  free: number;
+  low: boolean;
+}
+
+export interface AiInfo {
+  claude: { ok: boolean; version?: string; error?: string };
+  grok: { ok: boolean; version?: string; error?: string };
+  calls: { tool: string; calls: number; failed: number }[];
 }

@@ -12,9 +12,11 @@ import {
   type PlannerSlot,
   type PlannerView,
   type PostStatus,
+  type PostReview,
 } from "../plannerTypes";
 import { SourcePicker } from "./PlannerSource";
 import { WeekPack } from "./PlannerWeekPack";
+import { Batch } from "./PlannerBatch";
 
 /**
  * Planner: every social post on one calendar (docs/16-social-content-pipeline.md
@@ -50,7 +52,7 @@ function dayLabel(date: string): { weekday: string; day: string } {
   };
 }
 
-type Tab = "calendar" | "reserve" | "pack" | "pillars" | "slots";
+type Tab = "calendar" | "reserve" | "batch" | "pack" | "pillars" | "slots";
 
 type Editing = { post: PlannerPostInput & { id?: string } } | null;
 
@@ -105,9 +107,9 @@ export function Planner() {
       <div className="planner-head">
         <h1>Planner</h1>
         <div className="segmented">
-          {(["calendar", "reserve", "pack", "pillars", "slots"] as Tab[]).map((t) => (
+          {(["calendar", "reserve", "batch", "pack", "pillars", "slots"] as Tab[]).map((t) => (
             <button key={t} type="button" className={tab === t ? "active" : ""} onClick={() => setTab(t)}>
-              {t === "calendar" ? "Calendar" : t === "reserve" ? `Reserve (${view.reserve.length})` : t === "pack" ? "Week pack & stats" : t === "pillars" ? "Pillars" : "Slots"}
+              {t === "calendar" ? "Calendar" : t === "reserve" ? `Reserve (${view.reserve.length})` : t === "batch" ? "Weekly batch" : t === "pack" ? "Week pack & stats" : t === "pillars" ? "Pillars" : "Slots"}
             </button>
           ))}
         </div>
@@ -213,6 +215,7 @@ export function Planner() {
         </div>
       )}
 
+      {tab === "batch" && <Batch view={view} onChanged={() => reload()} onOpen={(p) => setEditing({ post: p })} />}
       {tab === "pack" && <WeekPack view={view} onChanged={() => reload()} />}
       {tab === "pillars" && <PillarsEditor pillars={view.pillars} slots={view.slots} onSaved={() => reload()} onError={setError} />}
       {tab === "slots" && <SlotsEditor slots={view.slots} onSaved={() => reload()} onError={setError} />}
@@ -340,6 +343,7 @@ function PostEditor({ initial, view, onClose, onSaved }: { initial: PlannerPostI
   });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [review, setReview] = useState<PostReview | null>(initial.review ?? null);
   const isNew = !post.id;
   const pillar = view.pillars.find((p) => p.id === post.pillarId);
 
@@ -383,7 +387,48 @@ function PostEditor({ initial, view, onClose, onSaved }: { initial: PlannerPostI
   async function reject() {
     const reason = prompt("Why is this post rejected? (Claude reads this when it writes the next week)", post.statusReason ?? "");
     if (reason === null) return;
-    await save({ status: "rejected", statusReason: reason });
+    if (!post.id) return;
+    setBusy(true);
+    setError(null);
+    try {
+      // Rejecting moves a ready reserve post into the slot (docs/16 §10.1).
+      await api.rejectPost(post.id, reason);
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reviewAgain() {
+    if (!post.id) return;
+    setBusy(true);
+    setError(null);
+    try {
+      // Save the edits first, then the code checks + one critic call.
+      const { id, ...body } = post;
+      await api.updatePlannerPost(id!, body);
+      const r = await api.reviewPost(id!);
+      setPost((cur) => ({ ...cur, status: r.status, statusReason: r.statusReason }));
+      setReview(r.review);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function pickPhoto() {
+    const subject = view.pillars.find((p) => p.id === post.pillarId)?.subject ?? view.books.find((b) => b.slug === post.book)?.subject ?? "";
+    if (!subject) return setError("Pick a pillar or book first");
+    try {
+      const r = await api.photoPick({ subject, book: post.book ?? "", date: post.reserve ? null : (post.date ?? null), current: post.photo || undefined });
+      if (r.photo) set("photo", r.photo);
+      else setError("No free photo in this book's folder or its _shared folder: download some into stock-images/");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
   }
 
   async function remove() {
@@ -543,13 +588,50 @@ function PostEditor({ initial, view, onClose, onSaved }: { initial: PlannerPostI
         <div className="planner-editor-row">
           <div className="field">
             <label>Background photo (in stock-images/)</label>
-            <input type="text" value={post.photo ?? ""} placeholder="japanese/_shared/places/…jpg" onChange={(e) => set("photo", e.target.value)} />
+            <div className="planner-photo-row">
+              <input type="text" value={post.photo ?? ""} placeholder="japanese/_shared/places/…jpg" onChange={(e) => set("photo", e.target.value)} />
+              <button type="button" className="secondary" onClick={pickPhoto} title="A free photo from the book's folder, then _shared (not used in the last 30 days)">
+                Pick
+              </button>
+            </div>
+            {post.photo && <img className="planner-photo-preview" src={api.stockImageUrl(post.photo)} alt="" onError={(e) => (e.currentTarget.style.display = "none")} />}
           </div>
           <div className="field">
             <label>Rendered file</label>
             <input type="text" value={post.mediaPath ?? ""} placeholder="output/…" onChange={(e) => set("mediaPath", e.target.value)} />
           </div>
         </div>
+        {(review || post.status === "drafted") && post.id && (
+          <div className={`planner-review${review?.approved ? " is-approved" : ""}`}>
+            <div className="planner-fb-head">
+              <strong>{review ? (review.approved ? "Auto-approved" : "Review: needs you") : "Not reviewed yet"}</strong>
+              {review?.scores && (
+                <span className="hint">
+                  hook {review.scores.hook} · Sinhala {review.scores.sinhala} · accuracy {review.scores.accuracy} · rules {review.scores.rules}
+                </span>
+              )}
+              {post.status === "drafted" && (
+                <button type="button" className="link-button" onClick={reviewAgain} disabled={busy} title="Saves your edits, then runs the checks and one Claude critic call">
+                  {busy ? "reviewing…" : "save & review again"}
+                </button>
+              )}
+            </div>
+            {review && (
+              <>
+                {review.needsOwner.length > 0 && <p className="planner-review-owner">Needs you: {review.needsOwner.join("; ")}</p>}
+                <ul className="planner-review-checks">
+                  {review.checks.map((c) => (
+                    <li key={c.id} className={c.ok ? "ok" : "bad"}>
+                      {c.ok ? "✓" : "✗"} {c.label}
+                      {c.detail && <span className="hint"> · {c.detail}</span>}
+                    </li>
+                  ))}
+                </ul>
+                {review.criticNotes && <p className="hint">Critic: {review.criticNotes}</p>}
+              </>
+            )}
+          </div>
+        )}
         {post.remoteId && (
           <div className="planner-fb">
             <div className="planner-fb-head">

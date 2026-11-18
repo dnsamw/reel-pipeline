@@ -34,6 +34,11 @@ import type {
   CsvImportResult,
   MatchResult,
   PackPlan,
+  AiInfo,
+  BatchEstimate,
+  BatchJob,
+  PhotoStock,
+  ScoutView,
   Pillar,
   PlannerPost,
   PlannerPostInput,
@@ -334,6 +339,25 @@ export const api = {
   markScheduled: (ids: string[]) => request<{ scheduled: number }>("/planner/mark-scheduled", { method: "POST", body: JSON.stringify({ ids }) }),
   importStatsCsv: (csv: string) => request<CsvImportResult>("/planner/stats/import", { method: "POST", headers: { "Content-Type": "text/csv" }, body: csv }),
   matchStats: () => request<MatchResult>("/planner/stats/match", { method: "POST" }),
+  plannerAi: () => request<AiInfo>("/planner/ai"),
+  batchEstimate: (from: string, to: string, scout: boolean) =>
+    request<BatchEstimate>(`/planner/batch/estimate?${new URLSearchParams({ from, to, scout: scout ? "1" : "0" })}`),
+  batchStatus: () => request<BatchJob | null>("/planner/batch"),
+  startBatch: (body: { from: string; to: string; scout: boolean; limit?: number }) => request<BatchJob>("/planner/batch", { method: "POST", body: JSON.stringify(body) }),
+  batchCleanup: (from: string, to: string) => request<{ removed: number }>("/planner/batch/cleanup", { method: "POST", body: JSON.stringify({ from, to }) }),
+  scout: () => request<ScoutView>("/planner/scout"),
+  startScout: (topics?: string[]) => request<{ running: ScoutView["running"] }>("/planner/scout", { method: "POST", body: JSON.stringify({ topics }) }),
+  photoStock: () => request<PhotoStock[]>("/planner/photos"),
+  photoPick: (q: { subject: string; book: string; date: string | null; current?: string }) => {
+    const p = new URLSearchParams({ subject: q.subject, book: q.book });
+    if (q.date) p.set("date", q.date);
+    if (q.current) p.set("current", q.current);
+    return request<{ photo: string | null }>(`/planner/photo-pick?${p}`);
+  },
+  stockImageUrl: (path: string) => `/api/planner/stock-image?${new URLSearchParams({ path })}`,
+  reviewPost: (id: string) => request<PlannerPost>(`/planner/posts/${encodeURIComponent(id)}/review`, { method: "POST" }),
+  rejectPost: (id: string, reason: string) =>
+    request<{ rejected: PlannerPost; filled: PlannerPost | null }>(`/planner/posts/${encodeURIComponent(id)}/reject`, { method: "POST", body: JSON.stringify({ reason }) }),
   plannerSource: (book: string) => request<BookOutline>(`/planner/source/${encodeURIComponent(book)}`),
   plannerSourceLines: (book: string, unit: string, date: string | null, postId?: string) => {
     const q = new URLSearchParams({ unit });

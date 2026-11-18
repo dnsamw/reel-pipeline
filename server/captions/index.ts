@@ -73,7 +73,7 @@ export async function suggestCaptions(req: SuggestRequest): Promise<CaptionSugge
 
   let fallbackReason: string;
   if (!aiStatus().available) {
-    fallbackReason = "No AI key is set, so these are the built-in suggestions.";
+    fallbackReason = "AI isn't available (Claude Code not found), so these are the built-in suggestions.";
   } else {
     try {
       const captions: Partial<Record<CaptionPlatform, PlatformCaption>> = await aiCaptions(ctx, req.platforms, req.options, ctaUrl);
