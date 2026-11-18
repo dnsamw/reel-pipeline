@@ -29,6 +29,7 @@ import type {
   TemplateRecord,
   VideoSpec,
 } from "./types";
+import type { Pillar, PlannerPost, PlannerPostInput, PlannerSlot, PlannerView } from "./plannerTypes";
 
 export interface AdRenderBody {
   templateId: string;
@@ -297,4 +298,22 @@ export const api = {
     }
     return { blob: await res.blob(), savedPath: res.headers.get("X-Saved-Path") ?? "" };
   },
+
+  // --- Planner (docs/16) ---
+  planner: (from?: string, to?: string) => {
+    const q = new URLSearchParams();
+    if (from) q.set("from", from);
+    if (to) q.set("to", to);
+    return request<PlannerView>(`/planner${q.size ? `?${q}` : ""}`);
+  },
+  createPlannerPost: (body: PlannerPostInput) => request<PlannerPost>("/planner/posts", { method: "POST", body: JSON.stringify(body) }),
+  updatePlannerPost: (id: string, body: PlannerPostInput) =>
+    request<PlannerPost>(`/planner/posts/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(body) }),
+  deletePlannerPost: (id: string) => request<void>(`/planner/posts/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  fillFromReserve: (id: string, date: string, slotId: string) =>
+    request<PlannerPost>(`/planner/posts/${encodeURIComponent(id)}/fill`, { method: "POST", body: JSON.stringify({ date, slotId }) }),
+  savePillar: (id: string, body: Partial<Pillar>) =>
+    request<Pillar>(`/planner/pillars/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(body) }),
+  saveSlot: (id: string, body: Partial<PlannerSlot>) =>
+    request<PlannerSlot>(`/planner/slots/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(body) }),
 };

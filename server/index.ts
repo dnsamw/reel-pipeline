@@ -43,6 +43,25 @@ import { listLibrary, deleteLibraryItems, resetManifest, pruneManifest } from ".
 import { aiStatus, suggestCaptions } from "./captions";
 import { askAi, getOverview, getReport, linkTikTok, listReports, recentTikTokVideos, refreshStats, startAiReport, startInsightsScheduler } from "./analytics";
 import type { CaptionContext, CaptionMeta, CaptionPlatform, CaptionTone } from "../src/captions/types";
+import {
+  addDays,
+  createPost,
+  deletePost,
+  fillFromReserve,
+  isDate,
+  listPillars,
+  listPosts,
+  listReserve,
+  listSlots,
+  pillarMix,
+  savePillar,
+  saveSlot,
+  STOCK_TARGET_DAYS,
+  stockLevel,
+  todaySriLanka,
+  updatePost,
+} from "./planner";
+import { listCatalogBooks } from "./lmsCatalog";
 
 const app = express();
 app.use(cors());
@@ -978,6 +997,76 @@ app.post("/api/youtube/disconnect", (_req, res) => {
 app.post("/api/instagram/disconnect", (_req, res) => {
   disconnectInstagram();
   res.status(204).end();
+});
+
+// --- Planner (docs/16-social-content-pipeline.md in studypal-lms) ---
+
+app.get("/api/planner", (req, res) => {
+  try {
+    const today = todaySriLanka();
+    const from = isDate(req.query.from) ? req.query.from : today;
+    const to = isDate(req.query.to) ? req.query.to : addDays(from, STOCK_TARGET_DAYS - 1);
+    res.json({
+      today,
+      from,
+      to,
+      slots: listSlots(),
+      pillars: listPillars(),
+      posts: listPosts(from, to),
+      reserve: listReserve(),
+      stock: stockLevel(today),
+      mix: pillarMix(from, to),
+      books: listCatalogBooks(),
+    });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+app.post("/api/planner/posts", (req, res) => {
+  try {
+    res.json(createPost(req.body ?? {}));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.put("/api/planner/posts/:id", (req, res) => {
+  try {
+    res.json(updatePost(req.params.id, req.body ?? {}));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.delete("/api/planner/posts/:id", (req, res) => {
+  deletePost(req.params.id);
+  res.status(204).end();
+});
+
+app.post("/api/planner/posts/:id/fill", (req, res) => {
+  try {
+    const { date, slotId } = req.body ?? {};
+    res.json(fillFromReserve(req.params.id, date, slotId));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.put("/api/planner/pillars/:id", (req, res) => {
+  try {
+    res.json(savePillar({ ...(req.body ?? {}), id: req.params.id }));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.put("/api/planner/slots/:id", (req, res) => {
+  try {
+    res.json(saveSlot({ ...(req.body ?? {}), id: req.params.id }));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
 });
 
 // Last-resort safety net - catches anything that slips past a route's own

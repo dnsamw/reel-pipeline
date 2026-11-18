@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import {
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
   Clapperboard,
@@ -33,6 +34,7 @@ import { PostCreator } from "./pages/PostCreator";
 import { AdCreator } from "./pages/AdCreator";
 import { MediaLibrary } from "./pages/MediaLibrary";
 import { Insights } from "./pages/Insights";
+import { Planner } from "./pages/Planner";
 
 const SIDEBAR_COLLAPSED_KEY = "studypal-reels:sidebar-collapsed"; // key kept from the old name so the saved state survives the rename
 
@@ -48,6 +50,7 @@ function readCollapsed(): boolean {
 // hide when the sidebar is collapsed (a divider remains).
 const NAV_SECTIONS = [
   { title: null, items: [{ to: "/", end: true, icon: LayoutDashboard, label: "Monitor" }] },
+  { title: "Plan", items: [{ to: "/planner", end: false, icon: CalendarDays, label: "Planner" }] },
   {
     title: "Reels",
     items: [
@@ -156,6 +159,7 @@ export function App() {
           <Route path="/ad-creator" element={<AdCreator />} />
           <Route path="/library" element={<MediaLibrary />} />
           <Route path="/insights" element={<Insights />} />
+          <Route path="/planner" element={<Planner />} />
           <Route path="/recipes/new" element={<RecipeEditor />} />
           <Route path="/recipes/:id" element={<RecipeEditor />} />
           <Route path="/video-spec" element={<VideoSpecPage />} />
