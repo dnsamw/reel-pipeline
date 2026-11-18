@@ -58,10 +58,12 @@ import {
   saveSlot,
   STOCK_TARGET_DAYS,
   stockLevel,
+  suggestSource,
   todaySriLanka,
+  unitLinesWithUse,
   updatePost,
 } from "./planner";
-import { listCatalogBooks } from "./lmsCatalog";
+import { bookOutline, listCatalogBooks, SOURCE_LINE_KINDS } from "./lmsCatalog";
 
 const app = express();
 app.use(cors());
@@ -1066,6 +1068,41 @@ app.put("/api/planner/slots/:id", (req, res) => {
     res.json(saveSlot({ ...(req.body ?? {}), id: req.params.id }));
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// --- Planner: book content as post source (docs/16 §4, P2) ---
+
+const errMsg = (err: unknown) => (err instanceof Error ? err.message : String(err));
+const qDate = (v: unknown) => (isDate(v) ? v : null);
+const qStr = (v: unknown) => (typeof v === "string" ? v : "");
+
+app.get("/api/planner/source/:book", (req, res) => {
+  try {
+    res.json(bookOutline(req.params.book));
+  } catch (err) {
+    res.status(404).json({ error: errMsg(err) });
+  }
+});
+
+/** ?unit=4-a-1&date=YYYY-MM-DD&post=<id being edited> → lines, each with the post that already uses it. */
+app.get("/api/planner/source/:book/lines", (req, res) => {
+  try {
+    res.json(unitLinesWithUse(req.params.book, qStr(req.query.unit), qDate(req.query.date), qStr(req.query.post)));
+  } catch (err) {
+    res.status(400).json({ error: errMsg(err) });
+  }
+});
+
+/** ?date&count&post&kind → { book, unit, unitTitle, free, lines } of unused lines, or null when the book is used up. */
+app.get("/api/planner/source/:book/suggest", (req, res) => {
+  try {
+    res.json(suggestSource(req.params.book, qDate(req.query.date), Number(req.query.count) || 5, {
+        excludePostId: qStr(req.query.post),
+        kind: SOURCE_LINE_KINDS.find((k) => k === req.query.kind),
+      }));
+  } catch (err) {
+    res.status(400).json({ error: errMsg(err) });
   }
 });
 

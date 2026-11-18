@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { db } from "./db";
+import { bookOutline, type SourceLine, type SourceLineKind, unitLines } from "./lmsCatalog";
 
 /**
  * The Planner (studypal-lms/docs/16-social-content-pipeline.md): one row per
@@ -64,6 +65,17 @@ export interface Pillar {
   active: boolean;
 }
 
+/** The book lines a post uses. Each line keeps its text, so the repeat guard works across export versions. */
+export interface PostSource {
+  book?: string;
+  /** Section key or grammar lesson slug. */
+  unit?: string;
+  unitTitle?: string;
+  /** The unit is free in the app (good for "try it" links). */
+  free?: boolean;
+  lines?: { id: string; text: string }[];
+}
+
 export interface PlannerPost {
   id: string;
   /** null = an evergreen reserve post with no day yet (docs/16 §7). */
@@ -81,8 +93,8 @@ export interface PlannerPost {
   photo: string;
   /** Rendered media file (absolute or repo-relative path). */
   mediaPath: string;
-  /** Where the content lines came from: { book, section, phraseIds… }. */
-  source: Record<string, unknown>;
+  /** Where the content lines came from (docs/16 §4); `{}` for posts made by hand. */
+  source: PostSource;
   status: PostStatus;
   /** Why it is not approved / was rejected / failed. */
   statusReason: string;
@@ -329,6 +341,9 @@ function validate(p: PlannerPost): void {
   }
   if (p.pillarId && !listPillars().some((x) => x.id === p.pillarId)) throw new Error(`Unknown pillar "${p.pillarId}"`);
   if (NEEDS_MEDIA.includes(p.status) && !p.mediaPath.trim()) throw new Error(`A ${p.status} post needs its media file`);
+  const lines = p.source.lines;
+  if (lines !== undefined && (!Array.isArray(lines) || lines.some((l) => !l || typeof l.id !== "string" || typeof l.text !== "string")))
+    throw new Error("source.lines must be a list of { id, text }");
 }
 
 function logEvent(postId: string, from: PostStatus | null, to: PostStatus, reason: string, by: string): void {
@@ -375,6 +390,7 @@ export function createPost(input: PostInput, by = "owner"): PlannerPost {
     updatedAt: now,
   };
   validate(p);
+  guardRepeats(p);
   write(p);
   logEvent(p.id, null, p.status, p.statusReason, by);
   return p;
@@ -399,9 +415,119 @@ export function updatePost(id: string, input: PostInput, by = "owner"): PlannerP
   // An owner edit of an auto-approved post makes it the owner's post.
   if (by === "owner" && next.status !== cur.status) next.autoApproved = false;
   validate(next);
+  // Only re-check repeats when what is checked changed, so an old post can still be edited.
+  const lineKey = (x: PlannerPost) => sourceTexts(x).join("\n");
+  if (next.date !== cur.date || next.reserve !== cur.reserve || next.photo !== cur.photo || lineKey(next) !== lineKey(cur) || (cur.status === "rejected" && next.status !== "rejected"))
+    guardRepeats(next);
   write(next);
   if (next.status !== cur.status) logEvent(id, cur.status, next.status, next.statusReason, by);
   return next;
+}
+
+// --- Repeat guard (docs/16 §3, §4) ---
+
+/** A book line is not used again within this many days (before or after). */
+export const LINE_REPEAT_DAYS = 90;
+/** A background photo is not used again within this many days. */
+export const PHOTO_REPEAT_DAYS = 30;
+
+/** Case, spacing and punctuation don't make a line new. */
+export const normLine = (s: string): string => s.normalize("NFC").toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, " ").trim();
+
+const sourceTexts = (p: Pick<PlannerPost, "source">): string[] => (p.source.lines ?? []).map((l) => normLine(l.text)).filter(Boolean);
+
+export interface Repeat {
+  kind: "line" | "photo";
+  /** The repeated line text or photo path. */
+  value: string;
+  postId: string;
+  date: string | null;
+  slotId: string | null;
+  title: string;
+}
+
+/**
+ * Other posts that already use these lines / this photo inside the window.
+ * Rejected posts don't count; reserve posts always count (they will go out
+ * some day). A reserve post is checked as if it went out today.
+ */
+export function findRepeats(
+  p: { id?: string; date: string | null; source: PostSource; photo?: string },
+  today = todaySriLanka(),
+): Repeat[] {
+  const at = p.date ?? today;
+  const texts = new Set(sourceTexts(p));
+  const photo = (p.photo ?? "").trim();
+  if (texts.size === 0 && !photo) return [];
+  const rows = db
+    .prepare("SELECT * FROM planner_posts WHERE id != ? AND status != 'rejected' AND (date IS NULL OR (date >= ? AND date <= ?))")
+    .all(p.id ?? "", addDays(at, -LINE_REPEAT_DAYS), addDays(at, LINE_REPEAT_DAYS)) as PostRow[];
+  const photoFrom = addDays(at, -PHOTO_REPEAT_DAYS);
+  const photoTo = addDays(at, PHOTO_REPEAT_DAYS);
+  const out: Repeat[] = [];
+  for (const o of rows.map(toPost)) {
+    const where = { postId: o.id, date: o.date, slotId: o.slotId, title: o.title };
+    for (const l of o.source.lines ?? []) if (texts.has(normLine(l.text))) out.push({ kind: "line", value: l.text, ...where });
+    if (photo && o.photo.trim() === photo && (o.date === null || (o.date >= photoFrom && o.date <= photoTo)))
+      out.push({ kind: "photo", value: photo, ...where });
+  }
+  return out;
+}
+
+const describeRepeat = (r: Repeat): string =>
+  `${r.kind === "line" ? `"${r.value.length > 60 ? `${r.value.slice(0, 57)}...` : r.value}"` : `Photo ${r.value}`} is already in ${
+    r.date ? `the ${r.date} ${r.slotId ?? ""} post` : "a reserve post"
+  }${r.title ? ` ("${r.title}")` : ""}`;
+
+function guardRepeats(p: PlannerPost): void {
+  if (p.status === "rejected") return;
+  const reps = findRepeats(p);
+  if (reps.length === 0) return;
+  const more = reps.length > 3 ? ` (+${reps.length - 3} more)` : "";
+  throw new Error(
+    `Repeat: ${reps.slice(0, 3).map(describeRepeat).join("; ")}${more}. Lines wait ${LINE_REPEAT_DAYS} days, photos ${PHOTO_REPEAT_DAYS} days.`,
+  );
+}
+
+/** A unit's lines, each with the post that already uses it in the window (if any). */
+export function unitLinesWithUse(book: string, unit: string, date: string | null, excludePostId = ""): (SourceLine & { usedBy: Repeat | null })[] {
+  const lines = unitLines(book, unit);
+  const reps = findRepeats({ id: excludePostId, date, source: { lines: lines.map((l) => ({ id: l.id, text: l.text })) } });
+  const byText = new Map(reps.map((r) => [normLine(r.value), r]));
+  return lines.map((l) => ({ ...l, usedBy: byText.get(normLine(l.text)) ?? null }));
+}
+
+export interface SourcePick {
+  book: string;
+  unit: string;
+  unitTitle: string;
+  free: boolean;
+  lines: SourceLine[];
+}
+
+/**
+ * "Pick for me": `count` unused lines from one unit of the book. Free units
+ * first (people can open them before buying), then the rest in random order.
+ * `kind` keeps only one kind of line (e.g. "mistake" for a grammar post).
+ */
+export function suggestSource(
+  book: string,
+  date: string | null,
+  count: number,
+  opts: { excludePostId?: string; kind?: SourceLineKind; random?: () => number } = {},
+): SourcePick | null {
+  const { excludePostId = "", kind, random = Math.random } = opts;
+  const units = bookOutline(book).groups.flatMap((g) => g.units);
+  const shuffled = units.map((u) => ({ u, r: random() })).sort((a, b) => Number(b.u.free) - Number(a.u.free) || a.r - b.r).map((x) => x.u);
+  const n = Math.max(1, Math.min(50, Math.floor(count)));
+  for (const u of shuffled) {
+    if (u.count !== null && u.count < n) continue;
+    const unused = unitLinesWithUse(book, u.id, date, excludePostId).filter((l) => !l.usedBy && (!kind || l.kind === kind));
+    if (unused.length < n) continue;
+    const lines = unused.slice(0, n).map(({ usedBy: _u, ...l }) => l);
+    return { book, unit: u.id, unitTitle: u.title, free: u.free, lines };
+  }
+  return null;
 }
 
 export function deletePost(id: string): void {

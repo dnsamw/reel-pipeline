@@ -13,6 +13,7 @@ import {
   type PlannerView,
   type PostStatus,
 } from "../plannerTypes";
+import { SourcePicker } from "./PlannerSource";
 
 /**
  * Planner: every social post on one calendar (docs/16-social-content-pipeline.md
@@ -305,6 +306,7 @@ function PostChip({ post, pillar, onClick }: { post: PlannerPost; pillar?: Pilla
       <span className="planner-chip-title">{post.title || post.hook || "(untitled)"}</span>
       <span className="planner-chip-meta">
         {pillar?.name ?? "No pillar"} · {post.kind}
+        {post.source.lines?.length ? ` · ${post.source.lines.length} lines` : ""}
       </span>
       <span className="planner-chip-badges">
         <span className={`badge planner-badge-${post.status}`}>{STATUS_LABEL[post.status]}</span>
@@ -312,6 +314,11 @@ function PostChip({ post, pillar, onClick }: { post: PlannerPost; pillar?: Pilla
       </span>
     </button>
   );
+}
+
+/** Changing the book drops lines picked from another book. */
+function withBook<T extends PlannerPostInput>(cur: T, book: string): T {
+  return { ...cur, book, source: cur.source?.book && cur.source.book !== book ? {} : (cur.source ?? {}) };
 }
 
 function PostEditor({ initial, view, onClose, onSaved }: { initial: PlannerPostInput & { id?: string }; view: PlannerView; onClose: () => void; onSaved: () => void }) {
@@ -325,6 +332,7 @@ function PostEditor({ initial, view, onClose, onSaved }: { initial: PlannerPostI
     notes: "",
     statusReason: "",
     pillarId: null,
+    source: {},
     ...initial,
   });
   const [error, setError] = useState<string | null>(null);
@@ -471,7 +479,7 @@ function PostEditor({ initial, view, onClose, onSaved }: { initial: PlannerPostI
               onChange={(e) => {
                 const next = view.pillars.find((p) => p.id === e.target.value);
                 // A one-book pillar (Working Abroad, Travel, monk) fills in its book.
-                setPost((cur) => ({ ...cur, pillarId: next?.id ?? null, book: next?.books.length === 1 ? next.books[0] : cur.book }));
+                setPost((cur) => withBook({ ...cur, pillarId: next?.id ?? null }, next?.books.length === 1 ? next.books[0] : (cur.book ?? "")));
               }}
             >
               <option value="">—</option>
@@ -486,7 +494,7 @@ function PostEditor({ initial, view, onClose, onSaved }: { initial: PlannerPostI
           </div>
           <div className="field">
             <label>Book</label>
-            <select value={post.book ?? ""} onChange={(e) => set("book", e.target.value)}>
+            <select value={post.book ?? ""} onChange={(e) => setPost((cur) => withBook(cur, e.target.value))}>
               <option value="">— (brand / any)</option>
               {books.map((b) => (
                 <option key={b.slug} value={b.slug}>
@@ -507,6 +515,15 @@ function PostEditor({ initial, view, onClose, onSaved }: { initial: PlannerPostI
           </div>
         </div>
         {pillar?.note && <p className="hint">{pillar.note}</p>}
+
+        <SourcePicker
+          book={post.book ?? ""}
+          date={post.reserve ? null : (post.date ?? null)}
+          postId={post.id}
+          source={post.source ?? {}}
+          // An empty title takes the unit title, so the calendar shows what the post is about.
+          onChange={(source) => setPost((cur) => ({ ...cur, source, title: cur.title || source.unitTitle || "" }))}
+        />
 
         <div className="field">
           <label>Title (for this list only)</label>

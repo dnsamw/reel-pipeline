@@ -33,6 +33,15 @@ export interface Pillar {
   active: boolean;
 }
 
+/** The book lines a post uses (server/planner.ts PostSource). */
+export interface PostSource {
+  book?: string;
+  unit?: string;
+  unitTitle?: string;
+  free?: boolean;
+  lines?: { id: string; text: string }[];
+}
+
 export interface PlannerPost {
   id: string;
   date: string | null;
@@ -46,7 +55,7 @@ export interface PlannerPost {
   caption: string;
   photo: string;
   mediaPath: string;
-  source: Record<string, unknown>;
+  source: PostSource;
   status: PostStatus;
   statusReason: string;
   autoApproved: boolean;
@@ -88,3 +97,51 @@ export interface PlannerView {
 }
 
 export type PlannerPostInput = Partial<Omit<PlannerPost, "id" | "createdAt" | "updatedAt" | "autoApproved">>;
+
+// --- Book content as post source (server/lmsCatalog.ts, P2) ---
+
+export interface SourceUnit {
+  id: string;
+  title: string;
+  titleSi: string;
+  free: boolean;
+  count: number | null;
+}
+
+export interface BookOutline {
+  book: CatalogBook;
+  groups: { id: string; title: string; units: SourceUnit[] }[];
+}
+
+export const SOURCE_LINE_KINDS = ["phrase", "mistake", "example", "hook", "tip"] as const;
+export type SourceLineKind = (typeof SOURCE_LINE_KINDS)[number];
+
+export interface SourceLine {
+  id: string;
+  kind: SourceLineKind;
+  text: string;
+  say: string;
+  meaning: string;
+  note: string;
+  wrong?: string;
+}
+
+/** Another post that already uses a line or photo inside the repeat window. */
+export interface Repeat {
+  kind: "line" | "photo";
+  value: string;
+  postId: string;
+  date: string | null;
+  slotId: string | null;
+  title: string;
+}
+
+export type SourceLineWithUse = SourceLine & { usedBy: Repeat | null };
+
+export interface SourcePick {
+  book: string;
+  unit: string;
+  unitTitle: string;
+  free: boolean;
+  lines: SourceLine[];
+}

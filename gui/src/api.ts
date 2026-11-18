@@ -29,7 +29,17 @@ import type {
   TemplateRecord,
   VideoSpec,
 } from "./types";
-import type { Pillar, PlannerPost, PlannerPostInput, PlannerSlot, PlannerView } from "./plannerTypes";
+import type {
+  BookOutline,
+  Pillar,
+  PlannerPost,
+  PlannerPostInput,
+  PlannerSlot,
+  PlannerView,
+  SourceLineKind,
+  SourceLineWithUse,
+  SourcePick,
+} from "./plannerTypes";
 
 export interface AdRenderBody {
   templateId: string;
@@ -316,4 +326,18 @@ export const api = {
     request<Pillar>(`/planner/pillars/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(body) }),
   saveSlot: (id: string, body: Partial<PlannerSlot>) =>
     request<PlannerSlot>(`/planner/slots/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(body) }),
+  plannerSource: (book: string) => request<BookOutline>(`/planner/source/${encodeURIComponent(book)}`),
+  plannerSourceLines: (book: string, unit: string, date: string | null, postId?: string) => {
+    const q = new URLSearchParams({ unit });
+    if (date) q.set("date", date);
+    if (postId) q.set("post", postId);
+    return request<SourceLineWithUse[]>(`/planner/source/${encodeURIComponent(book)}/lines?${q}`);
+  },
+  plannerSuggest: (book: string, opts: { date: string | null; count: number; postId?: string; kind?: SourceLineKind }) => {
+    const q = new URLSearchParams({ count: String(opts.count) });
+    if (opts.date) q.set("date", opts.date);
+    if (opts.postId) q.set("post", opts.postId);
+    if (opts.kind) q.set("kind", opts.kind);
+    return request<SourcePick | null>(`/planner/source/${encodeURIComponent(book)}/suggest?${q}`);
+  },
 };

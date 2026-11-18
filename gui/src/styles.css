@@ -2861,3 +2861,24 @@ button.posts-more {
   background: var(--surface);
   color: var(--fg);
 }
+
+/* Planner source picker (P2) */
+.planner-source { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--border); border-radius: 10px; padding: 10px; }
+.planner-source > label, .planner-source-head > label { font-weight: 600; font-size: 13px; }
+.planner-source-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.planner-source .hint { margin: 0; }
+.planner-source-pick { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.planner-source-pick input[type="number"] { width: 64px; }
+.planner-source-pick button { display: inline-flex; align-items: center; gap: 4px; }
+.planner-source-lines { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow-y: auto; border-top: 1px solid var(--border); }
+.planner-source-lines li { border-bottom: 1px solid var(--border); }
+.planner-source-lines label { display: flex; gap: 8px; align-items: flex-start; padding: 6px 4px; cursor: pointer; font-size: 13px; }
+.planner-source-lines li.is-picked { background: var(--primary-tint); }
+.planner-source-lines li.is-used { opacity: 0.55; }
+.planner-source-lines li.is-used label { cursor: not-allowed; }
+.planner-source-lines input { margin-top: 3px; }
+.planner-source-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.planner-source-meaning { color: var(--muted); }
+.planner-source-wrong { color: var(--danger); font-size: 12px; }
+.planner-source .text-danger { color: var(--danger); }
+.link-button { background: none; border: none; padding: 0; color: var(--primary); cursor: pointer; font: inherit; text-decoration: underline; }
