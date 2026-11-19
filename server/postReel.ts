@@ -85,23 +85,38 @@ export async function renderPostReel(
   post: { templateId: string; fields: PostFields; lists: PostLists; colors: PostColors; safeZones?: boolean },
   opts: PostReelOptions,
 ): Promise<{ mp4Path: string }> {
+  const musicPath = resolveMusicTrack(opts.musicFile);
+  const { savedPath: pngPath, width, height } = await renderPostPng(post);
+  // Merged with the template defaults - the request may only carry overrides.
+  const colors = { ...getPostTemplate(post.templateId)?.defaultColors, ...post.colors };
+  return encodeStillReel({ pngPath, width, height, background: colors.background ?? "#000000" }, opts, musicPath);
+}
+
+/** Absolute path of a track in assets/music, or null for none - throws for anything outside it or missing. Check before rendering, so a bad track fails fast. */
+export function resolveMusicTrack(musicFile: string | null): string | null {
+  if (!musicFile) return null;
+  const musicPath = resolve(MUSIC_DIR, basename(musicFile));
+  if (!musicPath.startsWith(MUSIC_DIR + sep) || !existsSync(musicPath)) throw new Error(`Music track not found: ${musicFile}`);
+  return musicPath;
+}
+
+/**
+ * Loops one still for `durationSeconds` over the music track into an MP4 next
+ * to the PNG (same name, .mp4). Shared by Post Creator and Ad Creator reels.
+ * `background` fills the letterbox bars when a non-9:16 still is framed as a reel.
+ */
+export async function encodeStillReel(
+  still: { pngPath: string; width: number; height: number; background: string },
+  opts: PostReelOptions,
+  musicPath: string | null,
+): Promise<{ mp4Path: string }> {
   const duration = Math.min(90, Math.max(3, Number(opts.durationSeconds) || 15));
   const volume = Math.min(1, Math.max(0, Number(opts.musicVolume ?? 0.8)));
   const start = Math.max(0, Number(opts.musicStartSeconds) || 0);
-
-  let musicPath: string | null = null;
-  if (opts.musicFile) {
-    musicPath = resolve(MUSIC_DIR, basename(opts.musicFile));
-    if (!musicPath.startsWith(MUSIC_DIR + sep) || !existsSync(musicPath)) throw new Error(`Music track not found: ${opts.musicFile}`);
-  }
-
-  const { savedPath: pngPath, width, height } = await renderPostPng(post);
+  const { pngPath, width, height } = still;
   const mp4Path = pngPath.replace(/\.png$/i, ".mp4");
   const ffmpeg = resolveTool("ffmpeg");
-
-  // Merged with the template defaults - the request may only carry overrides.
-  const colors = { ...getPostTemplate(post.templateId)?.defaultColors, ...post.colors };
-  const bg = (colors.background ?? "#000000").replace(/[^#0-9a-fA-F]/g, "") || "#000000";
+  const bg = still.background.replace(/[^#0-9a-fA-F]/g, "") || "#000000";
   const videoFilter =
     opts.frame === "reel" && width * REEL_H !== height * REEL_W
       ? `scale=${REEL_W}:${REEL_H}:force_original_aspect_ratio=decrease,pad=${REEL_W}:${REEL_H}:(ow-iw)/2:(oh-ih)/2:color=${bg},format=yuv420p`

@@ -24,7 +24,7 @@ function overflows(b: HTMLElement): boolean {
 export function useShrinkToFit(
   box: RefObject<HTMLElement | null>,
   apply: (value: number) => void,
-  { max, min, step }: { max: number; min: number; step: number },
+  { max, min, step, alsoOver }: { max: number; min: number; step: number; alsoOver?: () => boolean },
   deps: DependencyList,
 ): void {
   const hold = usePostHold();
@@ -38,7 +38,7 @@ export function useShrinkToFit(
       if (!b) return;
       let value = max;
       apply(value);
-      while (overflows(b) && value - step >= min - 1e-9) {
+      while ((overflows(b) || alsoOver?.()) && value - step >= min - 1e-9) {
         value = Math.round((value - step) * 1000) / 1000;
         apply(value);
       }
@@ -64,7 +64,7 @@ export function useShrinkToFit(
 export function useFitFontSize(
   box: RefObject<HTMLElement | null>,
   target: RefObject<HTMLElement | null>,
-  { max, min, step = 2 }: { max: number; min: number; step?: number },
+  { max, min, step = 2, alsoOver }: { max: number; min: number; step?: number; alsoOver?: () => boolean },
   deps: DependencyList,
 ): void {
   useShrinkToFit(
@@ -72,7 +72,7 @@ export function useFitFontSize(
     (size) => {
       if (target.current) target.current.style.fontSize = `${size}px`;
     },
-    { max, min, step },
+    { max, min, step, alsoOver },
     deps,
   );
 }

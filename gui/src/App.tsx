@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import {
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
   Clapperboard,
@@ -9,6 +10,7 @@ import {
   ImagePlus,
   Lightbulb,
   LayoutDashboard,
+  Megaphone,
   ListChecks,
   Monitor,
   Moon,
@@ -29,8 +31,10 @@ import { RecipeEditor } from "./pages/RecipeEditor";
 import { VideoSpecPage } from "./pages/VideoSpecPage";
 import { Settings } from "./pages/Settings";
 import { PostCreator } from "./pages/PostCreator";
+import { AdCreator } from "./pages/AdCreator";
 import { MediaLibrary } from "./pages/MediaLibrary";
 import { Insights } from "./pages/Insights";
+import { Planner } from "./pages/Planner";
 
 const SIDEBAR_COLLAPSED_KEY = "studypal-reels:sidebar-collapsed"; // key kept from the old name so the saved state survives the rename
 
@@ -46,6 +50,7 @@ function readCollapsed(): boolean {
 // hide when the sidebar is collapsed (a divider remains).
 const NAV_SECTIONS = [
   { title: null, items: [{ to: "/", end: true, icon: LayoutDashboard, label: "Monitor" }] },
+  { title: "Plan", items: [{ to: "/planner", end: false, icon: CalendarDays, label: "Planner" }] },
   {
     title: "Reels",
     items: [
@@ -55,7 +60,13 @@ const NAV_SECTIONS = [
       { to: "/templates", end: false, icon: Palette, label: "Templates" },
     ],
   },
-  { title: "Posts", items: [{ to: "/post-creator", end: false, icon: ImagePlus, label: "Post Creator" }] },
+  {
+    title: "Posts",
+    items: [
+      { to: "/post-creator", end: false, icon: ImagePlus, label: "Post Creator" },
+      { to: "/ad-creator", end: false, icon: Megaphone, label: "Ad Creator" },
+    ],
+  },
   { title: "Grow", items: [{ to: "/insights", end: false, icon: Lightbulb, label: "Insights" }] },
   {
     title: "Manage",
@@ -145,8 +156,10 @@ export function App() {
           <Route path="/templates/:id" element={<TemplateEditor />} />
           <Route path="/recipes" element={<Recipes />} />
           <Route path="/post-creator" element={<PostCreator />} />
+          <Route path="/ad-creator" element={<AdCreator />} />
           <Route path="/library" element={<MediaLibrary />} />
           <Route path="/insights" element={<Insights />} />
+          <Route path="/planner" element={<Planner />} />
           <Route path="/recipes/new" element={<RecipeEditor />} />
           <Route path="/recipes/:id" element={<RecipeEditor />} />
           <Route path="/video-spec" element={<VideoSpecPage />} />

@@ -394,7 +394,7 @@ export interface VideoSpec {
 }
 
 // Media Library (gui /library) - mirrors server/library.ts.
-export type LibraryKind = "reel" | "post" | "image";
+export type LibraryKind = "reel" | "post" | "ad" | "image";
 
 export interface LibraryItem {
   id: string;

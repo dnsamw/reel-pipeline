@@ -141,7 +141,7 @@ function AccessStrip({ access }: { access: StatsAccess[] }) {
   );
 }
 
-// --- Kimi ---
+// --- Claude (was Kimi) ---
 
 function KimiPanel({ ai, overview }: { ai: AiStatus | null; overview: InsightsOverview | null }) {
   const [reports, setReports] = useState<AiReportRecord[]>([]);
@@ -188,15 +188,14 @@ function KimiPanel({ ai, overview }: { ai: AiStatus | null; overview: InsightsOv
     <div className="card kimi-card">
       <div className="card-heading-row">
         <h2>
-          <BrainCircuit size={20} /> Kimi analysis
+          <BrainCircuit size={20} /> Claude analysis
         </h2>
         {ai?.model && <span className="hint">{ai.model}</span>}
       </div>
 
       {ai && !ai.available ? (
         <p className="kimi-off">
-          Add <code>NVIDIA_API_KEY</code> to <code>.env</code> and restart the server to get Kimi's analysis, predictions and content plan. The
-          built-in analysis below works without it.
+          Claude Code isn't available to the server (<code>claude --version</code> must work, or set <code>AI_PROVIDER=nvidia</code> with an <code>NVIDIA_API_KEY</code>). Restart the server after fixing it. The built-in analysis below works without it.
         </p>
       ) : (
         <>
@@ -214,12 +213,12 @@ function KimiPanel({ ai, overview }: { ai: AiStatus | null; overview: InsightsOv
               />
             </div>
             <button type="button" onClick={start} disabled={!!running || !ai}>
-              <Sparkles size={14} /> {running ? "Analysing…" : "Analyse with Kimi"}
+              <Sparkles size={14} /> {running ? "Analysing…" : "Analyse with Claude"}
             </button>
           </div>
           {running && (
             <p className="kimi-running">
-              <RefreshCw size={13} className="spin" /> Kimi is reading your {count} post{count === 1 ? "" : "s"} and your unposted phrases. With a full history this
+              <RefreshCw size={13} className="spin" /> Claude is reading your {count} post{count === 1 ? "" : "s"} and your unposted phrases. With a full history this
               takes 3-8 minutes. You can leave this page; the report is saved.
             </p>
           )}
@@ -244,7 +243,7 @@ function KimiPanel({ ai, overview }: { ai: AiStatus | null; overview: InsightsOv
 
       {shown?.status === "error" && <div className="error-banner">This report failed: {shown.error}</div>}
       {shown?.report && <ReportView record={shown} report={shown.report} />}
-      {!shown && !running && ai?.available && <p className="hint kimi-empty">No reports yet. Press Analyse with Kimi.</p>}
+      {!shown && !running && ai?.available && <p className="hint kimi-empty">No reports yet. Press Analyse with Claude.</p>}
 
       {ai?.available && <AskKimi />}
     </div>

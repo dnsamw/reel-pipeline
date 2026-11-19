@@ -35,14 +35,54 @@ import { startRender, getRun, listRuns, cancelRun } from "./renderRunner";
 import { introOutroVideoSpec } from "./videoSpec";
 import { renderPostPng, warmPostBundle } from "./postRenderer";
 import { listMusicTracks, renderPostReel } from "./postReel";
+import { renderAdPng, renderAdReel, type AdRenderInput } from "./adRenderer";
+import { AD_FORMAT_ORDER, isAdFormat } from "../src/ads/types";
+import { importStockPhoto, searchStockPhotos, stockStatus } from "./stockPhotos";
+import { listAdPresets, saveAdPreset, deleteAdPreset, importAdPresets, isPresetKind } from "./adPresets";
 import { listLibrary, deleteLibraryItems, resetManifest, pruneManifest } from "./library";
 import { aiStatus, suggestCaptions } from "./captions";
 import { askAi, getOverview, getReport, linkTikTok, listReports, recentTikTokVideos, refreshStats, startAiReport, startInsightsScheduler } from "./analytics";
 import type { CaptionContext, CaptionMeta, CaptionPlatform, CaptionTone } from "../src/captions/types";
+import {
+  addDays,
+  createPost,
+  deletePost,
+  fillEmptySlots,
+  fillFromReserve,
+  isPlannerPlatform,
+  rejectAndRefill,
+  getPost,
+  isDate,
+  listPillars,
+  listPosts,
+  listReserve,
+  listSlots,
+  pillarMix,
+  savePillar,
+  saveSlot,
+  STOCK_TARGET_DAYS,
+  stockLevel,
+  suggestSource,
+  todaySriLanka,
+  unitLinesWithUse,
+  updatePost,
+} from "./planner";
+import { bookOutline, listCatalogBooks, SOURCE_LINE_KINDS } from "./lmsCatalog";
+import { importFacebookCsv, matchPublished, plannerPostStats } from "./plannerStats";
+import { exportWeekPack, planWeekPack, showDir } from "./weekPack";
+import { batchJob, dropUnwrittenIdeas, estimateBatch, RESERVE_TARGET, reserveGap, startBatch } from "./planWeek";
+import { DEFAULT_WINDOW_DAYS, feedbackReport, learningNotes, MIN_POSTS, SETTLE_DAYS } from "./planLearn";
+import { checkPost, reviewPosts } from "./planReview";
+import { renderApproved, renderPlannerPost } from "./planRender";
+import { pickPhoto, photoStock, stockPhotoPath } from "./photoPicker";
+import { latestScoutNotes, SCOUT_TOPICS, scoutRunning, startScout } from "./scout";
+import { aiCallCounts, cliVersion } from "./ai/cli";
+import { facebookPostingOn } from "./distribution";
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+// 5mb (not the 100kb default) so an Ad Creator presets export can be imported in one request.
+app.use(express.json({ limit: "5mb" }));
 
 // Serves rendered reels for inline playback (Monitor page) - manifest
 // outputPath entries look like "output/<file>.mp4", so the GUI just needs
@@ -331,6 +371,30 @@ app.post("/api/assets/images", express.raw({ type: () => true, limit: "15mb" }),
   }
 });
 
+// Free stock photos (Pexels) for post backgrounds - server/stockPhotos.ts.
+app.get("/api/stock/status", (_req, res) => res.json(stockStatus()));
+
+app.get("/api/stock/search", async (req, res) => {
+  try {
+    const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    if (!q) return res.status(400).json({ error: "q is required" });
+    const page = Math.max(1, Number(req.query.page) || 1);
+    res.json(await searchStockPhotos(q, page, typeof req.query.orientation === "string" ? req.query.orientation : undefined));
+  } catch (err) {
+    res.status((err as { status?: number })?.status ?? 500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.post("/api/stock/import", async (req, res) => {
+  try {
+    const { id, src } = req.body ?? {};
+    if (typeof src !== "string") return res.status(400).json({ error: "src is required" });
+    res.json(await importStockPhoto(Number(id), src));
+  } catch (err) {
+    res.status((err as { status?: number })?.status ?? 500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // --- Post Creator (gui /post-creator): static image posts rendered to PNG ---
 // Renders the "Post" still (src/posts/PostStill.tsx) with renderStill - same
 // React template the GUI previews, so the PNG matches it exactly. Also saves
@@ -384,6 +448,96 @@ app.post("/api/posts/reel", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// --- Ad Creator (gui /ad-creator): Facebook/Instagram ad images + still-image videos ---
+// Renders the "Ad" still (src/ads/AdStill.tsx) - same AdCanvas the GUI
+// previews - into output/ads/{TEMPLATE}_{PRODUCT}_{FORMAT}_{VARIANT}.png.
+// Shares the post bundle, so /api/posts/warm warms this too.
+function adInput(body: Record<string, unknown>): AdRenderInput {
+  const { templateId, format, product, fields, lists, colors, mockup, variant } = body ?? {};
+  if (typeof templateId !== "string") throw Object.assign(new Error("templateId is required"), { status: 400 });
+  if (!isAdFormat(format)) throw Object.assign(new Error(`format must be one of ${AD_FORMAT_ORDER.join(", ")}`), { status: 400 });
+  return {
+    templateId,
+    format,
+    product: typeof product === "string" ? product : "",
+    fields: (fields as AdRenderInput["fields"]) ?? {},
+    lists: (lists as AdRenderInput["lists"]) ?? {},
+    colors: (colors as AdRenderInput["colors"]) ?? {},
+    mockup: (mockup as AdRenderInput["mockup"]) ?? {},
+    variant: typeof variant === "string" ? variant : "v1",
+  };
+}
+
+function adError(res: express.Response, err: unknown) {
+  console.error(err);
+  res.status((err as { status?: number })?.status ?? 500).json({ error: err instanceof Error ? err.message : String(err) });
+}
+
+// Ad Creator presets - named text or color snapshots per template (server/adPresets.ts).
+app.get("/api/ads/presets", (req, res) => {
+  const templateId = typeof req.query.templateId === "string" ? req.query.templateId : "";
+  const kind = req.query.kind ?? "text";
+  if (!templateId) return res.status(400).json({ error: "templateId is required" });
+  if (!isPresetKind(kind)) return res.status(400).json({ error: "kind must be text or colors" });
+  res.json(listAdPresets(templateId, kind));
+});
+
+// Every preset as one file, to move them to another machine.
+app.get("/api/ads/presets/export", (_req, res) => {
+  res.json({ type: "studypal-ad-presets", version: 1, exportedAt: new Date().toISOString(), presets: listAdPresets() });
+});
+
+app.post("/api/ads/presets/import", (req, res) => {
+  const presets = req.body?.presets;
+  if (req.body?.type !== "studypal-ad-presets" || !Array.isArray(presets)) {
+    return res.status(400).json({ error: "Not an Ad Creator presets file" });
+  }
+  res.json(importAdPresets(presets));
+});
+
+app.post("/api/ads/presets", (req, res) => {
+  const { templateId, name, data } = req.body ?? {};
+  const kind = req.body?.kind ?? "text";
+  if (typeof templateId !== "string" || !templateId) return res.status(400).json({ error: "templateId is required" });
+  if (!isPresetKind(kind)) return res.status(400).json({ error: "kind must be text or colors" });
+  if (typeof name !== "string" || !name.trim()) return res.status(400).json({ error: "name is required" });
+  if (!data || typeof data !== "object") return res.status(400).json({ error: "data is required" });
+  res.status(201).json(saveAdPreset(templateId, kind, name.trim(), data));
+});
+
+app.delete("/api/ads/presets/:id", (req, res) => {
+  if (!deleteAdPreset(req.params.id)) return res.status(404).json({ error: "Preset not found" });
+  res.status(204).end();
+});
+
+app.post("/api/ads/render", async (req, res) => {
+  try {
+    const { png, savedPath } = await renderAdPng(adInput(req.body));
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("X-Saved-Path", relative(process.cwd(), savedPath).replace(/\\/g, "/"));
+    res.send(png);
+  } catch (err) {
+    adError(res, err);
+  }
+});
+
+app.post("/api/ads/reel", async (req, res) => {
+  try {
+    const reel = req.body?.reel;
+    const { mp4Path } = await renderAdReel(adInput(req.body), {
+      durationSeconds: reel?.durationSeconds,
+      musicFile: typeof reel?.musicFile === "string" && reel.musicFile ? reel.musicFile : null,
+      musicStartSeconds: reel?.musicStartSeconds,
+      musicVolume: reel?.musicVolume,
+      frame: reel?.frame === "original" ? "original" : "reel",
+    });
+    res.setHeader("X-Saved-Path", relative(process.cwd(), mp4Path).replace(/\\/g, "/"));
+    res.sendFile(mp4Path);
+  } catch (err) {
+    adError(res, err);
   }
 });
 
@@ -859,6 +1013,351 @@ app.post("/api/youtube/disconnect", (_req, res) => {
 app.post("/api/instagram/disconnect", (_req, res) => {
   disconnectInstagram();
   res.status(204).end();
+});
+
+// --- Planner (docs/16-social-content-pipeline.md in studypal-lms) ---
+
+app.get("/api/planner", (req, res) => {
+  try {
+    const today = todaySriLanka();
+    const from = isDate(req.query.from) ? req.query.from : today;
+    const to = isDate(req.query.to) ? req.query.to : addDays(from, STOCK_TARGET_DAYS - 1);
+    const posts = listPosts(from, to);
+    res.json({
+      today,
+      from,
+      to,
+      slots: listSlots(),
+      pillars: listPillars(),
+      posts,
+      stats: plannerPostStats(posts),
+      facebookPosting: facebookPostingOn(),
+      reserve: listReserve(),
+      stock: stockLevel(today),
+      mix: pillarMix(from, to),
+      books: listCatalogBooks(),
+    });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+app.post("/api/planner/posts", (req, res) => {
+  try {
+    res.json(createPost(req.body ?? {}));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.put("/api/planner/posts/:id", (req, res) => {
+  try {
+    res.json(updatePost(req.params.id, req.body ?? {}));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.delete("/api/planner/posts/:id", (req, res) => {
+  deletePost(req.params.id);
+  res.status(204).end();
+});
+
+app.post("/api/planner/posts/:id/fill", (req, res) => {
+  try {
+    const { date, slotId } = req.body ?? {};
+    res.json(fillFromReserve(req.params.id, date, slotId));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.put("/api/planner/pillars/:id", (req, res) => {
+  try {
+    res.json(savePillar({ ...(req.body ?? {}), id: req.params.id }));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.put("/api/planner/slots/:id", (req, res) => {
+  try {
+    res.json(saveSlot({ ...(req.body ?? {}), id: req.params.id }));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// --- Planner: week pack + stats matching (docs/16 §7, P3). Nothing here posts to Facebook. ---
+
+const packRange = (q: Record<string, unknown>) => {
+  if (!isDate(q.from) || !isDate(q.to) || q.to < q.from) throw new Error("from and to must be YYYY-MM-DD, from <= to");
+  if (addDays(q.from, 31) < q.to) throw new Error("A pack covers at most 31 days");
+  return { from: q.from, to: q.to };
+};
+const packOut = <T extends { items: { media: string }[] }>(p: T) => ({ ...p, items: p.items.map((it) => ({ ...it, media: showDir(it.media) })) });
+
+/** Preview: what a pack for ?from&to would hold. Writes nothing. */
+app.get("/api/planner/week-pack", (req, res) => {
+  try {
+    const { from, to } = packRange(req.query);
+    res.json(packOut(planWeekPack(from, to)));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.post("/api/planner/week-pack", (req, res) => {
+  try {
+    const { from, to } = packRange(req.body ?? {});
+    // docs/16 §7: empty slots take a ready reserve post before the pack is written.
+    const filled = fillEmptySlots(from, to);
+    const r = exportWeekPack(from, to);
+    res.json({ ...packOut(r), dir: showDir(r.dir), filledFromReserve: filled.length });
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+/** { ids } of rendered posts the owner has loaded into Business Suite → scheduled. */
+app.post("/api/planner/mark-scheduled", (req, res) => {
+  try {
+    const ids: unknown = req.body?.ids;
+    if (!Array.isArray(ids) || !ids.every((x) => typeof x === "string")) throw new Error("ids must be a list of post ids");
+    const done = [];
+    for (const id of ids as string[]) {
+      const p = getPost(id);
+      if (p?.status === "rendered") done.push(updatePost(id, { status: "scheduled", statusReason: "" }));
+    }
+    res.json({ scheduled: done.length });
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+/** Body: the posts CSV from Meta Business Suite (Insights → Content → Export). */
+app.post("/api/planner/stats/import", express.text({ type: () => true, limit: "25mb" }), (req, res) => {
+  try {
+    if (typeof req.body !== "string" || !req.body.trim()) throw new Error("Send the CSV file as the request body");
+    res.json(importFacebookCsv(req.body));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+app.post("/api/planner/stats/match", (_req, res) => {
+  try {
+    res.json(matchPublished());
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// --- Planner: Claude + Grok batch, auto-approval, photos (docs/16 §2, §10.1, P4) ---
+
+const fail400 = (res: express.Response, err: unknown) => res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+const batchRange = (q: Record<string, unknown>) => {
+  if (!isDate(q.from) || !isDate(q.to) || q.to < q.from) throw new Error("from and to must be YYYY-MM-DD, from <= to");
+  if (addDays(q.from, 31) < q.to) throw new Error("A batch covers at most 31 days");
+  return { from: q.from, to: q.to };
+};
+
+/** Claude Code / Grok CLI availability and calls in the last 7 days. */
+app.get("/api/planner/ai", (_req, res) => {
+  res.json({ claude: cliVersion("claude"), grok: cliVersion("grok"), calls: aiCallCounts() });
+});
+
+app.get("/api/planner/batch/estimate", (req, res) => {
+  try {
+    const { from, to } = batchRange(req.query);
+    res.json(estimateBatch(from, to, req.query.scout === "1", req.query.reserve !== "0"));
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+app.get("/api/planner/batch", (_req, res) => {
+  res.json(batchJob());
+});
+
+/** { from, to, scout?, limit?, reserve? } → starts the batch in the background; poll GET /api/planner/batch. */
+app.post("/api/planner/batch", (req, res) => {
+  try {
+    const { from, to } = batchRange(req.body ?? {});
+    const limit = req.body?.limit === undefined || req.body?.limit === null ? undefined : Number(req.body.limit);
+    if (limit !== undefined && (!Number.isInteger(limit) || limit < 0)) throw new Error("limit must be a whole number");
+    res.json(startBatch(from, to, { scout: req.body?.scout === true, limit, reserve: req.body?.reserve !== false }));
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+/** P5: what the Page's numbers say (by slot, time, pillar, hook style, book), and what the next plan does with it. */
+app.get("/api/planner/feedback", (req, res) => {
+  try {
+    const days = req.query.days === undefined ? DEFAULT_WINDOW_DAYS : Number(req.query.days);
+    if (!Number.isInteger(days) || days < 7 || days > 365) throw new Error("days must be 7-365");
+    const platform = req.query.platform === undefined ? "facebook" : req.query.platform;
+    if (!isPlannerPlatform(platform)) throw new Error("platform must be facebook, instagram, tiktok or youtube");
+    const report = feedbackReport(days, undefined, platform);
+    res.json({ ...report, notes: learningNotes(report), minPosts: MIN_POSTS, settleDays: SETTLE_DAYS, reserve: { now: RESERVE_TARGET - reserveGap(), target: RESERVE_TARGET } });
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+/** { from, to } → fills empty slots with ready reserve posts. */
+app.post("/api/planner/reserve/fill", (req, res) => {
+  try {
+    const { from, to } = batchRange(req.body ?? {});
+    res.json({ filled: fillEmptySlots(from, to).map((p) => ({ id: p.id, date: p.date, slotId: p.slotId, title: p.title })) });
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+app.post("/api/planner/batch/cleanup", (req, res) => {
+  try {
+    const { from, to } = batchRange(req.body ?? {});
+    res.json({ removed: dropUnwrittenIdeas(from, to) });
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+app.get("/api/planner/scout", (_req, res) => {
+  res.json({ notes: latestScoutNotes(30), topics: Object.entries(SCOUT_TOPICS).map(([id, t]) => ({ id, label: t.label })), running: scoutRunning() });
+});
+
+/** { topics? } → starts one Grok call per topic in the background (a few minutes each); poll GET /api/planner/scout. */
+app.post("/api/planner/scout", (req, res) => {
+  try {
+    const topics: unknown = req.body?.topics;
+    if (topics !== undefined && (!Array.isArray(topics) || !topics.every((t) => typeof t === "string" && t in SCOUT_TOPICS))) throw new Error("Unknown topic");
+    startScout(topics as string[] | undefined);
+    res.json({ running: scoutRunning() });
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+app.get("/api/planner/photos", (_req, res) => {
+  try {
+    res.json(photoStock());
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+/** ?subject&book&date&post → a free stock photo (relative to stock-images/) or null. */
+app.get("/api/planner/photo-pick", (req, res) => {
+  try {
+    const cur = typeof req.query.current === "string" ? [req.query.current] : [];
+    res.json({ photo: pickPhoto(qStr(req.query.subject), qStr(req.query.book), qDate(req.query.date), { exclude: cur }) });
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+app.get("/api/planner/stock-image", (req, res) => {
+  const abs = typeof req.query.path === "string" ? stockPhotoPath(req.query.path) : null;
+  if (!abs) return res.status(404).json({ error: "Not a photo in stock-images/" });
+  res.sendFile(abs);
+});
+
+/** Code checks only, no AI call. */
+app.get("/api/planner/posts/:id/check", (req, res) => {
+  try {
+    res.json(checkPost(req.params.id));
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+/** Review a drafted post again (code checks + one critic call) after an edit. */
+app.post("/api/planner/posts/:id/review", async (req, res) => {
+  try {
+    await reviewPosts([req.params.id]);
+    res.json(getPost(req.params.id));
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+/** Renders one approved image post with the Hook photo template → status rendered. */
+app.post("/api/planner/posts/:id/render", async (req, res) => {
+  try {
+    res.json(await renderPlannerPost(req.params.id, "owner"));
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+let renderRun: { from: string; to: string; startedAt: string; log: string[]; done: boolean; rendered: number; skipped: { id: string; reason: string }[] } | null = null;
+
+/** { from, to } → renders every approved image post in the range, in the background; poll GET. */
+app.post("/api/planner/render", (req, res) => {
+  try {
+    const { from, to } = batchRange(req.body ?? {});
+    if (renderRun && !renderRun.done) throw new Error("A render run is already going");
+    const run = { from, to, startedAt: new Date().toISOString(), log: [] as string[], done: false, rendered: 0, skipped: [] as { id: string; reason: string }[] };
+    renderRun = run;
+    void renderApproved(from, to, (l) => run.log.push(l))
+      .then((r) => Object.assign(run, r))
+      .catch((err) => run.log.push(`failed: ${err instanceof Error ? err.message : String(err)}`))
+      .finally(() => (run.done = true));
+    res.json(run);
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+app.get("/api/planner/render", (_req, res) => {
+  res.json(renderRun);
+});
+
+/** { reason } → rejected (reason kept for next week's drafts) + a ready reserve post moved into its slot. */
+app.post("/api/planner/posts/:id/reject", (req, res) => {
+  try {
+    res.json(rejectAndRefill(req.params.id, String(req.body?.reason ?? "")));
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+// --- Planner: book content as post source (docs/16 §4, P2) ---
+
+const errMsg = (err: unknown) => (err instanceof Error ? err.message : String(err));
+const qDate = (v: unknown) => (isDate(v) ? v : null);
+const qStr = (v: unknown) => (typeof v === "string" ? v : "");
+
+app.get("/api/planner/source/:book", (req, res) => {
+  try {
+    res.json(bookOutline(req.params.book));
+  } catch (err) {
+    res.status(404).json({ error: errMsg(err) });
+  }
+});
+
+/** ?unit=4-a-1&date=YYYY-MM-DD&post=<id being edited> → lines, each with the post that already uses it. */
+app.get("/api/planner/source/:book/lines", (req, res) => {
+  try {
+    res.json(unitLinesWithUse(req.params.book, qStr(req.query.unit), qDate(req.query.date), qStr(req.query.post)));
+  } catch (err) {
+    res.status(400).json({ error: errMsg(err) });
+  }
+});
+
+/** ?date&count&post&kind → { book, unit, unitTitle, free, lines } of unused lines, or null when the book is used up. */
+app.get("/api/planner/source/:book/suggest", (req, res) => {
+  try {
+    res.json(suggestSource(req.params.book, qDate(req.query.date), Number(req.query.count) || 5, {
+        excludePostId: qStr(req.query.post),
+        kind: SOURCE_LINE_KINDS.find((k) => k === req.query.kind),
+      }));
+  } catch (err) {
+    res.status(400).json({ error: errMsg(err) });
+  }
 });
 
 // Last-resort safety net - catches anything that slips past a route's own

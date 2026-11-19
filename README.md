@@ -1,7 +1,7 @@
 # StudyPal Studio
 
 StudyPal's content studio: batch-rendered phrase reels, image posts and still-image reels (Post Creator),
-a media library, and one-click publishing to a Facebook Page - through a local web app (`npm run gui`) or
+Facebook/Instagram ad images and videos (Ad Creator), a media library, and one-click publishing to a Facebook Page - through a local web app (`npm run gui`) or
 the CLI below.
 
 Bulk-generates vertical reel videos (Instagram/TikTok-style, 1080×1920) promoting *The Ultimate
@@ -152,8 +152,9 @@ models beyond phrases can be added later without changing the editor. A custom r
 renderable, not just previewable — pick it anywhere a "Composition" is chosen. See
 [docs/COMPOSITION_DESIGNER.md](docs/COMPOSITION_DESIGNER.md) for the full design.
 
-**Media Library page** (`/library`) — every generated or uploaded file in one place, in three tabs: batch
-reels (`output/`), Post Creator exports (`output/posts/`) and uploaded images (`assets/images/`). Each card
+**Media Library page** (`/library`) — every generated or uploaded file in one place, in four tabs: batch
+reels (`output/`), Post Creator exports (`output/posts/`), Ad Creator exports (`output/ads/`) and uploaded
+images (`assets/images/`). Each card
 shows whether it's tracked in the manifest, published to Facebook, or still used by a recipe/template. Select
 files and **Delete selected**. Deleting a batch reel also removes its manifest entry, so that batch counts as
 not rendered again. The **Render manifest** panel can **Remove missing entries** (entries whose video is gone)
@@ -230,13 +231,31 @@ TikTok, not just the ones this app published.
     TikTok uploads are drafts, so each is matched to the video you post from it; fix a wrong match with the
     dropdown in the Posts table.
 
-**Post Creator page** (`/post-creator`) — static 1080×1080 image posts. Pick a post template from the
+**Post Creator page** (`/post-creator`) — static image posts (1080×1080, or 1080×1350 for the hook photo). Pick a post template from the
 dropdown (each option has a small live preview), edit its text fields and optional background photo, then set
 its colors directly or load them from any reel template on the Templates page (light or dark palette). **Export
 PNG** renders the exact same React component through Remotion's `renderStill`, so the PNG matches the preview,
 downloads it, and keeps a copy in `output/posts/`. The first export after a code change waits for a Remotion
 bundle (~20-30s); later ones take a few seconds. Your in-progress post for each template is remembered in the
 browser.
+
+**Hook photo + long caption** (`studypal-hook-photo`): the Facebook format where the image is just a photo
+with one big yellow Sinhala hook box ("…වාක්‍ය **300** එක්ක…", with `**stars**` marking highlighted words),
+and the content (a long phrase list) plus the offer live in the caption. A pill above and a pill below the
+box move with it as one block; the **Vertical position** slider slides that block from top (0%) to bottom
+(100%) so it doesn't cover the photo's subject. **Photo zoom** (100-400%) and **Photo position** (left/right,
+up/down) pick exactly the part of the photo to show; **Dark overlay** (0-90%, color under Colors → Photo
+overlay, black by default) tones down bright photos so the box and pills stand out. **Hook box opacity** (20-100%) lets the photo show through
+the rounded box. **Hook text size** (36-130px) sets the hook's size; it still shrinks on its own if a line
+wouldn't fit the box. The StudyPal mark sits bottom left and your WhatsApp number
+bottom right (empty hides either). Type line breaks into the hook to keep your lines exactly; it shrinks
+until the widest line fits. **Find a free photo…** under the photo field
+searches Pexels (set `PEXELS_API_KEY` in `.env` — free key at pexels.com/api — and restart the server); a
+click downloads the photo into `assets/images/`. The **Caption** card builds the caption from the "Caption:"
+fields: hook line, a "see below" line, a `[[ POST CONTENT ]]` placeholder for your list, then the StudyPal
+tail (story, what's in the set, price, WhatsApp number and a tappable `wa.me` link that opens WhatsApp with
+a keyword typed in, and a comment question). **Copy caption**, paste it into Facebook, replace the
+placeholder with your list.
 
 **Reels safe zones:** a Reel's top, bottom and right edge are covered by Facebook's UI (icons, caption, the
 like/share column), and tall phones crop its sides. **Keep content inside Reels safe zones** (under the
@@ -260,6 +279,50 @@ reel palette onto its colors), and append it to `src/posts/registry.ts`. Repeati
 numbered items) is a `type: "list"` field. The Content panel then gets add/remove/reorder controls for it, and
 the template sizes itself to however many items there are. The page, the dropdown and the PNG
 export pick it up automatically.
+
+**Ad Creator page** (`/ad-creator`) — Facebook/Instagram ad creatives from the ads plan
+(`study-pal-eng-book/english-book-content/marketing/facebook-ads-plan.md`). Four templates so far, ported from
+`ad-templates/*.html`: **S1 Cover Hero** and **S2 Peek Inside** (single book), **M1 Pack Hero** (3-book pack) and
+**C1 The Shelf** (complete collection), plus **C2 The Offer** (complete collection, built in React with no HTML
+original): a boost-ready version of C1 in the dark brand purple, with the deadline in the corner chip, one
+sample entry as proof of the Sinhala pronunciation, "what you get" badges (PDF via WhatsApp), and its own
+WhatsApp-ordering primary text. Its defaults are the live Oct 2026 offer, so it renders ready to boost. Each renders in three formats: **PT** 1080×1350 (feed, make this first),
+**ST** 1080×1920 (Stories/Reels, content kept inside the safe zones) and **SQ** 1080×1080. C1 and C2 also render
+**LS** 1200×628, a two-column layout for Ads Manager's 1.91:1 "Horizontal" crop. Upload it there with
+*Replace* instead of letting Meta auto-crop the portrait ad.
+
+- **Product**: pick the book or pack the ad is for. Book ads take that book's accent and tint colors, and empty
+  fields fall back to its copy-bank hook, phrase count and so on (shown as grey placeholders). Each
+  template × product remembers its own content, colors and mockup in the browser.
+- **Offer**: "All 9 Volumes" on its own line above the gold price chip, on every template. The count comes from
+  the product (a pack adds up its three books, the collection is 69). The chip has a word before *or* after the
+  price ("Just Rs 2,490", or after the price for Sinhala word order). All three are editable.
+- **S1 volume stack**: without a mockup image, S1 shows the book's volumes as a fanned stack of its cover, Vol 01
+  in front and each labelled VOL 01, 02... ("Covers in the stack" - defaults to the volume count, 1 = a single cover).
+- **Mockup**: upload a transparent PNG mockup per product, then nudge it (scale / rotate / move). With no mockup
+  the ad shows the book's flat cover (`assets/ads/covers/`) with a 3D tilt. M1 fans the three covers, and C1
+  draws a CSS bookshelf of all ten spines, each with an editable English name and the Sinhala name under it.
+- **C1 kicker**: an optional line above the big number ("Phrases & patterns" by default; empty hides it).
+- **Second call to action**: an optional line just under the call to action on every template (e.g. a second
+  WhatsApp number); empty hides it.
+- **Saved text / Saved colors**: save the ad's current words (content fields, spine names, Ads Manager copy) or
+  its color combination under a name and load them back later. Saved per template on the server
+  (`data/gui.db`), so they outlive the browser draft. Loading text keeps the colors and vice versa.
+- **Move presets to another computer**: *Export presets* downloads every saved text and color preset (all
+  templates) as one `.json` file; *Import presets…* on the other computer adds them, skipping any already there.
+  The in-progress draft of each ad still lives only in that browser, so save it as a preset to carry it over.
+- **Export PNG** / **Export all formats** render through Remotion's `renderStill` (same component as the
+  preview) into `output/ads/`, named by the plan's convention `{TEMPLATE}_{PRODUCT}_{FORMAT}_{VARIANT}.png`
+  (e.g. `S1_B04_PT_v1.png`). Exporting the same variant again replaces the file.
+- **Video (MP4)**: the ad as a still-image video over a track from `assets/music/`, same encoder and settings
+  as Post Creator reels. Use the ST format for Reels/Stories placements.
+- **Batch export**: one template across several products and formats in one go (the plan's Part 10.3).
+- **Ad copy**: a suggested Ads Manager headline (≤ 40 characters) and Sinhala-first primary text from the copy
+  bank, with copy buttons. The Sinhala lines are drafts, so get a native speaker to review them.
+
+To add an ad design: save the HTML (built to the plan's Part 7 contract) in `ad-templates/`, port it to
+`src/ads/templates/<Name>.tsx` exporting an `AdTemplateDef` (shared pieces such as the brand bar, offer bar,
+mockup slot and text fitting are in `src/ads/AdKit.tsx`), and append it to `src/ads/registry.ts`.
 
 | Flag | Meaning |
 |---|---|
@@ -294,6 +357,7 @@ src/
   audio/           Music/sfx/voice/TTS selection + ffmpeg availability check (Node-only)
   compositions/    Composition recipes (recipe/) + beat-kind scene components - see docs/COMPOSITION_DESIGNER.md
   posts/           Post Creator image templates (React) + registry, rendered to PNG via the "Post" still
+  ads/             Ad Creator templates (React), product data (books/packs) + registry, rendered via the "Ad" still
   render/          The batch runner (renderBatch.ts), manifest tracking, and sidechain ducking post-process
 server/            Express API for the GUI - template + recipe libraries (SQLite + git export), global
                    settings, Facebook OAuth + publishing, render orchestration, chapter/book lookups
@@ -304,9 +368,10 @@ recipes/           Git-tracked JSON export of every saved custom recipe (one fil
 data/              SQLite db for the GUI's own state - template + recipe libraries, global settings, connected
                    Facebook Page token, publish history (gitignored - templates/*.json and recipes/*.json are
                    the only parts with a git export)
-assets/            fonts, music, sfx, voice-over, and generated TTS audio
+assets/            fonts, music, sfx, voice-over, generated TTS audio, and the books' flat covers (ads/covers/)
 post-templates/    Original HTML mocks for post designs - the source each src/posts/templates/*.tsx is ported from
-output/            Rendered videos + manifest.json, and output/posts/ PNG exports (gitignored)
+ad-templates/      Original HTML ad designs (ads plan Part 7 contract) - the source of each src/ads/templates/*.tsx
+output/            Rendered videos + manifest.json, output/posts/ and output/ads/ exports (gitignored)
 ```
 
 ## Notes

@@ -29,6 +29,80 @@ import type {
   TemplateRecord,
   VideoSpec,
 } from "./types";
+import type {
+  BookOutline,
+  CsvImportResult,
+  MatchResult,
+  PackPlan,
+  AiInfo,
+  BatchEstimate,
+  BatchJob,
+  FeedbackReport,
+  PhotoStock,
+  ScoutView,
+  PlannerRenderRun,
+  Pillar,
+  PlannerPost,
+  PlannerPostInput,
+  PlannerSlot,
+  PlannerView,
+  SourceLineKind,
+  SourceLineWithUse,
+  SourcePick,
+} from "./plannerTypes";
+
+export interface AdRenderBody {
+  templateId: string;
+  format: "SQ" | "PT" | "ST" | "LS";
+  product: string;
+  fields: Record<string, string>;
+  lists: Record<string, Record<string, string>[]>;
+  colors: Record<string, string>;
+  mockup: { scale: number; x: number; y: number; rotate: number };
+  variant: string;
+}
+
+/** A free stock photo search result - see server/stockPhotos.ts. */
+export interface StockPhoto {
+  id: number;
+  width: number;
+  height: number;
+  alt: string;
+  photographer: string;
+  pageUrl: string;
+  thumb: string;
+  src: string;
+}
+
+/** Ad Creator presets - see server/adPresets.ts. */
+export type AdPresetKind = "text" | "colors";
+
+export interface AdPresetData {
+  fields?: Record<string, string>;
+  lists?: Record<string, Record<string, string>[]>;
+  headline?: string;
+  primaryText?: string;
+  colors?: Record<string, string>;
+}
+
+export interface AdPreset {
+  id: string;
+  templateId: string;
+  kind: AdPresetKind;
+  name: string;
+  data: AdPresetData;
+  createdAt: string;
+}
+
+/** POSTs JSON to an endpoint whose success response is a file - returns it with the X-Saved-Path header. */
+async function postForFile(url: string, body: unknown): Promise<{ blob: Blob; savedPath: string }> {
+  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error ?? `${res.status} ${res.statusText}`);
+  }
+  return { blob: await res.blob(), savedPath: res.headers.get("X-Saved-Path") ?? "" };
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
@@ -119,6 +193,12 @@ export const api = {
 
   // Not through request() - this sends the raw File as the body, not JSON
   // (matching server/index.ts's express.raw() route, not express.json()).
+  stockStatus: () => request<{ available: boolean; provider: string }>("/stock/status"),
+  searchStock: (q: string, page: number, orientation?: string) =>
+    request<{ photos: StockPhoto[]; hasMore: boolean }>(
+      `/stock/search?q=${encodeURIComponent(q)}&page=${page}${orientation ? `&orientation=${orientation}` : ""}`,
+    ),
+  importStock: (photo: StockPhoto) => request<{ path: string }>("/stock/import", { method: "POST", body: JSON.stringify({ id: photo.id, src: photo.src }) }),
   uploadImage: async (file: File) => {
     const res = await fetch(`/api/assets/images?filename=${encodeURIComponent(file.name)}`, {
       method: "POST",
@@ -214,6 +294,17 @@ export const api = {
   resetManifest: () => request<{ cleared: number; backupPath: string | null }>("/library/manifest/reset", { method: "POST" }),
   pruneManifest: () => request<{ removed: number }>("/library/manifest/prune", { method: "POST" }),
   warmPostRenderer: () => request<void>("/posts/warm", { method: "POST" }),
+  // Ad Creator - both answer with the file itself (PNG / MP4), not JSON.
+  renderAd: (body: AdRenderBody) => postForFile("/api/ads/render", body),
+  adPresets: (templateId: string, kind: AdPresetKind) =>
+    request<AdPreset[]>(`/ads/presets?templateId=${encodeURIComponent(templateId)}&kind=${kind}`),
+  saveAdPreset: (templateId: string, kind: AdPresetKind, name: string, data: AdPresetData) =>
+    request<AdPreset>("/ads/presets", { method: "POST", body: JSON.stringify({ templateId, kind, name, data }) }),
+  exportAdPresets: () => request<{ type: string; version: number; exportedAt: string; presets: AdPreset[] }>("/ads/presets/export"),
+  importAdPresets: (file: unknown) => request<{ added: number; skipped: number }>("/ads/presets/import", { method: "POST", body: JSON.stringify(file) }),
+  deleteAdPreset: (id: string) => request<void>(`/ads/presets/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  renderAdReel: (body: AdRenderBody & { reel: { durationSeconds: number; musicFile: string | null; musicStartSeconds: number; musicVolume: number; frame: "reel" | "original" } }) =>
+    postForFile("/api/ads/reel", body),
   // Not through request() - the success response is the PNG itself, not JSON.
   renderPost: async (body: { templateId: string; fields: Record<string, string>; lists: Record<string, Record<string, string>[]>; colors: Record<string, string>; safeZones: boolean }) => {
     const res = await fetch("/api/posts/render", {
@@ -226,5 +317,70 @@ export const api = {
       throw new Error(err.error ?? `${res.status} ${res.statusText}`);
     }
     return { blob: await res.blob(), savedPath: res.headers.get("X-Saved-Path") ?? "" };
+  },
+
+  // --- Planner (docs/16) ---
+  planner: (from?: string, to?: string) => {
+    const q = new URLSearchParams();
+    if (from) q.set("from", from);
+    if (to) q.set("to", to);
+    return request<PlannerView>(`/planner${q.size ? `?${q}` : ""}`);
+  },
+  createPlannerPost: (body: PlannerPostInput) => request<PlannerPost>("/planner/posts", { method: "POST", body: JSON.stringify(body) }),
+  updatePlannerPost: (id: string, body: PlannerPostInput) =>
+    request<PlannerPost>(`/planner/posts/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(body) }),
+  deletePlannerPost: (id: string) => request<void>(`/planner/posts/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  fillFromReserve: (id: string, date: string, slotId: string) =>
+    request<PlannerPost>(`/planner/posts/${encodeURIComponent(id)}/fill`, { method: "POST", body: JSON.stringify({ date, slotId }) }),
+  savePillar: (id: string, body: Partial<Pillar>) =>
+    request<Pillar>(`/planner/pillars/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(body) }),
+  saveSlot: (id: string, body: Partial<PlannerSlot>) =>
+    request<PlannerSlot>(`/planner/slots/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(body) }),
+  weekPackPreview: (from: string, to: string) => request<PackPlan>(`/planner/week-pack?${new URLSearchParams({ from, to })}`),
+  exportWeekPack: (from: string, to: string) => request<PackPlan & { filledFromReserve?: number }>("/planner/week-pack", { method: "POST", body: JSON.stringify({ from, to }) }),
+  markScheduled: (ids: string[]) => request<{ scheduled: number }>("/planner/mark-scheduled", { method: "POST", body: JSON.stringify({ ids }) }),
+  importStatsCsv: (csv: string) => request<CsvImportResult>("/planner/stats/import", { method: "POST", headers: { "Content-Type": "text/csv" }, body: csv }),
+  matchStats: () => request<MatchResult>("/planner/stats/match", { method: "POST" }),
+  plannerAi: () => request<AiInfo>("/planner/ai"),
+  batchEstimate: (from: string, to: string, scout: boolean, reserve = true) =>
+    request<BatchEstimate>(`/planner/batch/estimate?${new URLSearchParams({ from, to, scout: scout ? "1" : "0", reserve: reserve ? "1" : "0" })}`),
+  batchStatus: () => request<BatchJob | null>("/planner/batch"),
+  startBatch: (body: { from: string; to: string; scout: boolean; limit?: number; reserve?: boolean }) => request<BatchJob>("/planner/batch", { method: "POST", body: JSON.stringify(body) }),
+  plannerFeedback: (days?: number, platform = "facebook") =>
+    request<FeedbackReport>(`/planner/feedback?${new URLSearchParams({ ...(days ? { days: String(days) } : {}), platform })}`),
+  reserveFill: (from: string, to: string) =>
+    request<{ filled: { id: string; date: string; slotId: string; title: string }[] }>("/planner/reserve/fill", { method: "POST", body: JSON.stringify({ from, to }) }),
+  batchCleanup: (from: string, to: string) => request<{ removed: number }>("/planner/batch/cleanup", { method: "POST", body: JSON.stringify({ from, to }) }),
+  scout: () => request<ScoutView>("/planner/scout"),
+  startScout: (topics?: string[]) => request<{ running: ScoutView["running"] }>("/planner/scout", { method: "POST", body: JSON.stringify({ topics }) }),
+  photoStock: () => request<PhotoStock[]>("/planner/photos"),
+  photoPick: (q: { subject: string; book: string; date: string | null; current?: string }) => {
+    const p = new URLSearchParams({ subject: q.subject, book: q.book });
+    if (q.date) p.set("date", q.date);
+    if (q.current) p.set("current", q.current);
+    return request<{ photo: string | null }>(`/planner/photo-pick?${p}`);
+  },
+  stockImageUrl: (path: string) => `/api/planner/stock-image?${new URLSearchParams({ path })}`,
+  plannerRenderPost: (id: string) => request<PlannerPost>(`/planner/posts/${encodeURIComponent(id)}/render`, { method: "POST" }),
+  plannerRenderApproved: (from: string, to: string) => request<PlannerRenderRun>("/planner/render", { method: "POST", body: JSON.stringify({ from, to }) }),
+  plannerRenderStatus: () => request<PlannerRenderRun | null>("/planner/render"),
+  /** output/posts/x.png → /media/posts/x.png (the server serves output/ as /media). */
+  mediaUrl: (mediaPath: string) => (mediaPath.startsWith("output/") ? `/media/${mediaPath.slice("output/".length)}` : null),
+  reviewPost: (id: string) => request<PlannerPost>(`/planner/posts/${encodeURIComponent(id)}/review`, { method: "POST" }),
+  rejectPost: (id: string, reason: string) =>
+    request<{ rejected: PlannerPost; filled: PlannerPost | null }>(`/planner/posts/${encodeURIComponent(id)}/reject`, { method: "POST", body: JSON.stringify({ reason }) }),
+  plannerSource: (book: string) => request<BookOutline>(`/planner/source/${encodeURIComponent(book)}`),
+  plannerSourceLines: (book: string, unit: string, date: string | null, postId?: string) => {
+    const q = new URLSearchParams({ unit });
+    if (date) q.set("date", date);
+    if (postId) q.set("post", postId);
+    return request<SourceLineWithUse[]>(`/planner/source/${encodeURIComponent(book)}/lines?${q}`);
+  },
+  plannerSuggest: (book: string, opts: { date: string | null; count: number; postId?: string; kind?: SourceLineKind }) => {
+    const q = new URLSearchParams({ count: String(opts.count) });
+    if (opts.date) q.set("date", opts.date);
+    if (opts.postId) q.set("post", opts.postId);
+    if (opts.kind) q.set("kind", opts.kind);
+    return request<SourcePick | null>(`/planner/source/${encodeURIComponent(book)}/suggest?${q}`);
   },
 };

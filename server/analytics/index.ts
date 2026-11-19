@@ -1,5 +1,5 @@
 import { listPublications } from "../publications";
-import { aiStatus } from "../ai/client";
+import { aiSetupHint, aiStatus } from "../ai/client";
 import { collectFacebook, collectInstagram, collectTikTok, collectYouTube, type CollectResult, type TikTokVideo } from "./collectors";
 import { allPhrases, buildContentPieces, durationOf, usedPhraseIds } from "./content";
 import { compare, coverage, predict, scorePieces, suggest } from "./analysis";
@@ -19,6 +19,7 @@ import {
 } from "./store";
 import type { AiReportRecord, InsightsOverview, StatsAccess, StatsPlatform } from "../../src/analytics/types";
 import type { Phrase } from "../../src/data/getPhrases";
+import { matchPublished } from "../plannerStats";
 
 /**
  * Insights: reads every post on each connected account (not only the ones
@@ -77,6 +78,12 @@ async function doRefresh(): Promise<void> {
   const fetchedAt = new Date().toISOString();
   for (const r of results) if (r.posts.length || r.complete) savePlatformPosts(r.access.platform, r.posts, r.complete, fetchedAt);
   autoLinkTikTok();
+  // Planner (P3): link the fresh Facebook posts to the posts planned for them.
+  try {
+    matchPublished();
+  } catch (err) {
+    console.error("[planner] matching after stats refresh failed:", err);
+  }
   saveState({ refreshedAt: fetchedAt, access: results.map((r) => r.access), notes: {} });
 }
 
@@ -142,7 +149,7 @@ export function linkTikTok(publicationId: string, videoId: string | null): void 
 
 export function startAiReport(focus: string | null): AiReportRecord {
   const status = aiStatus();
-  if (!status.available) throw new Error("No AI key is set - add NVIDIA_API_KEY to .env and restart the server. The built-in analysis below works without it.");
+  if (!status.available) throw new Error(`${aiSetupHint()}. The built-in analysis below works without it.`);
   if (listReports(1)[0]?.status === "running") throw new Error("A report is already being written - wait for it to finish");
 
   // The record is created before the (async) overview so the GUI can start polling at once.
@@ -162,7 +169,7 @@ export function startAiReport(focus: string | null): AiReportRecord {
 }
 
 export async function askAi(question: string): Promise<string> {
-  if (!aiStatus().available) throw new Error("No AI key is set - add NVIDIA_API_KEY to .env and restart the server");
+  if (!aiStatus().available) throw new Error(aiSetupHint());
   const overview = await getOverview();
   const phrases = await phrasesOrEmpty();
   return aiAsk(overview, phrases, usedPhraseIds(listPublications(), listPlatformPosts(), phrases), question);

@@ -259,7 +259,7 @@ export function PublishPanel({
   const done = jobs.length > 0 && !running;
   const busy = suggesting != null || running;
   const aiTitle = !ai?.available
-    ? "Add NVIDIA_API_KEY to .env and restart the server to enable AI captions"
+    ? "Claude Code isn't available to the server (claude --version must work) - fix that and restart the server to enable AI captions"
     : `Writes a fresh caption with ${ai.model} - can take up to a minute`;
 
   return (

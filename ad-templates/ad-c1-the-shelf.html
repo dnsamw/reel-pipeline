@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<!--
+  StudyPal ad template C1 · The Shelf
+  Formats: SQ 1080x1080 · PT 1080x1350 · ST 1080x1920 (data-format, ST respects safe zones 270/380/150/200)
+  CONFIG keys: format, bigNumber, bigLabel, bigLabelSi, statLine, price, priceWas, saveBadge, cta, mockup, mockupScale/X/Y/Rotate
+  URL params override any CONFIG key, e.g. ?format=ST&mockup=mockups/collection-shelf.png&render=1
+  Render mode (?render=1): page is exactly the ad's pixel size; wait for window.AD_READY.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StudyPal ad · C1 The Shelf</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&family=Noto+Sans+Sinhala:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ===================== Shared tokens ===================== */
+:root {
+  --sp-purple: #591F82; --sp-purple-deep: #3B1259; --sp-purple-light: #6E2A9E; --sp-gold: #F9B200;
+  --page: #EDF0F6; --surface: #FFFFFF; --ink: #1B2140; --ink-soft: #3A4166; --muted: #6A7194; --line: #E1E5EF;
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Figtree", "Segoe UI", system-ui, sans-serif;
+  --f-si: "Noto Sans Sinhala", "Iskoola Pota", "Nirmala UI", sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: #14101C; font-family: var(--f-body); min-height: 100vh;
+       display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 16px; }
+
+/* ===================== Ad root ===================== */
+.stage { position: relative; }
+.ad {
+  --accent: #591F82; --tint: #F4ECFA;
+  --deep: color-mix(in srgb, var(--accent) 72%, #000);
+  --light: color-mix(in srgb, var(--accent) 70%, #fff);
+  position: absolute; top: 0; left: 0; transform-origin: 0 0;
+  width: 1080px; height: 1350px; overflow: hidden; color: var(--ink);
+}
+.ad[data-format="SQ"] { height: 1080px; }
+.ad[data-format="ST"] { height: 1920px; }
+.ad-inner { position: absolute; inset: 0; padding: 72px; display: flex; flex-direction: column; }
+.ad[data-format="ST"] .ad-inner { padding: 270px 200px 380px 150px; }
+
+[lang="si"] { font-family: var(--f-si); line-height: 1.5; letter-spacing: normal; }
+
+/* Brand bar */
+.brand-bar { display: flex; align-items: center; gap: 18px; flex: none; }
+.sp-logo { width: 72px; height: 72px; flex: none; display: block; }
+.brand-name { font-family: var(--f-display); font-weight: 700; font-size: 36px; letter-spacing: -0.01em; }
+.chip { margin-left: auto; padding: 10px 22px; border-radius: 99px; font-family: var(--f-display);
+        font-weight: 700; font-size: 28px; white-space: nowrap; }
+.chip:empty { display: none; }
+.ad[data-format="ST"] .sp-logo { width: 64px; height: 64px; }
+.ad[data-format="ST"] .brand-name { font-size: 32px; }
+
+/* Offer: price chip, save badge, CTA */
+.offer-bar { display: flex; align-items: center; gap: 20px; flex: none; flex-wrap: wrap; }
+.price-chip { display: inline-flex; align-items: baseline; gap: 16px; padding: 14px 28px; border-radius: 20px;
+              background: var(--sp-gold); color: var(--sp-purple-deep); font-family: var(--f-display); white-space: nowrap; }
+.price { font-weight: 800; font-size: 56px; line-height: 1; }
+.price-was { font-weight: 700; font-size: 30px; text-decoration: line-through; text-decoration-thickness: 3px; opacity: .65; }
+.price:empty, .price-was:empty { display: none; }
+.price-chip:has(.price:empty) { display: none; }
+.save-badge { padding: 12px 20px; border-radius: 14px; font-family: var(--f-display); font-weight: 800; font-size: 30px; white-space: nowrap; }
+.save-badge:empty { display: none; }
+.cta { margin-left: auto; font-weight: 600; font-size: 30px; white-space: nowrap; }
+.cta:empty { display: none; }
+
+/* Mockup slots */
+.mockup-slot { position: relative; }
+.mockup-shadow { position: absolute; left: 50%; bottom: -16px; height: 44px; transform: translateX(-50%);
+  background: radial-gradient(ellipse at center, rgba(15,20,40,.40) 0%, rgba(15,20,40,0) 70%); filter: blur(6px); }
+.mockup { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: center bottom;
+  transform: translate(var(--mx,0px), var(--my,0px)) scale(var(--ms,1)) rotate(var(--mr,0deg)); transform-origin: center bottom;
+  filter: drop-shadow(0 30px 40px rgba(15,20,40,.28)); }
+.cover-wrap { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); transform-origin: center bottom; }
+.cover-wrap.is-tilted { transform: translateX(-50%) perspective(1600px) rotateY(-18deg) rotateX(2deg); }
+.cover-img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 4px 10px 10px 4px;
+  box-shadow: inset 6px 0 10px rgba(0,0,0,.18), 24px 30px 50px -10px rgba(15,20,40,.35); }
+
+/* CSS fallback cover (base 400x600, scaled by JS) */
+.css-cover { position: absolute; left: 0; top: 0; width: 400px; height: 600px; transform-origin: 0 0; overflow: hidden;
+  background: var(--c-accent); border-radius: 4px 10px 10px 4px;
+  box-shadow: inset 7px 0 0 rgba(0,0,0,.14), 24px 30px 50px -10px rgba(15,20,40,.40); }
+.css-cover .cc-glow { position: absolute; right: -120px; top: -110px; width: 360px; height: 360px; border-radius: 50%;
+  background: color-mix(in srgb, var(--c-accent) 70%, #fff); opacity: .45; }
+.css-cover .cc-bubble { position: absolute; left: 84px; top: 92px; width: 190px; height: 112px; border-radius: 30px; background: var(--c-tint); }
+.css-cover .cc-bubble::after { content: ""; position: absolute; left: 34px; bottom: -26px; border: 16px solid transparent;
+  border-top: 22px solid var(--c-tint); border-left-width: 6px; }
+.css-cover .cc-dots { position: absolute; left: 124px; top: 140px; display: flex; gap: 22px; }
+.css-cover .cc-dots i { width: 18px; height: 18px; border-radius: 50%; background: var(--c-accent); }
+.css-cover .cc-dots i:nth-child(2) { opacity: .7; } .css-cover .cc-dots i:nth-child(3) { opacity: .45; }
+.css-cover .cc-top { position: absolute; top: 24px; left: 26px; right: 26px; display: flex; justify-content: space-between;
+  color: #fff; font: 600 13px var(--f-body); }
+.css-cover .cc-badge { background: #fff; color: var(--c-accent); border-radius: 99px; padding: 2px 10px; font: 800 14px var(--f-display); }
+.css-cover .cc-panel { position: absolute; left: 0; right: 0; bottom: 0; height: 58%; background: var(--c-tint);
+  border-top-right-radius: 88px; padding: 30px 28px 22px; display: flex; flex-direction: column; }
+.css-cover .cc-num { font: 700 15px var(--f-display); color: var(--c-accent); }
+.css-cover .cc-si { margin-top: 6px; font: 700 38px/1.4 var(--f-si); color: color-mix(in srgb, var(--c-accent) 72%, #000); }
+.css-cover .cc-en { margin-top: 6px; font: 700 19px/1.2 var(--f-display); color: color-mix(in srgb, var(--c-accent) 60%, #000); }
+.css-cover .cc-foot { margin-top: auto; display: flex; align-items: center; gap: 10px; padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--c-accent) 22%, transparent); font: 700 17px var(--f-display);
+  color: color-mix(in srgb, var(--c-accent) 72%, #000); }
+.css-cover .cc-foot svg { width: 30px; height: 30px; }
+
+/* Preview controls */
+.controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; }
+.controls button, .controls select { padding: 8px 14px; border-radius: 99px; border: 1px solid rgba(255,255,255,.22);
+  background: transparent; color: #fff; font: 600 13px var(--f-body); cursor: pointer; }
+.controls select option { color: #000; }
+.controls button[aria-pressed="true"] { background: var(--sp-gold); color: var(--sp-purple-deep); border-color: var(--sp-gold); }
+.controls .sep { width: 1px; height: 22px; background: rgba(255,255,255,.2); }
+
+/* Render mode (Part 7.3) */
+body.render { margin: 0; padding: 0; background: none; display: block; min-height: 0; }
+body.render .controls { display: none; }
+body.render .stage { width: auto; height: auto; }
+body.render .ad { position: static; transform: none !important; }
+
+/* ===================== Template ===================== */
+
+.ad.purple { background: radial-gradient(circle at 50% 58%, rgba(110,42,158,.9) 0%, rgba(89,31,130,0) 55%), var(--sp-purple); color: #fff; }
+.purple .brand-name { color: #fff; }
+.purple .chip { background: transparent; color: var(--sp-gold); border: 3px solid var(--sp-gold); }
+.purple .save-badge { background: #fff; color: var(--sp-purple-deep); }
+.purple .cta { color: rgba(255,255,255,.92); }
+.purple .price-chip { box-shadow: 0 16px 30px -14px rgba(0,0,0,.5); }
+.ad.purple[data-format="ST"] .cta { margin-left: 0; width: 100%; }
+
+.c1 .big { margin: 64px 0 0; flex: none; font: 800 230px/.86 var(--f-display); letter-spacing: -0.05em; color: var(--sp-gold); }
+.c1 .big-label { margin: 22px 0 0; flex: none; font: 700 46px/1.15 var(--f-display); letter-spacing: -0.015em; color: #fff; }
+.c1 .big-si { margin: 14px 0 0; flex: none; font: 600 36px/1.55 var(--f-si); color: rgba(255,255,255,.82); }
+.c1 .big-si:empty { display: none; }
+
+.c1 .shelf-area { position: relative; flex: 1; min-height: 430px; margin: 34px 0 26px; }
+.c1 .shelf-area .mockup-slot { position: absolute; inset: 0; }
+.c1 .shelf { position: absolute; left: 0; right: 0; bottom: 0; top: 0; display: flex; flex-direction: column; justify-content: flex-end; }
+.c1 .spines { display: flex; align-items: flex-end; gap: 8px; padding: 0 14px; }
+.c1 .spine { flex: 1; min-width: 0; position: relative; border-radius: 6px 6px 3px 3px; background: var(--s-accent);
+  display: flex; flex-direction: column; align-items: center; padding: 14px 0 14px; overflow: hidden;
+  box-shadow: inset -6px 0 0 rgba(0,0,0,.16), inset 3px 0 0 rgba(255,255,255,.12); }
+.c1 .spine-num { width: 44px; height: 44px; flex: none; border-radius: 50%; background: var(--s-tint); color: var(--s-accent);
+  display: grid; place-items: center; font: 800 22px var(--f-display); }
+.c1 .spine-title { flex: 1; min-height: 0; margin: 14px 0; writing-mode: vertical-rl; transform: rotate(180deg);
+  font: 700 28px/1 var(--f-display); color: var(--s-tint); white-space: nowrap; overflow: hidden; }
+.c1 .spine .sp-logo { width: 38px; height: 38px; }
+.c1 .plank { height: 26px; border-radius: 6px; background: var(--sp-purple-deep);
+  box-shadow: inset 0 4px 0 var(--sp-gold), 0 20px 30px -10px rgba(0,0,0,.55); }
+
+.c1 .stat { flex: none; margin-bottom: 30px; font: 600 36px/1.3 var(--f-body); color: rgba(255,255,255,.92); }
+.c1 .stat b { color: var(--sp-gold); font-weight: 700; }
+
+.ad.c1[data-format="SQ"] .big { margin-top: 40px; font-size: 180px; }
+.ad.c1[data-format="SQ"] .big-label { font-size: 40px; margin-top: 14px; }
+.ad.c1[data-format="SQ"] .big-si { display: none; }
+.ad.c1[data-format="SQ"] .shelf-area { min-height: 330px; margin: 24px 0 18px; }
+.ad.c1[data-format="SQ"] .stat { margin-bottom: 22px; }
+
+.ad.c1[data-format="ST"] .big { margin-top: 48px; font-size: 190px; }
+.ad.c1[data-format="ST"] .shelf-area { min-height: 520px; }
+.ad.c1[data-format="ST"] .spines { gap: 6px; padding: 0 8px; }
+.ad.c1[data-format="ST"] .spine-num { width: 36px; height: 36px; font-size: 18px; }
+.ad.c1[data-format="ST"] .spine-title { font-size: 24px; }
+.ad.c1[data-format="ST"] .spine .sp-logo { width: 30px; height: 30px; }
+
+</style>
+</head>
+<body>
+<div class="stage">
+<article id="ad" class="ad" data-format="PT">
+
+  <div class="ad-inner">
+    <header class="brand-bar">
+      <span id="logo"></span><span class="brand-name">StudyPal</span>
+      <span class="chip">Complete set</span>
+    </header>
+    <div class="big" id="bigNumber" data-fit data-min="120"></div>
+    <div class="big-label" id="bigLabel" data-fit data-min="30"></div>
+    <div class="big-si" id="bigLabelSi" data-fit data-min="26"></div>
+    <div class="shelf-area" id="shelfArea"></div>
+    <div class="stat" id="stat" data-fit data-min="26"></div>
+    <footer class="offer-bar">
+      <div class="price-chip"><span class="price" id="price"></span><span class="price-was" id="priceWas"></span></div>
+      <span class="save-badge" id="saveBadge"></span>
+      <span class="cta" id="cta"></span>
+    </footer>
+  </div>
+
+</article>
+</div>
+<div class="controls" id="controls"></div>
+
+<script>
+/* ================== EDIT PER AD ==================
+   Any key can also be overridden by URL param, e.g.
+   ad.html?format=ST&mockup=mockups/collection-shelf.png&render=1
+   Arrays/objects: pass JSON (or "a|b|c" for simple string lists). */
+const CONFIG = {
+  format:     "PT",                           // SQ | PT | ST
+  bigNumber:  "21,000+",
+  bigLabel:   "English phrases for every situation, in Sinhala",
+  bigLabelSi: "හැම ඉංග්‍රීසි වාක්‍යයකටම සිංහල අකුරෙන් උච්චාරණය, තේරුම සහ පැහැදිලි කිරීම.",
+  statLine:   "",                             // "" = "10 books · 69 volumes"
+  price:      "Rs ____",
+  priceWas:   "Rs ____",
+  saveBadge:  "Save __%",
+  cta:        "Order now · studypal.store",
+  mockup:     "mockups/collection-shelf.png", // missing → CSS bookshelf of all 10 spines
+  mockupScale: 1, mockupX: 0, mockupY: 0, mockupRotate: 0
+};
+/* ================================================= */
+
+/* ---------- Product data (from facebook-ads-plan.md, Part 1 & 2) ---------- */
+const BOOKS = [
+  {
+    "n": 1,
+    "en": "Just Start Talking",
+    "enSub": "Confidence Kit",
+    "si": "කතා කරන්න පටන් ගනිමු",
+    "phrases": 2888,
+    "phrasesLabel": "2,800+",
+    "volumes": 9,
+    "accent": "#C2410C",
+    "tint": "#FFEDE4",
+    "spine": "Just Start Talking",
+    "cover": "covers/book-01-just-start-talking.png",
+    "hook": "ඉංග්‍රීසි තේරෙනවා, ඒත් කතා කරන්න බයද?",
+    "hookEn": "Understand English but freeze when you speak?"
+  },
+  {
+    "n": 2,
+    "en": "Everyday English",
+    "enSub": "Foundations",
+    "si": "එදිනෙදා ඉංග්‍රීසි",
+    "phrases": 2200,
+    "phrasesLabel": "2,200",
+    "volumes": 8,
+    "accent": "#15803D",
+    "tint": "#E3F4E8",
+    "spine": "Everyday English",
+    "cover": "covers/book-02-everyday-english.png",
+    "hook": "එදිනෙදා ජීවිතයට ඕන ඉංග්‍රීසි, එක පොතක.",
+    "hookEn": "The English you need every single day"
+  },
+  {
+    "n": 3,
+    "en": "Getting Things Done",
+    "enSub": "Banks, Clinics, Hotels & Travel",
+    "si": "වැඩ කටයුතු කරගැනීම",
+    "phrases": 2602,
+    "phrasesLabel": "2,600+",
+    "volumes": 8,
+    "accent": "#0F766E",
+    "tint": "#DDF3EF",
+    "spine": "Getting Things Done",
+    "cover": "covers/book-03-getting-things-done.png",
+    "hook": "බැංකුවේ, හොස්පිට්ල් එකේ, හෝටලයේ, කියන්න ඕන දේ.",
+    "hookEn": "Know exactly what to say at the bank, clinic or hotel"
+  },
+  {
+    "n": 4,
+    "en": "Working Abroad",
+    "enSub": "Visas, Interviews & Jobs",
+    "si": "විදේශගත රැකියා",
+    "phrases": 5500,
+    "phrasesLabel": "5,500",
+    "volumes": 9,
+    "accent": "#1E3A8A",
+    "tint": "#E6EBF7",
+    "spine": "Working Abroad",
+    "cover": "covers/book-04-working-abroad.png",
+    "hook": "විදේශ රැකියාවකට ලෑස්තිද?",
+    "hookEn": "Ready to work abroad?"
+  },
+  {
+    "n": 5,
+    "en": "Digital Life, AI & Modern World",
+    "enSub": "",
+    "si": "ඩිජිටල් ජීවිතය, AI සහ නූතන ලෝකය",
+    "phrases": 2076,
+    "phrasesLabel": "2,000+",
+    "volumes": 7,
+    "accent": "#6D28D9",
+    "tint": "#EEE7FC",
+    "spine": "Digital Life & AI",
+    "cover": "covers/book-05-digital-life.png",
+    "hook": "Text, social media, AI: ඔක්කොම ඉංග්‍රීසියෙන්.",
+    "hookEn": "Text, post and use AI in English with confidence"
+  },
+  {
+    "n": 6,
+    "en": "Love, Flirting & Social Confidence",
+    "enSub": "",
+    "si": "ආදරය, ආලවන්ත හැඟීම් පෑම සහ සමාජයීය විශ්වාසය",
+    "phrases": 1600,
+    "phrasesLabel": "1,600",
+    "volumes": 8,
+    "accent": "#BE185D",
+    "tint": "#FCE7EF",
+    "spine": "Social Confidence",
+    "cover": "covers/book-06-social-confidence.png",
+    "hook": "විශ්වාසයෙන් කතාව පටන් ගන්න.",
+    "hookEn": "Start conversations with confidence"
+  },
+  {
+    "n": 7,
+    "en": "Standing Your Ground",
+    "enSub": "Conflict, Safety & Respect",
+    "si": "ආත්මගෞරවය රැකගැනීම",
+    "phrases": 1400,
+    "phrasesLabel": "1,400",
+    "volumes": 6,
+    "accent": "#B91C1C",
+    "tint": "#FDE8E8",
+    "spine": "Standing Your Ground",
+    "cover": "covers/book-07-standing-your-ground.png",
+    "hook": "ගෞරවයෙන්, ස්ථිරව කතා කරන්න.",
+    "hookEn": "Stand your ground, calmly and clearly"
+  },
+  {
+    "n": 8,
+    "en": "Real Talk (18+)",
+    "enSub": "Slang, Swearing & Street Register",
+    "si": "සිරා කතාව",
+    "phrases": 1200,
+    "phrasesLabel": "1,200",
+    "volumes": 5,
+    "accent": "#1C1917",
+    "tint": "#ECEAE8",
+    "spine": "Real Talk",
+    "cover": "covers/book-08-real-talk.png",
+    "hook": "",
+    "hookEn": "Never get caught off guard by slang again"
+  },
+  {
+    "n": 9,
+    "en": "Raising Kids in English",
+    "enSub": "Family & Parenting",
+    "si": "දෙමාපියන් සහ පවුල",
+    "phrases": 1200,
+    "phrasesLabel": "1,200",
+    "volumes": 4,
+    "accent": "#A16207",
+    "tint": "#FDF3D6",
+    "spine": "Raising Kids",
+    "cover": "covers/book-09-raising-kids.png",
+    "hook": "දරුවා එක්ක ගෙදරදීම ඉංග්‍රීසියෙන් කතා කරමු.",
+    "hookEn": "Bring English into your home"
+  },
+  {
+    "n": 10,
+    "en": "Silver Surfers",
+    "enSub": "Everyday English for Seniors",
+    "si": "වැඩිහිටි අපට",
+    "phrases": 900,
+    "phrasesLabel": "900",
+    "volumes": 5,
+    "accent": "#6B3F7A",
+    "tint": "#F1E9F4",
+    "spine": "Silver Surfers",
+    "cover": "covers/book-10-silver-surfers.png",
+    "hook": "අම්මාට, තාත්තාට, ඉංග්‍රීසියෙන් කතා කරන්න පුළුවන් තෑග්ගක්.",
+    "hookEn": "A gift of confidence for your parents"
+  }
+];
+const PACKS = [
+  {
+    "id": "PKSTART",
+    "name": "Starter Pack",
+    "nameSi": "පටන් ගන්න",
+    "books": [
+      1,
+      2,
+      3
+    ],
+    "phrases": 7690,
+    "phrasesLabel": "7,600+",
+    "volumes": 25,
+    "hook": "පටන් ගන්න හොඳම තැන. පොත් 3ක්, එක මිලක්.",
+    "hookEn": "The best place to start: 3 books, one price"
+  },
+  {
+    "id": "PKABROAD",
+    "name": "Going Abroad Pack",
+    "nameSi": "විදේශ ගමනට",
+    "books": [
+      3,
+      4,
+      7
+    ],
+    "phrases": 9502,
+    "phrasesLabel": "9,500+",
+    "volumes": 23,
+    "hook": "වීසා interview එකේ ඉඳන් වැඩබිමට.",
+    "hookEn": "From visa interview to your first shift"
+  },
+  {
+    "id": "PKSOCIAL",
+    "name": "Social Confidence Pack",
+    "nameSi": "",
+    "books": [
+      1,
+      5,
+      6
+    ],
+    "phrases": 6564,
+    "phrasesLabel": "6,500+",
+    "volumes": 24,
+    "hook": "",
+    "hookEn": "Talk, text and connect with confidence, online and in person"
+  },
+  {
+    "id": "PKFAMILY",
+    "name": "Family Pack",
+    "nameSi": "පවුලටම",
+    "books": [
+      2,
+      9,
+      10
+    ],
+    "phrases": 4300,
+    "phrasesLabel": "4,300",
+    "volumes": 17,
+    "hook": "පවුලේ හැමෝටම ඉංග්‍රීසි.",
+    "hookEn": "English for the whole family"
+  }
+];
+const COLLECTION = { phrasesLabel: "21,000+", books: 10, volumes: 69 };
+
+/* ---------- Shared runtime ---------- */
+const q = new URLSearchParams(location.search);
+const RENDER = q.get("render") === "1";
+if (RENDER) document.body.classList.add("render");
+const FORMATS = { SQ: [1080, 1080], PT: [1080, 1350], ST: [1080, 1920] };
+const AD = document.getElementById("ad");
+let SHOW_MOCKUPS = q.get("mockups") !== "0";
+
+for (const k in CONFIG) {
+  if (!q.has(k)) continue;
+  const v = q.get(k), cur = CONFIG[k];
+  if (typeof cur === "number") CONFIG[k] = Number(v);
+  else if (Array.isArray(cur) || (cur && typeof cur === "object")) {
+    try { CONFIG[k] = JSON.parse(v); } catch (e) { if (Array.isArray(cur)) CONFIG[k] = v.split("|"); }
+  } else CONFIG[k] = v;
+}
+if (!FORMATS[CONFIG.format]) CONFIG.format = "PT";
+
+const byId = id => document.getElementById(id);
+const hasSi = s => /[\u0D80-\u0DFF]/.test(s || "");
+const bookOf = n => BOOKS[Math.min(10, Math.max(1, Number(n) || 1)) - 1];
+function setText(id, value) {
+  const el = byId(id); if (!el) return;
+  el.textContent = value || "";
+  if (hasSi(value)) el.setAttribute("lang", "si"); else el.removeAttribute("lang");
+}
+function setColors(accent, tint) {
+  AD.style.setProperty("--accent", (CONFIG.colors && CONFIG.colors.accent) || accent);
+  AD.style.setProperty("--tint", (CONFIG.colors && CONFIG.colors.tint) || tint);
+}
+
+const LOGO_PATH = "M87.787 36.736a20.05 20.05 0 0 0-14.263-5.912 20.05 20.05 0 0 0-14.264 5.912L36.034 59.962a12.59 12.59 0 0 1-8.962 3.707 12.55 12.55 0 0 1-8.952-3.717A12.53 12.53 0 0 1 14.404 51c0-3.378 1.314-6.56 3.716-8.962a12.58 12.58 0 0 1 8.952-3.707 12.58 12.58 0 0 1 8.962 3.707l5.463 5.464 4.961-.46.342-4.842-5.464-5.464a20.05 20.05 0 0 0-14.264-5.912 20.05 20.05 0 0 0-14.264 5.912C8.998 40.546 6.896 45.613 6.896 51s2.102 10.452 5.912 14.265a20.05 20.05 0 0 0 14.264 5.911 20.05 20.05 0 0 0 14.264-5.911l23.226-23.227a12.59 12.59 0 0 1 8.963-3.707c3.378 0 6.56 1.313 8.952 3.707 4.944 4.945 4.944 12.979 0 17.924a12.58 12.58 0 0 1-8.952 3.707 12.59 12.59 0 0 1-8.963-3.707L58.301 53.7l-.342 4.842-4.961.46-.045-.045v.001l6.308 6.307a20.05 20.05 0 0 0 14.264 5.911 20.05 20.05 0 0 0 14.263-5.911c7.862-7.866 7.862-20.665-.001-28.529";
+function logoSVG(bg, fg, label) {
+  return `<svg class="sp-logo" viewBox="0 0 300 300" ${label ? 'role="img" aria-label="StudyPal"' : 'aria-hidden="true"'}>` +
+    `<rect width="300" height="300" rx="64" fill="${bg}"/>` +
+    `<g fill="${fg}" transform="matrix(2.3512290156904005,0,0,2.3512290156904005,31.75624218697046,30.09)"><path d="${LOGO_PATH}"/></g></svg>`;
+}
+
+function loadImg(src) {
+  return new Promise(res => {
+    if (!src) return res(false);
+    const i = new Image(); i.onload = () => res(true); i.onerror = () => res(false); i.src = src;
+  });
+}
+
+/* CSS-only cover, used when neither a mockup nor the flat cover PNG is available */
+function cssCover(book) {
+  const c = document.createElement("div");
+  c.className = "css-cover";
+  c.style.setProperty("--c-accent", book.accent);
+  c.style.setProperty("--c-tint", book.tint);
+  c.innerHTML = `<div class="cc-glow"></div><div class="cc-bubble"></div><div class="cc-dots"><i></i><i></i><i></i></div>
+    <div class="cc-top"><span>The Ultimate Practical English Book</span><span class="cc-badge"></span></div>
+    <div class="cc-panel"><div class="cc-num"></div><div class="cc-si" lang="si"></div><div class="cc-en"></div>
+    <div class="cc-foot">${logoSVG(book.accent, book.tint)}<span>StudyPal</span></div></div>`;
+  c.querySelector(".cc-num").textContent = "Book " + String(book.n).padStart(2, "0");
+  c.querySelector(".cc-si").textContent = book.si;
+  c.querySelector(".cc-en").textContent = book.en;
+  const badge = c.querySelector(".cc-badge");
+  if (book.n === 8) badge.textContent = "18+"; else badge.remove();
+  return c;
+}
+function fitCoverTitle(c) {
+  const si = c.querySelector(".cc-si"), panel = c.querySelector(".cc-panel");
+  let s = 38; si.style.fontSize = s + "px";
+  while (panel.scrollHeight > panel.clientHeight && s > 18) { s -= 1; si.style.fontSize = s + "px"; }
+}
+
+/* Fill a mockup slot: mockup image → flat cover PNG (CSS 3D) → CSS cover */
+async function fillSlot(slot, { src = "", book, tilt = true, nudge = false, maxH = 1 } = {}) {
+  slot.innerHTML = "";
+  const W = slot.offsetWidth, H = slot.offsetHeight;
+  const shadow = document.createElement("div");
+  shadow.className = "mockup-shadow";
+  slot.appendChild(shadow);
+  if (SHOW_MOCKUPS && src && await loadImg(src)) {
+    const img = new Image();
+    img.className = "mockup"; img.alt = ""; img.src = src;
+    if (nudge) {
+      img.style.setProperty("--ms", CONFIG.mockupScale ?? 1);
+      img.style.setProperty("--mx", (CONFIG.mockupX ?? 0) + "px");
+      img.style.setProperty("--my", (CONFIG.mockupY ?? 0) + "px");
+      img.style.setProperty("--mr", (CONFIG.mockupRotate ?? 0) + "deg");
+    }
+    shadow.style.width = W * 0.8 + "px";
+    slot.appendChild(img);
+    return;
+  }
+  const h = Math.min(H * maxH, W * 1.5), w = h * 2 / 3;
+  shadow.style.width = w * 0.95 + "px";
+  const wrap = document.createElement("div");
+  wrap.className = "cover-wrap" + (tilt ? " is-tilted" : "");
+  wrap.style.width = w + "px"; wrap.style.height = h + "px";
+  slot.appendChild(wrap);
+  if (await loadImg(book.cover)) {
+    const img = new Image(); img.className = "cover-img"; img.alt = ""; img.src = book.cover;
+    wrap.appendChild(img);
+  } else {
+    const c = cssCover(book);
+    c.style.transform = `scale(${w / 400})`;
+    wrap.appendChild(c);
+    fitCoverTitle(c);
+  }
+}
+
+/* Shrink-to-fit (Part 7.5): lower [data-fit] font sizes in 2px steps until the ad's content fits */
+function fitText() {
+  const inner = AD.querySelector(".ad-inner");
+  const els = [...AD.querySelectorAll("[data-fit]")].filter(e => e.offsetParent !== null);
+  els.forEach(e => e.style.fontSize = "");
+  const base = els.map(e => parseFloat(getComputedStyle(e).fontSize));
+  const min = els.map(e => Number(e.dataset.min || 28));
+  const tallOver = () => inner.scrollHeight > inner.clientHeight + 1;
+  const ownOver = e => e.scrollWidth > e.clientWidth + 1 || (e.dataset.box && e.scrollHeight > e.clientHeight + 1);
+  for (let step = 0; step < 120; step++) {
+    const tall = tallOver();
+    let moved = false;
+    els.forEach((e, i) => {
+      if (!tall && !ownOver(e)) return;          // width problems shrink only that element
+      const cur = parseFloat(e.style.fontSize || base[i]);
+      if (cur - 2 >= min[i]) { e.style.fontSize = (cur - 2) + "px"; moved = true; }
+    });
+    if (!moved) break;
+  }
+}
+
+function layoutStage() {
+  const [W, H] = FORMATS[CONFIG.format];
+  if (RENDER) { AD.style.transform = "none"; return; }
+  const s = Math.min((innerWidth - 32) / W, (innerHeight - 110) / H, 1);
+  const st = document.querySelector(".stage");
+  st.style.width = W * s + "px"; st.style.height = H * s + "px";
+  AD.style.transform = `scale(${s})`;
+}
+
+function buildControls(extra) {
+  const bar = byId("controls");
+  const fmt = ["SQ", "PT", "ST"].map(f => `<button type="button" data-fmt="${f}">${f}</button>`).join("");
+  bar.innerHTML = fmt + '<span class="sep"></span>' + (extra || "") +
+    '<button type="button" id="mockToggle">Mockups</button>';
+  bar.querySelectorAll("[data-fmt]").forEach(b => b.onclick = () => { CONFIG.format = b.dataset.fmt; run(); });
+  byId("mockToggle").onclick = () => { SHOW_MOCKUPS = !SHOW_MOCKUPS; run(); };
+}
+function syncControls() {
+  document.querySelectorAll("[data-fmt]").forEach(b => b.setAttribute("aria-pressed", b.dataset.fmt === CONFIG.format));
+  const t = byId("mockToggle"); if (t) t.setAttribute("aria-pressed", SHOW_MOCKUPS);
+}
+
+async function run() {
+  AD.dataset.format = CONFIG.format;
+  populate();
+  fitText();
+  await fillSlots();
+  layoutStage();
+  syncControls();
+}
+addEventListener("resize", layoutStage);
+
+/* ---------- Template ---------- */
+
+AD.classList.add("c1", "purple");
+const CONTROLS_EXTRA = "";
+
+function populate() {
+  byId("logo").innerHTML = logoSVG("#F9B200", "#591F82", true);
+  setText("bigNumber", CONFIG.bigNumber);
+  setText("bigLabel", CONFIG.bigLabel);
+  setText("bigLabelSi", CONFIG.bigLabelSi);
+  const stat = byId("stat");
+  if (CONFIG.statLine) stat.textContent = CONFIG.statLine;
+  else stat.innerHTML = `<b>${COLLECTION.books} books</b> · ${COLLECTION.volumes} volumes · Sinhala pronunciation`;
+  setText("price", CONFIG.price); setText("priceWas", CONFIG.priceWas);
+  setText("saveBadge", CONFIG.saveBadge); setText("cta", CONFIG.cta);
+}
+
+async function fillSlots() {
+  const area = byId("shelfArea"); area.innerHTML = "";
+  if (SHOW_MOCKUPS && CONFIG.mockup && await loadImg(CONFIG.mockup)) {
+    const slot = document.createElement("div"); slot.className = "mockup-slot"; area.appendChild(slot);
+    await fillSlot(slot, { src: CONFIG.mockup, book: BOOKS[0], nudge: true });
+    return;
+  }
+  // CSS bookshelf fallback: ten spines in their accent colors
+  const shelf = document.createElement("div"); shelf.className = "shelf";
+  const row = document.createElement("div"); row.className = "spines";
+  const h = Math.round(area.offsetHeight * 0.9 - 26);
+  BOOKS.forEach(b => {
+    const s = document.createElement("div"); s.className = "spine";
+    s.style.setProperty("--s-accent", b.accent); s.style.setProperty("--s-tint", b.tint);
+    s.style.height = h + "px";
+    s.innerHTML = `<span class="spine-num">${b.n}</span><span class="spine-title"></span>${logoSVG(b.tint, b.accent)}`;
+    s.querySelector(".spine-title").textContent = b.spine + (b.n === 8 ? " 18+" : "");
+    row.appendChild(s);
+  });
+  const plank = document.createElement("div"); plank.className = "plank";
+  shelf.append(row, plank); area.appendChild(shelf);
+  row.querySelectorAll(".spine-title").forEach(t => {
+    let fs = parseFloat(getComputedStyle(t).fontSize);
+    while (t.scrollHeight > t.clientHeight + 1 && fs > 11) { fs -= 1; t.style.fontSize = fs + "px"; }
+  });
+}
+
+
+/* ---------- Boot + ready signal (Part 7.3) ---------- */
+(async () => {
+  buildControls(CONTROLS_EXTRA);
+  await document.fonts.ready;
+  await run();
+  await Promise.all([...document.images].map(i => i.decode().catch(() => {})));
+  document.body.dataset.ready = "1";
+  window.AD_READY = true;
+})();
+</script>
+</body>
+</html>

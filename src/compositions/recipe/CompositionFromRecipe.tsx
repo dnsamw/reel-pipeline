@@ -1,3 +1,4 @@
+import { BrandTextProvider } from "../scenes/brandText";
 import { Fragment, type ReactNode } from "react";
 import { z } from "zod";
 import { Html5Audio, staticFile, type CalculateMetadataFunction } from "remotion";
@@ -97,6 +98,7 @@ export function CompositionFromRecipeDynamic({
 
   return (
     <ThemeProvider theme={config.theme}>
+      <BrandTextProvider value={{ label: config.brandLabel, outroHeading: config.outroHeading, outroSub: config.outroSub }}>
       {musicFile && (
         <Html5Audio src={staticFile(`music/${musicFile}`)} loop trimBefore={musicStartFrame} volume={config.musicVolume} />
       )}
@@ -183,6 +185,7 @@ export function CompositionFromRecipeDynamic({
           );
         })}
       </TransitionSeries>
+      </BrandTextProvider>
     </ThemeProvider>
   );
 }

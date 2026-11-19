@@ -97,6 +97,19 @@ db.exec(`
   );
 `);
 
+// Ad Creator presets: named snapshots per template, either an ad's words
+// (kind 'text': fields, lists, Ads Manager copy) or its color overrides
+// (kind 'colors') - see server/adPresets.ts.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS ad_presets (
+    id TEXT PRIMARY KEY,
+    template_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    data_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+`);
+
 // Additive migrations for tables created before a column existed -
 // CREATE TABLE IF NOT EXISTS above never alters an existing table.
 function addColumnIfMissing(table: string, column: string, ddl: string): void {
@@ -113,3 +126,4 @@ addColumnIfMissing("publications", "stage", "stage TEXT");
 addColumnIfMissing("publications", "caption_meta", "caption_meta TEXT");
 // What a successful publish actually produced: live post, TikTok draft, private/unlisted YouTube upload.
 addColumnIfMissing("publications", "outcome", "outcome TEXT");
+addColumnIfMissing("ad_presets", "kind", "kind TEXT NOT NULL DEFAULT 'text'");

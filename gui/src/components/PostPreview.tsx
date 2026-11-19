@@ -66,7 +66,7 @@ export function PostPreview({
           <Component fields={{ ...def.defaultFields, ...fields }} lists={{ ...def.defaultLists, ...lists }} colors={{ ...def.defaultColors, ...colors }}
             insets={postInsets(def.width, def.height, safeZones)}
           />
-          {showGuides && <SafeZoneGuides def={def} />}
+          {showGuides && <SafeZoneGuides width={def.width} height={def.height} />}
         </div>
       ) : (
         <div className="post-preview-loading">
@@ -82,10 +82,10 @@ export function PostPreview({
  * scaled 1:1 layer): shaded bands where the Reels/Stories UI covers the post
  * or tall phones crop it, and a dashed outline of the area content can use.
  */
-function SafeZoneGuides({ def }: { def: PostTemplateDef }) {
-  const i = reelSafeInsets(def.width, def.height);
+export function SafeZoneGuides({ width, height }: { width: number; height: number }) {
+  const i = reelSafeInsets(width, height);
   const band = "rgba(239, 68, 68, 0.28)";
-  const line = Math.max(2, Math.round(def.width / 270));
+  const line = Math.max(2, Math.round(width / 270));
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 50 }}>
       <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: i.top, background: band }} />
