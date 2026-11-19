@@ -103,7 +103,7 @@ export interface PackPlan {
   alreadyScheduled: number;
 }
 
-function resolveMedia(p: string): string | null {
+export function resolveMedia(p: string): string | null {
   if (!p.trim() || /^https?:|^facebook:/.test(p)) return null;
   const abs = isAbsolute(p) ? p : resolve(process.cwd(), p);
   return existsSync(abs) && statSync(abs).isFile() ? abs : null;

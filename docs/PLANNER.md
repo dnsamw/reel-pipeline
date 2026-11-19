@@ -2,7 +2,7 @@
 
 The Planner page (`/planner` in the GUI, "Plan → Planner" in the sidebar) is the one calendar for every social
 post. The plan behind it is `studypal-lms/docs/16-social-content-pipeline.md` in the StudyPal workspace; this
-file only covers the code. Status: **P1** (calendar, stock, pillars, slots, reserve), **P2** (book lines as post source, repeat guard), **P3** (week pack, stats matching, Facebook posting off) and **P4** (Claude drafts the empty slots, auto-approval, Grok scout, stock-photo picker, Insights on Claude). Approved posts are rendered automatically: image posts with the Hook photo template, reels **silent with music only** (owner 2026-11-18).
+file only covers the code. Status: **P1** (calendar, stock, pillars, slots, reserve), **P2** (book lines as post source, repeat guard), **P3** (week pack, stats matching, Facebook posting off) **P4** (Claude drafts the empty slots, auto-approval, Grok scout, stock-photo picker, Insights on Claude) and **P5** (feedback loop: the Page's numbers shape the next plan, evergreen reserve kept at 10). Approved posts are rendered automatically: image posts with the Hook photo template, reels **silent with music only** (owner 2026-11-18).
 
 ## Rules it enforces
 
@@ -48,7 +48,30 @@ file only covers the code. Status: **P1** (calendar, stock, pillars, slots, rese
   free section, else the landing page).
 - **Claude and Grok** run as CLIs on the owner's subscriptions (`server/ai/cli.ts`): Claude with no tools and no MCP,
   in a temp folder; every call is logged in `ai_calls`. The batch asks before it runs and shows the call count.
-- Rejecting (Weekly batch tab or the editor) needs a reason and moves a ready reserve post into the slot.
+- Rejecting (Weekly batch tab or the editor) needs a reason and moves a ready reserve post into the slot (same post type first).
+
+## Feedback loop (P5, `server/planLearn.ts`, Planner → What worked)
+
+No AI call; all code. Each Facebook post with numbers (Insights refresh or the Business Suite CSV) gets a **score
+0-100**: its rank among posts of the same type in the window (reels by views; image posts by reach or, as now,
+likes + comments + shares). 50 = a typical post. The last 3 days are left out (numbers still climbing). Posts are
+grouped by slot, 2-hour time band, hook style (`hookStyle()`: warning, mistake, number, question, how-to-say,
+statement), and, for Planner posts only, pillar and book. A group counts from **5 posts**. Posts made outside the
+Planner count for time bands and hook styles (their first caption line is the hook).
+
+What the batch does with it:
+- **Pillar mix:** a pillar with 5+ measured Planner posts moves by (score − 50) %, at most ±25 % (`pillarWeights()`);
+  the owner's share stays the base, 0 % stays 0. `planSlots()` takes the weights.
+- **Writer:** `learningNotes()` goes into the writer prompt: hook styles with scores, best 5 and weakest 3 hooks
+  (one per text, none that breaks a banned-word rule), as hints; the rules still win.
+- **Slot times:** `slotSuggestions()` names a time band of the same type with 1.5× the median of the slot's own
+  band. Shown to the owner only; code never moves a slot.
+- **Evergreen reserve (docs/16 §7):** target 10. The batch writes new timeless reserve posts for the gap
+  (`planReserve()`: no brand/launch pillars, half reels half images) and copies Planner posts that scored 75+
+  back in (`cloneBestPosts()`) once the repeat guard allows it (lines 90 days, photo 30). A copy with a passing
+  code check is ready on its own; otherwise it waits as a draft. `fillEmptySlots()` drops ready reserve posts
+  (same type first) into slots with no post at all at the end of a batch and before a week pack is written; a
+  slot with a draft waiting for the owner is left alone.
 
 ## Code
 
@@ -66,6 +89,7 @@ file only covers the code. Status: **P1** (calendar, stock, pillars, slots, rese
 | `server/planWeek.ts` | The batch: `planSlots()` (empty slots → the pillar furthest behind its share, allowed in that slot, not twice a day), books least used in 30 days (never the 18+ book), lines via `suggestSource()` (grammar: mistakes), photo via the picker, `idea` posts → Claude writes 6 per call → `drafted` → review. `estimateBatch()`, `startBatch()` (one at a time, background), `dropUnwrittenIdeas()` |
 | `server/planReview.ts` | Code checks + Claude critic (a separate call, 6 posts per call) → `saveReview()`; `composeCaption()`, `expectedSales()`, `BANNED` (add a rule here when a rejection shows a gap) |
 | `server/planRender.ts` | `renderPlannerPost()`, `renderApproved()`, `renderBlocker()`, `templateUsedBefore()`; routes `POST /api/planner/posts/:id/render`, `GET/POST /api/planner/render` (background run over a range) |
+| `server/planLearn.ts` | P5: `feedbackReport()`, `collectSamples()`, `hookStyle()`, `pillarWeights()`, `slotSuggestions()`, `learningNotes()`, `bestPlannerPosts()`; `GET /api/planner/feedback?days`, `POST /api/planner/reserve/fill`; GUI `gui/src/pages/PlannerFeedback.tsx` |
 | `server/planReel.ts` | `renderPlannerReel()`, `reelPhrases()`, `reelTexts()`, `plannerMusic()`, `musicStart()` (ffprobe) |
 | `server/salesBlock.ts` | Prices from `products.ts`, the 2-line sales block per subject, `learnPath()` |
 | `server/photoPicker.ts` | `stock-images/<subject>/<book folder>` (book 4 → `english/04-…`, J3 → `japanese/n5-j2-j4`, K4 → `korean/k4-…`) then `_shared`; not used in 30 days, least used first, `ai-grok-` last; `photoStock()` (under 6 free = low); `stockPhotoPath()` for serving |
@@ -86,4 +110,4 @@ file only covers the code. Status: **P1** (calendar, stock, pillars, slots, rese
 
 ## Next phases (docs/16 §11)
 
-~~P2~~ · ~~P3~~ · ~~P4 Claude + Grok batch~~ (done) · ~~image post rendering~~ · ~~silent Planner reels~~ · **Next:** P5 feedback loop · later: reels with voice-over (TTS quota) · P6 more platforms.
+~~P2~~ · ~~P3~~ · ~~P4 Claude + Grok batch~~ (done) · ~~image post rendering~~ · ~~silent Planner reels~~ · ~~P5 feedback loop~~ · **Next:** P6 more platforms · later: reels with voice-over (TTS quota).

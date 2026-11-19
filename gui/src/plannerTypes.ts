@@ -226,6 +226,11 @@ export interface BatchEstimate {
   from: string;
   to: string;
   slots: number;
+  /** New reserve posts Claude writes to bring the reserve to its target. */
+  reserve: number;
+  reserveNow: number;
+  /** Pillars whose share the numbers moved (P5). */
+  weights: { name: string; weight: number }[];
   claudeCalls: number;
   grokCalls: number;
   byPillar: Record<string, number>;
@@ -244,7 +249,62 @@ export interface BatchJob {
   approved: number;
   needsYou: number;
   rendered: number;
+  reserveAdded: number;
+  filledFromReserve: number;
   error: string | null;
+}
+
+// --- P5 feedback (server/planLearn.ts) ---
+
+export type SampleKind = "reel" | "image";
+
+export interface FeedbackSample {
+  remoteId: string;
+  permalink: string | null;
+  at: string;
+  day: string;
+  minutes: number;
+  kind: SampleKind;
+  hook: string;
+  style: string;
+  views: number | null;
+  reach: number | null;
+  engagement: number | null;
+  score: number;
+  value: number;
+  planner: { postId: string; pillarId: string | null; slotId: string | null; book: string } | null;
+}
+
+export interface FeedbackGroup {
+  key: string;
+  label: string;
+  kind?: SampleKind;
+  n: number;
+  score: number;
+  value: number;
+  signal: boolean;
+}
+
+export interface FeedbackReport {
+  from: string;
+  to: string;
+  days: number;
+  samples: number;
+  plannerSamples: number;
+  scoreBy: Record<SampleKind, "views" | "reach" | "engagement" | null>;
+  bySlot: FeedbackGroup[];
+  byBand: FeedbackGroup[];
+  byPillar: FeedbackGroup[];
+  byStyle: FeedbackGroup[];
+  byBook: FeedbackGroup[];
+  top: FeedbackSample[];
+  bottom: FeedbackSample[];
+  weights: { pillarId: string; name: string; sharePct: number; weight: number; effectivePct: number; n: number }[];
+  suggestions: { slotId: string; text: string }[];
+  notes: string;
+  minPosts: number;
+  settleDays: number;
+  reserve: { now: number; target: number };
 }
 
 export interface ScoutNote {

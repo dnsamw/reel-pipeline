@@ -47,6 +47,7 @@ import {
   addDays,
   createPost,
   deletePost,
+  fillEmptySlots,
   fillFromReserve,
   rejectAndRefill,
   getPost,
@@ -68,7 +69,8 @@ import {
 import { bookOutline, listCatalogBooks, SOURCE_LINE_KINDS } from "./lmsCatalog";
 import { importFacebookCsv, matchPublished, plannerPostStats } from "./plannerStats";
 import { exportWeekPack, planWeekPack, showDir } from "./weekPack";
-import { batchJob, dropUnwrittenIdeas, estimateBatch, startBatch } from "./planWeek";
+import { batchJob, dropUnwrittenIdeas, estimateBatch, RESERVE_TARGET, reserveGap, startBatch } from "./planWeek";
+import { DEFAULT_WINDOW_DAYS, feedbackReport, learningNotes, MIN_POSTS, SETTLE_DAYS } from "./planLearn";
 import { checkPost, reviewPosts } from "./planReview";
 import { renderApproved, renderPlannerPost } from "./planRender";
 import { pickPhoto, photoStock, stockPhotoPath } from "./photoPicker";
@@ -1107,8 +1109,10 @@ app.get("/api/planner/week-pack", (req, res) => {
 app.post("/api/planner/week-pack", (req, res) => {
   try {
     const { from, to } = packRange(req.body ?? {});
+    // docs/16 §7: empty slots take a ready reserve post before the pack is written.
+    const filled = fillEmptySlots(from, to);
     const r = exportWeekPack(from, to);
-    res.json({ ...packOut(r), dir: showDir(r.dir) });
+    res.json({ ...packOut(r), dir: showDir(r.dir), filledFromReserve: filled.length });
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -1165,7 +1169,7 @@ app.get("/api/planner/ai", (_req, res) => {
 app.get("/api/planner/batch/estimate", (req, res) => {
   try {
     const { from, to } = batchRange(req.query);
-    res.json(estimateBatch(from, to, req.query.scout === "1"));
+    res.json(estimateBatch(from, to, req.query.scout === "1", req.query.reserve !== "0"));
   } catch (err) {
     fail400(res, err);
   }
@@ -1175,13 +1179,35 @@ app.get("/api/planner/batch", (_req, res) => {
   res.json(batchJob());
 });
 
-/** { from, to, scout?, limit? } → starts the batch in the background; poll GET /api/planner/batch. */
+/** { from, to, scout?, limit?, reserve? } → starts the batch in the background; poll GET /api/planner/batch. */
 app.post("/api/planner/batch", (req, res) => {
   try {
     const { from, to } = batchRange(req.body ?? {});
     const limit = req.body?.limit === undefined || req.body?.limit === null ? undefined : Number(req.body.limit);
     if (limit !== undefined && (!Number.isInteger(limit) || limit < 0)) throw new Error("limit must be a whole number");
-    res.json(startBatch(from, to, { scout: req.body?.scout === true, limit }));
+    res.json(startBatch(from, to, { scout: req.body?.scout === true, limit, reserve: req.body?.reserve !== false }));
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+/** P5: what the Page's numbers say (by slot, time, pillar, hook style, book), and what the next plan does with it. */
+app.get("/api/planner/feedback", (req, res) => {
+  try {
+    const days = req.query.days === undefined ? DEFAULT_WINDOW_DAYS : Number(req.query.days);
+    if (!Number.isInteger(days) || days < 7 || days > 365) throw new Error("days must be 7-365");
+    const report = feedbackReport(days);
+    res.json({ ...report, notes: learningNotes(report), minPosts: MIN_POSTS, settleDays: SETTLE_DAYS, reserve: { now: RESERVE_TARGET - reserveGap(), target: RESERVE_TARGET } });
+  } catch (err) {
+    fail400(res, err);
+  }
+});
+
+/** { from, to } → fills empty slots with ready reserve posts. */
+app.post("/api/planner/reserve/fill", (req, res) => {
+  try {
+    const { from, to } = batchRange(req.body ?? {});
+    res.json({ filled: fillEmptySlots(from, to).map((p) => ({ id: p.id, date: p.date, slotId: p.slotId, title: p.title })) });
   } catch (err) {
     fail400(res, err);
   }

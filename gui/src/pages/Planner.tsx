@@ -17,6 +17,7 @@ import {
 import { SourcePicker } from "./PlannerSource";
 import { WeekPack } from "./PlannerWeekPack";
 import { Batch } from "./PlannerBatch";
+import { Feedback } from "./PlannerFeedback";
 
 /**
  * Planner: every social post on one calendar (docs/16-social-content-pipeline.md
@@ -52,7 +53,7 @@ function dayLabel(date: string): { weekday: string; day: string } {
   };
 }
 
-type Tab = "calendar" | "reserve" | "batch" | "pack" | "pillars" | "slots";
+type Tab = "calendar" | "reserve" | "batch" | "learn" | "pack" | "pillars" | "slots";
 
 type Editing = { post: PlannerPostInput & { id?: string } } | null;
 
@@ -107,9 +108,9 @@ export function Planner() {
       <div className="planner-head">
         <h1>Planner</h1>
         <div className="segmented">
-          {(["calendar", "reserve", "batch", "pack", "pillars", "slots"] as Tab[]).map((t) => (
+          {(["calendar", "reserve", "batch", "learn", "pack", "pillars", "slots"] as Tab[]).map((t) => (
             <button key={t} type="button" className={tab === t ? "active" : ""} onClick={() => setTab(t)}>
-              {t === "calendar" ? "Calendar" : t === "reserve" ? `Reserve (${view.reserve.length})` : t === "batch" ? "Weekly batch" : t === "pack" ? "Week pack & stats" : t === "pillars" ? "Pillars" : "Slots"}
+              {t === "calendar" ? "Calendar" : t === "reserve" ? `Reserve (${view.reserve.length})` : t === "batch" ? "Weekly batch" : t === "learn" ? "What worked" : t === "pack" ? "Week pack & stats" : t === "pillars" ? "Pillars" : "Slots"}
             </button>
           ))}
         </div>
@@ -196,7 +197,7 @@ export function Planner() {
         <div className="card">
           <p className="hint" style={{ marginTop: 0 }}>
             Evergreen posts with no day yet. When a day is empty or a post is rejected, move one of these into the slot
-            (open it and pick a day). Target: 10 approved reserve posts (docs/16 §7).
+            (open it and pick a day). Target: 10 approved reserve posts (docs/16 §7). The weekly batch tops the reserve up, and empty slots take a ready reserve post at the end of a batch and before a week pack is written.
           </p>
           <div className="button-row" style={{ marginTop: 0 }}>
             <button type="button" onClick={() => setEditing({ post: { reserve: true, kind: "image", status: "idea" } })}>
@@ -216,6 +217,7 @@ export function Planner() {
       )}
 
       {tab === "batch" && <Batch view={view} onChanged={() => reload()} onOpen={(p) => setEditing({ post: p })} />}
+      {tab === "learn" && <Feedback />}
       {tab === "pack" && <WeekPack view={view} onChanged={() => reload()} />}
       {tab === "pillars" && <PillarsEditor pillars={view.pillars} slots={view.slots} onSaved={() => reload()} onError={setError} />}
       {tab === "slots" && <SlotsEditor slots={view.slots} onSaved={() => reload()} onError={setError} />}

@@ -21,7 +21,7 @@ export function WeekPack({ view, onChanged }: { view: PlannerView; onChanged: ()
   const [from, setFrom] = useState(addDays(view.today, 1));
   const [to, setTo] = useState(addDays(view.today, 7));
   const [plan, setPlan] = useState<PackPlan | null>(null);
-  const [written, setWritten] = useState<PackPlan | null>(null);
+  const [written, setWritten] = useState<(PackPlan & { filledFromReserve?: number }) | null>(null);
   const [marked, setMarked] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,6 +119,7 @@ export function WeekPack({ view, onChanged }: { view: PlannerView; onChanged: ()
           <div className="planner-pack-done">
             <p>
               Written to <code>{written.dir}</code>. Open <code>index.html</code> in that folder: it has every caption and comment with copy buttons.
+              {written.filledFromReserve ? ` ${written.filledFromReserve} empty slots were filled from the reserve first.` : ""}
             </p>
             {marked === null ? (
               <button type="button" onClick={markScheduled} disabled={busy}>

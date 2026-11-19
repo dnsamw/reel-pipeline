@@ -2933,3 +2933,15 @@ button.posts-more {
 .planner-photo-preview { margin-top: 6px; max-width: 160px; max-height: 120px; border-radius: 6px; object-fit: cover; }
 .planner-thumb-img video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .planner-reel-preview { max-height: 260px; max-width: 150px; }
+
+/* Planner: What worked (P5) */
+.planner-feedback-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 16px; }
+.planner-feedback-table td:first-child { max-width: 260px; }
+.planner-feedback-weak { opacity: 0.45; }
+.planner-feedback-bar { display: inline-block; width: 60px; height: 8px; border-radius: 4px; background: var(--border, #e5e7eb); margin-right: 8px; vertical-align: middle; overflow: hidden; }
+.planner-feedback-bar > span { display: block; height: 100%; background: #868e96; }
+.planner-feedback-bar > span.good { background: #2f9e44; }
+.planner-feedback-bar > span.bad { background: #e03131; }
+.planner-feedback-list { margin: 8px 0; padding-left: 20px; }
+.planner-feedback-list li { margin: 6px 0; line-height: 1.45; }
+.planner-tag { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 4px; font-size: 11px; background: #ede7f6; color: #58238b; }

@@ -587,17 +587,46 @@ export function rejectAndRefill(id: string, reason: string): { rejected: Planner
   if (!reason.trim()) throw new Error("Say why it is rejected: Claude reads the reason next week");
   const rejected = updatePost(id, { status: "rejected", statusReason: reason.trim() });
   let filled: PlannerPost | null = null;
-  if (cur.date && cur.slotId && STOCK_STATUSES.includes(cur.status)) {
-    for (const r of listReserve().filter((x) => STOCK_STATUSES.includes(x.status))) {
-      try {
-        filled = fillFromReserve(r.id, cur.date, cur.slotId);
-        break;
-      } catch {
-        // that reserve post repeats a line or photo near this day: try the next one
-      }
+  if (cur.date && cur.slotId && STOCK_STATUSES.includes(cur.status)) filled = fillSlotFromReserve(cur.date, cur.slotId, cur.kind);
+  return { rejected, filled };
+}
+
+/** Ready reserve posts, those of `kind` first, oldest first. */
+function readyReserve(kind: PostKind): PlannerPost[] {
+  const ready = listReserve().filter((x) => STOCK_STATUSES.includes(x.status));
+  return [...ready.filter((x) => x.kind === kind), ...ready.filter((x) => x.kind !== kind)];
+}
+
+/** Moves the first ready reserve post that fits (same type first, no repeat near that day) into the slot. */
+export function fillSlotFromReserve(date: string, slotId: string, kind: PostKind): PlannerPost | null {
+  for (const r of readyReserve(kind)) {
+    try {
+      return fillFromReserve(r.id, date, slotId);
+    } catch {
+      // that reserve post repeats a line or photo near this day: try the next one
     }
   }
-  return { rejected, filled };
+  return null;
+}
+
+/**
+ * docs/16 §7: the reserve drops into empty slots so the streak never breaks.
+ * Fills active slots in [from, to] (not before today) that have no post at
+ * all (a rejected one doesn't count); a slot with a draft waiting for the
+ * owner is left alone.
+ */
+export function fillEmptySlots(from: string, to: string, today = todaySriLanka()): PlannerPost[] {
+  const slots = listSlots().filter((s) => s.active);
+  const taken = new Set(listPosts(from, to).filter((p) => p.status !== "rejected").map((p) => `${p.date}|${p.slotId}`));
+  const filled: PlannerPost[] = [];
+  for (let d = from < today ? today : from; d <= to; d = addDays(d, 1))
+    for (const s of slots) {
+      if (taken.has(`${d}|${s.id}`)) continue;
+      if (readyReserve(s.kind).length === 0) return filled;
+      const p = fillSlotFromReserve(d, s.id, s.kind);
+      if (p) filled.push(p);
+    }
+  return filled;
 }
 
 /** The latest rejection reasons, for the writer prompt ("the rules get tighter over time"). */

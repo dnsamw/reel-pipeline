@@ -37,6 +37,7 @@ import type {
   AiInfo,
   BatchEstimate,
   BatchJob,
+  FeedbackReport,
   PhotoStock,
   ScoutView,
   PlannerRenderRun,
@@ -336,15 +337,18 @@ export const api = {
   saveSlot: (id: string, body: Partial<PlannerSlot>) =>
     request<PlannerSlot>(`/planner/slots/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(body) }),
   weekPackPreview: (from: string, to: string) => request<PackPlan>(`/planner/week-pack?${new URLSearchParams({ from, to })}`),
-  exportWeekPack: (from: string, to: string) => request<PackPlan>("/planner/week-pack", { method: "POST", body: JSON.stringify({ from, to }) }),
+  exportWeekPack: (from: string, to: string) => request<PackPlan & { filledFromReserve?: number }>("/planner/week-pack", { method: "POST", body: JSON.stringify({ from, to }) }),
   markScheduled: (ids: string[]) => request<{ scheduled: number }>("/planner/mark-scheduled", { method: "POST", body: JSON.stringify({ ids }) }),
   importStatsCsv: (csv: string) => request<CsvImportResult>("/planner/stats/import", { method: "POST", headers: { "Content-Type": "text/csv" }, body: csv }),
   matchStats: () => request<MatchResult>("/planner/stats/match", { method: "POST" }),
   plannerAi: () => request<AiInfo>("/planner/ai"),
-  batchEstimate: (from: string, to: string, scout: boolean) =>
-    request<BatchEstimate>(`/planner/batch/estimate?${new URLSearchParams({ from, to, scout: scout ? "1" : "0" })}`),
+  batchEstimate: (from: string, to: string, scout: boolean, reserve = true) =>
+    request<BatchEstimate>(`/planner/batch/estimate?${new URLSearchParams({ from, to, scout: scout ? "1" : "0", reserve: reserve ? "1" : "0" })}`),
   batchStatus: () => request<BatchJob | null>("/planner/batch"),
-  startBatch: (body: { from: string; to: string; scout: boolean; limit?: number }) => request<BatchJob>("/planner/batch", { method: "POST", body: JSON.stringify(body) }),
+  startBatch: (body: { from: string; to: string; scout: boolean; limit?: number; reserve?: boolean }) => request<BatchJob>("/planner/batch", { method: "POST", body: JSON.stringify(body) }),
+  plannerFeedback: (days?: number) => request<FeedbackReport>(`/planner/feedback${days ? `?days=${days}` : ""}`),
+  reserveFill: (from: string, to: string) =>
+    request<{ filled: { id: string; date: string; slotId: string; title: string }[] }>("/planner/reserve/fill", { method: "POST", body: JSON.stringify({ from, to }) }),
   batchCleanup: (from: string, to: string) => request<{ removed: number }>("/planner/batch/cleanup", { method: "POST", body: JSON.stringify({ from, to }) }),
   scout: () => request<ScoutView>("/planner/scout"),
   startScout: (topics?: string[]) => request<{ running: ScoutView["running"] }>("/planner/scout", { method: "POST", body: JSON.stringify({ topics }) }),

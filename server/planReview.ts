@@ -48,11 +48,14 @@ const BANNED: { re: RegExp; why: string }[] = [
   { re: /\blifetime\b|ජීවිත\s*කාලය(ටම)?|සදහටම|සදාකාලික/i, why: "no lifetime claims (app access has an end date)" },
   {
     // \b only works next to Latin letters, so the Sinhala verbs are matched without it.
-    re: /\b(like|comment|share|tag)\s*(එකක්\s*)?(කරන්න|කරලා|කරපු|දාන්න|දාලා)|\b(like|comment|share)\s+(if|and|&|\+)\s+(share|comment|you|tag)\b|\bcomment\s+(below|your)\b|\btag\s+(a\s+)?friend/i,
+    re: /\b(like|comment|share|tag|mention)\s*(එකක්\s*)?(කරන්න|කරලා|කරපු|දාන්න|දාලා)|\b(like|comment|share)\s+(if|and|&|\+)\s+(share|comment|you|tag)\b|\bcomment\s+(below|your)\b|\btag\s+(a\s+)?friend/i,
     why: "no like/comment/share bait",
   },
   { re: /\b(guarantee[ds]?|100%\s*(job|pass|success))\b|සහතිකයි|අනිවාර්යයෙන්ම\s*(රැකියාව|pass)/i, why: "no guaranteed results" },
 ];
+
+/** Why a text breaks a banned-word rule, or null. */
+export const bannedReason = (text: string): string | null => BANNED.find((b) => b.re.test(text))?.why ?? null;
 
 /**
  * "Never print how long app access lasts": a time span (a number with a
@@ -148,7 +151,8 @@ function codeChecks(post: PlannerPost): { checks: PostReview["checks"]; needsOwn
   }
 
   // Slot, pillar
-  const slotOk = !!slot && (!pillar || pillar.slotIds.length === 0 || pillar.slotIds.includes(slot.id));
+  // A reserve post has no slot yet; it gets one when it fills a gap.
+  const slotOk = post.reserve || (!!slot && (!pillar || pillar.slotIds.length === 0 || pillar.slotIds.includes(slot.id)));
   add("slot", "Slot fits the pillar", slotOk, slotOk ? undefined : `${pillar?.name} is planned for ${pillar?.slotIds.join("/")}`);
   if (slot && slot.kind !== post.kind) add("kind", "Post type fits the slot", false, `${post.kind} in a ${slot.kind} slot`);
 

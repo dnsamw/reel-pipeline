@@ -23,7 +23,14 @@ Tell the owner: full days of stock (target 14), streak days, posts that need the
 
 ## 2. Review (what worked)
 
-Insights refreshes the Page's posts read-only and links them to Planner posts. Read the last 2 weeks:
+Insights refreshes the Page's posts read-only and links them to Planner posts. Start with the scored report
+(the same one Planner → What worked shows and the batch uses):
+
+```bash
+curl -s "localhost:4300/api/planner/feedback?days=56" | jq '{from, to, samples, suggestions, weights: [.weights[] | select(.weight != 1)], byStyle, bySlot, top: [.top[] | {score, kind, day, hook}]}'
+```
+
+Then, for detail on the last 2 weeks of Planner posts:
 
 ```bash
 curl -s "localhost:4300/api/planner?from=$(date -d '-14 days' +%F)&to=$(date +%F)" \

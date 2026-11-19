@@ -22,6 +22,7 @@ export function Batch({ view, onChanged, onOpen }: { view: PlannerView; onChange
   const [from, setFrom] = useState(addDays(view.today, 1));
   const [to, setTo] = useState(addDays(view.today, 14));
   const [scout, setScout] = useState(true);
+  const [reserve, setReserve] = useState(true);
   const [limit, setLimit] = useState("");
   const [est, setEst] = useState<BatchEstimate | null>(null);
   const [job, setJob] = useState<BatchJob | null>(null);
@@ -43,10 +44,10 @@ export function Batch({ view, onChanged, onOpen }: { view: PlannerView; onChange
     setEst(null);
     if (!from || !to || to < from) return;
     api
-      .batchEstimate(from, to, scout)
+      .batchEstimate(from, to, scout, reserve)
       .then(setEst)
       .catch((err) => setError(errText(err)));
-  }, [from, to, scout, job?.state]);
+  }, [from, to, scout, reserve, job?.state]);
 
   // Poll while the batch or the scout runs.
   const busy = job?.state === "running" || !!notes?.running || (!!renderRun && !renderRun.done);
@@ -69,11 +70,14 @@ export function Batch({ view, onChanged, onOpen }: { view: PlannerView; onChange
   async function run() {
     setError(null);
     const n = limit.trim() ? Number(limit) : undefined;
-    const slots = n !== undefined ? Math.min(n, est?.slots ?? n) : (est?.slots ?? 0);
-    const calls = Math.ceil(slots / 6) * 2 + (scout ? 3 : 0);
-    if (!confirm(`Fill ${slots} slots? This makes about ${calls} calls on your Claude${scout ? " and Grok" : ""} subscription and takes a while. Nothing is posted.`)) return;
+    const all = (est?.slots ?? 0) + (est?.reserve ?? 0);
+    const posts = n !== undefined ? Math.min(n, all) : all;
+    const slots = Math.min(posts, est?.slots ?? 0);
+    const calls = Math.ceil(posts / 6) * 2 + (scout ? 3 : 0);
+    const extra = posts > slots ? ` and ${posts - slots} reserve posts` : "";
+    if (!confirm(`Fill ${slots} slots${extra}? This makes about ${calls} calls on your Claude${scout ? " and Grok" : ""} subscription and takes a while. Nothing is posted.`)) return;
     try {
-      setJob(await api.startBatch({ from, to, scout, limit: n }));
+      setJob(await api.startBatch({ from, to, scout, limit: n, reserve }));
     } catch (err) {
       setError(errText(err));
     }
@@ -119,8 +123,10 @@ export function Batch({ view, onChanged, onOpen }: { view: PlannerView; onChange
   }
 
   const toRender = view.posts.filter((p) => p.status === "approved" && (p.kind === "image" || p.kind === "reel") && p.date! >= view.today).length;
-  const auto = view.posts.filter((p) => p.autoApproved && (p.status === "approved" || p.status === "rendered") && p.date! >= view.today);
-  const needs = view.posts.filter((p) => p.status === "drafted" && p.date! >= view.today);
+  // Reserve posts (no day) are listed too: they go out on whatever day they fill.
+  const upcoming = [...view.posts.filter((p) => !!p.date && p.date >= view.today), ...view.reserve];
+  const auto = upcoming.filter((p) => p.autoApproved && (p.status === "approved" || p.status === "rendered"));
+  const needs = upcoming.filter((p) => p.status === "drafted");
   const low = (photos ?? []).filter((p) => p.low);
   const calls = (t: string) => ai?.calls.find((c) => c.tool === t)?.calls ?? 0;
 
@@ -160,22 +166,26 @@ export function Batch({ view, onChanged, onOpen }: { view: PlannerView; onChange
           <label className="planner-check">
             <input type="checkbox" checked={scout} onChange={(e) => setScout(e.target.checked)} /> Grok scout first
           </label>
-          <button type="button" onClick={run} disabled={busy || !est?.slots}>
+          <label className="planner-check" title="Writes new evergreen posts until the reserve holds 10">
+            <input type="checkbox" checked={reserve} onChange={(e) => setReserve(e.target.checked)} /> Top up reserve
+          </label>
+          <button type="button" onClick={run} disabled={busy || !(est?.slots || est?.reserve)}>
             <Sparkles size={14} /> Plan &amp; draft
           </button>
           <button type="button" className="secondary" onClick={cleanup} disabled={busy} title="Removes ideas the batch created but couldn't write">
             <Trash2 size={14} /> Clean up
           </button>
-          <button type="button" className="secondary" onClick={renderAll} disabled={busy || toRender === 0} title="Hook photo template, with each post's stock photo. Reels are rendered by hand.">
+          <button type="button" className="secondary" onClick={renderAll} disabled={busy || toRender === 0} title="Image posts: Hook photo template with each post's stock photo. Reels: silent, music only.">
             <Images size={14} /> Render approved ({toRender})
           </button>
         </div>
         {est && (
           <p className="hint">
-            {est.slots} empty slots · about {est.claudeCalls} Claude{est.grokCalls ? ` + ${est.grokCalls} Grok` : ""} calls ·{" "}
+            {est.slots} empty slots{est.reserve ? ` + ${est.reserve} reserve posts (reserve has ${est.reserveNow} of 10)` : ""} · about {est.claudeCalls} Claude{est.grokCalls ? ` + ${est.grokCalls} Grok` : ""} calls ·{" "}
             {Object.entries(est.byPillar)
               .map(([k, n]) => `${k} ${n}`)
               .join(", ")}
+            {est.weights.length > 0 && <> · shares moved by the numbers: {est.weights.map((w) => `${w.name} ×${w.weight}`).join(", ")}</>}
           </p>
         )}
         {renderRun && (
@@ -194,6 +204,8 @@ export function Batch({ view, onChanged, onOpen }: { view: PlannerView; onChange
             </strong>{" "}
             <span className="hint">
               {job.created} planned · {job.drafted} written · {job.approved} approved on their own ({job.rendered ?? 0} rendered) · {job.needsYou} need you
+              {job.reserveAdded ? ` · ${job.reserveAdded} reserve posts` : ""}
+              {job.filledFromReserve ? ` · ${job.filledFromReserve} empty slots filled from the reserve` : ""}
             </span>
             <pre>{job.log.slice(-12).join("\n")}</pre>
           </div>
@@ -224,7 +236,7 @@ export function Batch({ view, onChanged, onOpen }: { view: PlannerView; onChange
                   {!api.mediaUrl(p.mediaPath) && <span className="planner-thumb-hook">{p.hook}</span>}
                 </button>
                 <div className="planner-thumb-meta">
-                  {p.date} {p.slotId} · {p.kind}
+                  {p.reserve ? "Reserve" : `${p.date} ${p.slotId}`} · {p.kind}
                   {p.review?.scores && (
                     <span className="hint">
                       {" "}
@@ -250,7 +262,7 @@ export function Batch({ view, onChanged, onOpen }: { view: PlannerView; onChange
             {needs.map((p) => (
               <li key={p.id}>
                 <button type="button" className="link-button" onClick={() => onOpen(p)}>
-                  {p.date} {p.slotId}: {p.title || p.hook || "(untitled)"}
+                  {p.reserve ? "Reserve" : `${p.date} ${p.slotId}`}: {p.title || p.hook || "(untitled)"}
                 </button>
                 <span className="hint"> · {p.statusReason || "drafted, not reviewed yet"}</span>
               </li>
