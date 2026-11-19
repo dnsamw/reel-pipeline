@@ -197,7 +197,7 @@ if (!(db.prepare("PRAGMA table_info(planner_posts)").all() as { name: string }[]
 const DEFAULT_SLOTS: Omit<Slot, "active">[] = [
   { id: "R1", label: "Morning reel", timeFrom: "06:00", timeTo: "09:00", kind: "reel", note: "growth, ≤ 10 s", sort: 1 },
   { id: "I1", label: "Midday image", timeFrom: "12:00", timeTo: "13:30", kind: "image", note: "practical, \"need it today\"", sort: 2 },
-  { id: "R2", label: "Evening reel", timeFrom: "18:00", timeTo: "19:00", kind: "reel", note: "growth", sort: 3 },
+  { id: "R2", label: "Afternoon reel", timeFrom: "16:00", timeTo: "18:00", kind: "reel", note: "growth (moved from 18:00-19:00 on 2026-11-19, P5 numbers)", sort: 3 },
   { id: "I2", label: "Evening image", timeFrom: "19:30", timeTo: "21:00", kind: "image", note: "emotional / curiosity, the shareable one; the streak slot", sort: 4 },
 ];
 
