@@ -49,6 +49,7 @@ import {
   deletePost,
   fillEmptySlots,
   fillFromReserve,
+  isPlannerPlatform,
   rejectAndRefill,
   getPost,
   isDate,
@@ -1196,7 +1197,9 @@ app.get("/api/planner/feedback", (req, res) => {
   try {
     const days = req.query.days === undefined ? DEFAULT_WINDOW_DAYS : Number(req.query.days);
     if (!Number.isInteger(days) || days < 7 || days > 365) throw new Error("days must be 7-365");
-    const report = feedbackReport(days);
+    const platform = req.query.platform === undefined ? "facebook" : req.query.platform;
+    if (!isPlannerPlatform(platform)) throw new Error("platform must be facebook, instagram, tiktok or youtube");
+    const report = feedbackReport(days, undefined, platform);
     res.json({ ...report, notes: learningNotes(report), minPosts: MIN_POSTS, settleDays: SETTLE_DAYS, reserve: { now: RESERVE_TARGET - reserveGap(), target: RESERVE_TARGET } });
   } catch (err) {
     fail400(res, err);

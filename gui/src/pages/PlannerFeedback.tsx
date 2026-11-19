@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { TrendingUp } from "lucide-react";
 import { api } from "../api";
-import type { FeedbackGroup, FeedbackReport, FeedbackSample } from "../plannerTypes";
+import { PLANNER_PLATFORMS, PLATFORM_LABELS, type FeedbackGroup, type FeedbackReport, type FeedbackSample, type PlannerPlatform } from "../plannerTypes";
 
 /**
  * P5 "What worked" (studypal-lms docs/16 §2 step 1): the Page's Facebook
@@ -71,16 +71,17 @@ function SampleList({ title, items, unitOf }: { title: string; items: FeedbackSa
 
 export function Feedback() {
   const [days, setDays] = useState(56);
+  const [platform, setPlatform] = useState<PlannerPlatform>("facebook");
   const [r, setR] = useState<FeedbackReport | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setR(null);
     api
-      .plannerFeedback(days)
+      .plannerFeedback(days, platform)
       .then(setR)
       .catch((e) => setError(errText(e)));
-  }, [days]);
+  }, [days, platform]);
 
   if (error) return <div className="error-banner">{error}</div>;
   if (!r) return <p className="hint">Reading the numbers…</p>;
@@ -102,6 +103,13 @@ export function Feedback() {
             <TrendingUp size={20} /> What worked
           </h2>
           <div className="segmented">
+            {PLANNER_PLATFORMS.map((pf) => (
+              <button key={pf} type="button" className={platform === pf ? "active" : ""} onClick={() => setPlatform(pf)}>
+                {PLATFORM_LABELS[pf]}
+              </button>
+            ))}
+          </div>
+          <div className="segmented">
             {[28, 56, 90, 180].map((d) => (
               <button key={d} type="button" className={days === d ? "active" : ""} onClick={() => setDays(d)}>
                 {d} days
@@ -110,14 +118,20 @@ export function Feedback() {
           </div>
         </div>
         <p className="hint">
-          Facebook posts from {r.from} to {r.to} ({r.samples} posts, {r.plannerSamples} from the Planner; the last {r.settleDays} days are left out while their numbers
+          {PLATFORM_LABELS[r.platform]} posts from {r.from} to {r.to} ({r.samples} posts, {r.plannerSamples} from the Planner; the last {r.settleDays} days are left out while their numbers
           still climb). Each post gets a <strong>score 0-100</strong>: its rank among posts of the same type (reels by {r.scoreBy.reel ?? "-"}, image posts by{" "}
           {unitFor("image") || "-"}). <strong>50 is a typical post.</strong> A group counts once it has {r.minPosts} posts; greyed rows don't count yet. Refresh Insights or
           import the Business Suite CSV (Week pack &amp; stats) for newer numbers.
         </p>
       </div>
 
-      <div className="card">
+      {r.platform !== "facebook" && (
+        <p className="hint">
+          Shown for your information: only Facebook's numbers change the plan (pillar mix, Claude's notes). Planner posts are linked to their {PLATFORM_LABELS[r.platform]} copy
+          by day and caption after an Insights refresh.
+        </p>
+      )}
+      <div className="card" style={r.platform !== "facebook" ? { display: "none" } : undefined}>
         <h2>What the next batch does with this</h2>
         <ul className="planner-feedback-list">
           <li>

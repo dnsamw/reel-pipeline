@@ -2945,3 +2945,4 @@ button.posts-more {
 .planner-feedback-list { margin: 8px 0; padding-left: 20px; }
 .planner-feedback-list li { margin: 6px 0; line-height: 1.45; }
 .planner-tag { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 4px; font-size: 11px; background: #ede7f6; color: #58238b; }
+.planner-platforms { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; margin: 4px 0 10px; }

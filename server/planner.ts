@@ -33,6 +33,25 @@ const NEEDS_MEDIA: readonly PostStatus[] = ["rendered", "scheduled", "published"
 export const POST_KINDS = ["reel", "image", "carousel", "video"] as const;
 export type PostKind = (typeof POST_KINDS)[number];
 
+/**
+ * P6 (docs/16 §9): where a post goes. All by hand from the week pack (owner
+ * 2026-11-19: no API posting on any platform). TikTok and YouTube Shorts take
+ * videos only.
+ */
+export const PLANNER_PLATFORMS = ["facebook", "instagram", "tiktok", "youtube"] as const;
+export type PlannerPlatform = (typeof PLANNER_PLATFORMS)[number];
+export const isPlannerPlatform = (x: unknown): x is PlannerPlatform => PLANNER_PLATFORMS.includes(x as PlannerPlatform);
+const VIDEO_KINDS: readonly PostKind[] = ["reel", "video"];
+export const platformTakes = (platform: PlannerPlatform, kind: PostKind): boolean =>
+  platform === "facebook" || platform === "instagram" || VIDEO_KINDS.includes(kind);
+/** Reels go everywhere; image posts to Facebook and Instagram. */
+export const defaultTargets = (kind: PostKind): PlannerPlatform[] => PLANNER_PLATFORMS.filter((x) => platformTakes(x, kind));
+/** The platforms a post goes to: its own choice (only those that take its type), else the default for its type. Facebook is always in. */
+export function postTargets(p: Pick<PlannerPost, "kind" | "targets">): PlannerPlatform[] {
+  const chosen = p.targets ? p.targets.filter((x) => platformTakes(x, p.kind)) : defaultTargets(p.kind);
+  return PLANNER_PLATFORMS.filter((x) => x === "facebook" || chosen.includes(x));
+}
+
 export const isPostStatus = (s: unknown): s is PostStatus => POST_STATUSES.includes(s as PostStatus);
 export const isPostKind = (k: unknown): k is PostKind => POST_KINDS.includes(k as PostKind);
 
@@ -104,6 +123,10 @@ export interface PlannerPost {
   remoteId: string | null;
   /** The last auto-approval review (P4): code checks, critic scores, why it needs the owner. */
   review: PostReview | null;
+  /** P6: platforms chosen for this post; null = the default for its type (see postTargets). */
+  targets: PlannerPlatform[] | null;
+  /** P6: the post on the other platforms, once matched from the stats (platform_posts.remote_id). */
+  remoteIds: Partial<Record<Exclude<PlannerPlatform, "facebook">, string>>;
   createdAt: string;
   updatedAt: string;
 }
@@ -191,6 +214,11 @@ if (!(db.prepare("PRAGMA table_info(planner_posts)").all() as { name: string }[]
 // P4: the last auto-approval review.
 if (!(db.prepare("PRAGMA table_info(planner_posts)").all() as { name: string }[]).some((c) => c.name === "review_json"))
   db.exec("ALTER TABLE planner_posts ADD COLUMN review_json TEXT");
+// P6: platforms per post, and the post on each other platform.
+if (!(db.prepare("PRAGMA table_info(planner_posts)").all() as { name: string }[]).some((c) => c.name === "targets_json"))
+  db.exec("ALTER TABLE planner_posts ADD COLUMN targets_json TEXT");
+if (!(db.prepare("PRAGMA table_info(planner_posts)").all() as { name: string }[]).some((c) => c.name === "remote_ids_json"))
+  db.exec("ALTER TABLE planner_posts ADD COLUMN remote_ids_json TEXT");
 
 // --- Defaults (docs/16 §3), seeded once into empty tables ---
 
@@ -238,7 +266,7 @@ interface PillarRow { id: string; name: string; subject: string; color: string; 
 interface PostRow {
   id: string; date: string | null; slot_id: string | null; reserve: number; pillar_id: string | null; book: string; kind: string;
   title: string; hook: string; caption: string; photo: string; media_path: string; source_json: string; status: string;
-  status_reason: string; auto_approved: number; notes: string; remote_id: string | null; review_json: string | null; created_at: string; updated_at: string;
+  status_reason: string; auto_approved: number; notes: string; remote_id: string | null; review_json: string | null; targets_json: string | null; remote_ids_json: string | null; created_at: string; updated_at: string;
 }
 
 const toSlot = (r: SlotRow): Slot => ({
@@ -256,7 +284,8 @@ const toPost = (r: PostRow): PlannerPost => ({
   id: r.id, date: r.date, slotId: r.slot_id, reserve: r.reserve === 1, pillarId: r.pillar_id, book: r.book,
   kind: isPostKind(r.kind) ? r.kind : "image", title: r.title, hook: r.hook, caption: r.caption, photo: r.photo,
   mediaPath: r.media_path, source: JSON.parse(r.source_json), status: isPostStatus(r.status) ? r.status : "idea",
-  statusReason: r.status_reason, autoApproved: r.auto_approved === 1, notes: r.notes, remoteId: r.remote_id ?? null, review: r.review_json ? (JSON.parse(r.review_json) as PostReview) : null, createdAt: r.created_at, updatedAt: r.updated_at,
+  statusReason: r.status_reason, autoApproved: r.auto_approved === 1, notes: r.notes, remoteId: r.remote_id ?? null, review: r.review_json ? (JSON.parse(r.review_json) as PostReview) : null,
+  targets: r.targets_json ? cleanTargets(JSON.parse(r.targets_json)) : null, remoteIds: r.remote_ids_json ? JSON.parse(r.remote_ids_json) : {}, createdAt: r.created_at, updatedAt: r.updated_at,
 });
 
 // --- Dates (Sri Lanka) ---
@@ -357,6 +386,9 @@ export function getPost(id: string): PlannerPost | null {
 
 export type PostInput = Partial<Omit<PlannerPost, "id" | "createdAt" | "updatedAt" | "autoApproved" | "review">>;
 
+const cleanTargets = (t: unknown): PlannerPlatform[] | null =>
+  Array.isArray(t) ? PLANNER_PLATFORMS.filter((x) => x === "facebook" || t.includes(x)) : null;
+
 function validate(p: PlannerPost): void {
   if (p.reserve) {
     if (p.date !== null || p.slotId !== null) throw new Error("A reserve post has no day or slot");
@@ -380,13 +412,21 @@ function logEvent(postId: string, from: PostStatus | null, to: PostStatus, reaso
 function write(p: PlannerPost): void {
   db.prepare(
     `INSERT INTO planner_posts (id, date, slot_id, reserve, pillar_id, book, kind, title, hook, caption, photo, media_path, source_json,
-       status, status_reason, auto_approved, notes, remote_id, created_at, updated_at)
+       status, status_reason, auto_approved, notes, remote_id, targets_json, remote_ids_json, created_at, updated_at)
      VALUES (@id, @date, @slotId, @reserve, @pillarId, @book, @kind, @title, @hook, @caption, @photo, @mediaPath, @source,
-       @status, @statusReason, @autoApproved, @notes, @remoteId, @createdAt, @updatedAt)
+       @status, @statusReason, @autoApproved, @notes, @remoteId, @targetsJson, @remoteIdsJson, @createdAt, @updatedAt)
      ON CONFLICT(id) DO UPDATE SET date=@date, slot_id=@slotId, reserve=@reserve, pillar_id=@pillarId, book=@book, kind=@kind,
        title=@title, hook=@hook, caption=@caption, photo=@photo, media_path=@mediaPath, source_json=@source, status=@status,
-       status_reason=@statusReason, auto_approved=@autoApproved, notes=@notes, remote_id=@remoteId, updated_at=@updatedAt`,
-  ).run({ ...p, reserve: p.reserve ? 1 : 0, autoApproved: p.autoApproved ? 1 : 0, source: JSON.stringify(p.source) });
+       status_reason=@statusReason, auto_approved=@autoApproved, notes=@notes, remote_id=@remoteId, targets_json=@targetsJson,
+       remote_ids_json=@remoteIdsJson, updated_at=@updatedAt`,
+  ).run({
+    ...p,
+    reserve: p.reserve ? 1 : 0,
+    autoApproved: p.autoApproved ? 1 : 0,
+    source: JSON.stringify(p.source),
+    targetsJson: p.targets ? JSON.stringify(p.targets) : null,
+    remoteIdsJson: Object.keys(p.remoteIds ?? {}).length ? JSON.stringify(p.remoteIds) : null,
+  });
 }
 
 export function createPost(input: PostInput, by = "owner"): PlannerPost {
@@ -413,6 +453,8 @@ export function createPost(input: PostInput, by = "owner"): PlannerPost {
     notes: input.notes ?? "",
     remoteId: input.remoteId ?? null,
     review: null,
+    targets: cleanTargets(input.targets),
+    remoteIds: input.remoteIds ?? {},
     createdAt: now,
     updatedAt: now,
   };
@@ -436,6 +478,8 @@ export function updatePost(id: string, input: PostInput, by = "owner"): PlannerP
     slotId: reserve ? null : (input.slotId !== undefined ? input.slotId : cur.slotId),
     kind: isPostKind(input.kind) ? input.kind : cur.kind,
     status: isPostStatus(input.status) ? input.status : cur.status,
+    targets: input.targets !== undefined ? cleanTargets(input.targets) : cur.targets,
+    remoteIds: input.remoteIds ?? cur.remoteIds,
     createdAt: cur.createdAt,
     updatedAt: new Date().toISOString(),
   };

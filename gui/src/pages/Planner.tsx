@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { api } from "../api";
 import {
+  PLANNER_PLATFORMS,
+  PLATFORM_LABELS,
   POST_KINDS,
+  platformTakes,
+  postTargets,
   POST_STATUSES,
   STOCK_STATUSES,
   type CatalogBook,
@@ -581,6 +585,34 @@ function PostEditor({ initial, view, onClose, onSaved }: { initial: PlannerPostI
           </div>
         </div>
         {pillar?.note && <p className="hint">{pillar.note}</p>}
+        <div className="planner-platforms">
+          <span className="hint">Goes to:</span>
+          {PLANNER_PLATFORMS.map((pf) => {
+            const kind = post.kind ?? "image";
+            const takes = platformTakes(pf, kind);
+            const on = postTargets({ kind, targets: post.targets }).includes(pf);
+            return (
+              <label key={pf} className="planner-check" title={takes ? "" : `${PLATFORM_LABELS[pf]} takes videos only`}>
+                <input
+                  type="checkbox"
+                  checked={on && takes}
+                  disabled={!takes || pf === "facebook"}
+                  onChange={(e) => {
+                    const cur = postTargets({ kind, targets: post.targets });
+                    set("targets", e.target.checked ? [...cur, pf] : cur.filter((x) => x !== pf));
+                  }}
+                />{" "}
+                {PLATFORM_LABELS[pf]}
+                {post.remoteIds?.[pf as "instagram"] && <span className="planner-tag">matched</span>}
+              </label>
+            );
+          })}
+          {post.targets && (
+            <button type="button" className="link-button" onClick={() => set("targets", null)}>
+              default for {post.kind ?? "image"}
+            </button>
+          )}
+        </div>
 
         <SourcePicker
           book={post.book ?? ""}

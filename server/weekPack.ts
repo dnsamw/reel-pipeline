@@ -1,13 +1,15 @@
 import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, extname, isAbsolute, join, relative, resolve } from "node:path";
-import { listPillars, listPosts, listSlots, type PlannerPost, type Slot } from "./planner";
+import { listPillars, listPosts, listSlots, type PlannerPlatform, type PlannerPost, type Slot } from "./planner";
+import { PLATFORM_LABELS, postCaptions, type PlatformCaption } from "./platformCaptions";
 
 /**
  * P3 week pack (studypal-lms docs/16 §2 step 7): the rendered posts of a date
  * range as numbered files in posting order, with captions, first comments and
  * a checklist page, for scheduling by hand in Meta Business Suite. No API
- * posting (docs/16 §7).
+ * posting (docs/16 §7). P6: each post also carries its Instagram, TikTok and
+ * YouTube Shorts captions (by hand too, owner 2026-11-19).
  */
 
 export function socialMediaDir(): string {
@@ -92,6 +94,8 @@ export interface PackItem {
   /** File name in the pack. */
   file: string;
   comment: { variant: string; text: string; image: string | null } | null;
+  /** P6: one entry per platform the post goes to (Facebook first). */
+  platforms: PlatformCaption[];
 }
 
 export interface PackPlan {
@@ -165,12 +169,20 @@ export function planWeekPack(from: string, to: string): PackPlan {
       media,
       file: `${stem}${extname(media).toLowerCase()}`,
       comment: c ? { variant: c.variant, text: c.text, image: c.image } : null,
+      platforms: postCaptions(post),
     });
   });
   return plan;
 }
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/** "Facebook 14 · Instagram 14 · TikTok 7 · YouTube Shorts 7" */
+function countsLine(plan: PackPlan): string {
+  const n = new Map<PlannerPlatform, number>();
+  for (const it of plan.items) for (const pc of it.platforms) n.set(pc.platform, (n.get(pc.platform) ?? 0) + 1);
+  return [...n.entries()].map(([k, v]) => `${esc(PLATFORM_LABELS[k])} <b>${v}</b>`).join(" · ");
+}
 
 function checklistHtml(plan: PackPlan, files: Map<number, { comment: string | null }>): string {
   const rows = plan.items
@@ -181,10 +193,19 @@ function checklistHtml(plan: PackPlan, files: Map<number, { comment: string | nu
       const comment = it.comment
         ? `<h4>First comment (variant ${it.comment.variant})${cImg ? ` + <a href="${esc(cImg)}">image</a>` : ""}</h4><pre>${esc(it.comment.text)}</pre><button data-copy>Copy comment</button>`
         : "";
-      return `<section><label class="done"><input type="checkbox"> scheduled</label>
-<div class="when">${it.n}. ${esc(it.date)} · <b>${esc(it.time)}</b> · ${esc(it.slotId)} · ${esc(it.kind)}</div>
+      const blocks = it.platforms
+        .map((pc) => {
+          const title = pc.title ? `<h4>Title</h4><pre>${esc(pc.title)}</pre><button data-copy>Copy title</button><h4>Description</h4>` : "";
+          const warn = pc.tooLong ? `<p class="warn">Longer than ${esc(PLATFORM_LABELS[pc.platform])} takes: shorten it before posting.</p>` : "";
+          const same = pc.platform !== "facebook" && pc.caption === it.caption && !pc.title ? " (same as Facebook)" : "";
+          return `<details class="pf pf-${pc.platform}"${pc.platform === "facebook" ? " open" : ""}><summary><label class="done"><input type="checkbox" data-pf="${pc.platform}"> done</label><b>${esc(PLATFORM_LABELS[pc.platform])}</b>${same}</summary>
+${warn}${title}<pre>${esc(pc.caption)}</pre><button data-copy>Copy ${pc.title ? "description" : "caption"}</button>${pc.comment ? comment : ""}</details>`;
+        })
+        .join("");
+      return `<section>
+<div class="when">${it.n}. ${esc(it.date)} · <b>${esc(it.time)}</b> · ${esc(it.slotId)} · ${esc(it.kind)} · ${it.platforms.map((pc) => esc(PLATFORM_LABELS[pc.platform])).join(", ")}</div>
 <div class="grid"><div class="media">${media}<div class="file">${esc(it.file)}</div></div>
-<div><h3>${esc(it.title)}</h3><pre>${esc(it.caption)}</pre><button data-copy>Copy caption</button>${comment}</div></div></section>`;
+<div><h3>${esc(it.title)}</h3>${blocks}</div></div></section>`;
     })
     .join("\n");
   const missing = plan.missing.length
@@ -194,15 +215,17 @@ function checklistHtml(plan: PackPlan, files: Map<number, { comment: string | nu
 <style>body{font:15px/1.45 system-ui,"Noto Sans Sinhala",sans-serif;max-width:1100px;margin:24px auto;padding:0 16px;color:#1d1626}
 section{border:1px solid #e4dfec;border-radius:12px;padding:14px;margin:14px 0}section.is-done{opacity:.45}
 .grid{display:grid;grid-template-columns:300px 1fr;gap:16px}.media img,.media video{width:100%;border-radius:8px}
-.file{font:12px monospace;color:#6b6470;margin-top:4px;word-break:break-all}.when{font-size:14px;margin-bottom:8px}
+.file{font:12px monospace;color:#6b6470;margin-top:4px;word-break:break-all}details.pf{border-top:1px solid #eee7f3;padding:6px 0}details.pf summary{cursor:pointer;padding:4px 0}details.pf.is-done summary b{text-decoration:line-through;opacity:.6}.warn{color:#c92a2a;font-weight:600}.counts{background:#f7f4fa;border-radius:8px;padding:8px 12px}.when{font-size:14px;margin-bottom:8px}
 pre{white-space:pre-wrap;background:#f7f4fa;padding:10px;border-radius:8px;font:inherit}h3{margin:0 0 6px}h4{margin:12px 0 4px}
 button{background:#58238b;color:#fff;border:0;border-radius:8px;padding:6px 12px;cursor:pointer}.done{float:right}</style></head><body>
 <h1>Week pack: ${esc(plan.from)} to ${esc(plan.to)}</h1>
-<p>${plan.items.length} posts, in posting order. Times are <b>Sri Lanka time</b>. In Meta Business Suite → Planner, for each post: upload the file, paste the caption, set the day and time, schedule. Right after it goes out, add the first comment from the Page (rotate; never the same text twice in a row). Then tick <i>scheduled</i> here and press <b>Mark scheduled</b> in Studio's Planner.</p>
+<p>${plan.items.length} posts, in posting order. Times are <b>Sri Lanka time</b>. In Meta Business Suite → Planner, for each post: upload the file, tick <b>Instagram</b> next to Facebook when the post lists it, paste the Facebook caption (and the Instagram one under "Customise for Instagram"), set the day and time, schedule. Right after it goes out, add the first comment from the Page (rotate; never the same text twice in a row). <b>TikTok</b> and <b>YouTube Shorts</b>: upload the same video in their apps or studio sites at the same time, with the caption (and title) below; TikTok and YouTube Studio can schedule too. Tick each platform here as you go, and press <b>Mark scheduled</b> in Studio's Planner once all are in.</p>
+<p class="counts">${countsLine(plan)}</p>
 ${rows}
 ${missing}
 <script>document.querySelectorAll("[data-copy]").forEach(b=>{const label=b.textContent;b.onclick=()=>{navigator.clipboard.writeText(b.previousElementSibling.textContent);b.textContent="Copied";setTimeout(()=>b.textContent=label,1200)}});
-document.querySelectorAll(".done input").forEach((c,i)=>{const k="pack:"+location.pathname+":"+i;c.checked=localStorage[k]==="1";c.closest("section").classList.toggle("is-done",c.checked);c.onchange=()=>{localStorage[k]=c.checked?"1":"0";c.closest("section").classList.toggle("is-done",c.checked)}});</script>
+const mark=()=>document.querySelectorAll("section").forEach(sec=>{const all=[...sec.querySelectorAll(".done input")];sec.classList.toggle("is-done",all.length>0&&all.every(c=>c.checked))});
+document.querySelectorAll(".done input").forEach((c,i)=>{const k="pack:"+location.pathname+":"+i;c.checked=localStorage[k]==="1";c.closest("details")?.classList.toggle("is-done",c.checked);c.onclick=e=>e.stopPropagation();c.onchange=()=>{localStorage[k]=c.checked?"1":"0";c.closest("details")?.classList.toggle("is-done",c.checked);mark()}});mark();</script>
 </body></html>`;
 }
 
@@ -224,6 +247,9 @@ export function exportWeekPack(from: string, to: string): PackResult {
     copyFileSync(it.media, join(dir, it.file));
     const stem = it.file.slice(0, -extname(it.file).length);
     writeFileSync(join(dir, `${stem}_caption.txt`), `${it.caption.trim()}\n`, "utf8");
+    // P6: the other platforms' captions (YouTube: title, blank line, description).
+    for (const pc of it.platforms)
+      if (pc.platform !== "facebook") writeFileSync(join(dir, `${stem}_${pc.platform}.txt`), `${pc.title ? `${pc.title}\n\n` : ""}${pc.caption}\n`, "utf8");
     let commentImage: string | null = null;
     if (it.comment) {
       writeFileSync(join(dir, `${stem}_comment.txt`), `${it.comment.text}\n`, "utf8");

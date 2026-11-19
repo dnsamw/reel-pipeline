@@ -346,7 +346,8 @@ export const api = {
     request<BatchEstimate>(`/planner/batch/estimate?${new URLSearchParams({ from, to, scout: scout ? "1" : "0", reserve: reserve ? "1" : "0" })}`),
   batchStatus: () => request<BatchJob | null>("/planner/batch"),
   startBatch: (body: { from: string; to: string; scout: boolean; limit?: number; reserve?: boolean }) => request<BatchJob>("/planner/batch", { method: "POST", body: JSON.stringify(body) }),
-  plannerFeedback: (days?: number) => request<FeedbackReport>(`/planner/feedback${days ? `?days=${days}` : ""}`),
+  plannerFeedback: (days?: number, platform = "facebook") =>
+    request<FeedbackReport>(`/planner/feedback?${new URLSearchParams({ ...(days ? { days: String(days) } : {}), platform })}`),
   reserveFill: (from: string, to: string) =>
     request<{ filled: { id: string; date: string; slotId: string; title: string }[] }>("/planner/reserve/fill", { method: "POST", body: JSON.stringify({ from, to }) }),
   batchCleanup: (from: string, to: string) => request<{ removed: number }>("/planner/batch/cleanup", { method: "POST", body: JSON.stringify({ from, to }) }),

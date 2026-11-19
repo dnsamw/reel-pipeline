@@ -1,7 +1,7 @@
 import { listPlatformPosts } from "./analytics/store";
 import { db } from "./db";
 import { bannedReason } from "./planReview";
-import { addDays, listPillars, listSlots, todaySriLanka, type Pillar, type Slot } from "./planner";
+import { addDays, listPillars, listSlots, todaySriLanka, type Pillar, type PlannerPlatform, type Slot } from "./planner";
 
 /**
  * P5, the feedback loop (studypal-lms docs/16 §2 step 1): the Page's numbers
@@ -92,6 +92,8 @@ export interface SlotSuggestion {
 }
 
 export interface FeedbackReport {
+  /** P6: whose numbers. Only Facebook's change the plan (weights, writer notes). */
+  platform: PlannerPlatform;
   from: string;
   to: string;
   days: number;
@@ -142,17 +144,29 @@ interface PlannerLink {
   slot_id: string | null;
   book: string;
   hook: string;
-  remote_id: string;
+  remote_id: string | null;
+  remote_ids_json: string | null;
 }
 
-/** Facebook posts in [from, to] (Sri Lanka days) with numbers, scored within their kind. */
-export function collectSamples(from: string, to: string): { samples: Sample[]; scoreBy: Record<SampleKind, ScoreBy | null> } {
-  const links = new Map(
-    (db.prepare("SELECT id, pillar_id, slot_id, book, hook, remote_id FROM planner_posts WHERE remote_id IS NOT NULL").all() as PlannerLink[]).map((r) => [r.remote_id, r]),
-  );
+/** P6: Planner posts by their post id on `platform` (Facebook: remote_id; others: remote_ids_json). */
+function plannerLinks(platform: PlannerPlatform): Map<string, PlannerLink> {
+  const rows = db
+    .prepare("SELECT id, pillar_id, slot_id, book, hook, remote_id, remote_ids_json FROM planner_posts WHERE remote_id IS NOT NULL OR remote_ids_json IS NOT NULL")
+    .all() as PlannerLink[];
+  const out = new Map<string, PlannerLink>();
+  for (const r of rows) {
+    const id = platform === "facebook" ? r.remote_id : (JSON.parse(r.remote_ids_json ?? "{}") as Record<string, string>)[platform];
+    if (id) out.set(id, r);
+  }
+  return out;
+}
+
+/** Posts on `platform` (default Facebook) in [from, to] (Sri Lanka days) with numbers, scored within their kind. */
+export function collectSamples(from: string, to: string, platform: PlannerPlatform = "facebook"): { samples: Sample[]; scoreBy: Record<SampleKind, ScoreBy | null> } {
+  const links = plannerLinks(platform);
   const raw: Omit<Sample, "score" | "value">[] = [];
   for (const p of listPlatformPosts()) {
-    if (p.platform !== "facebook") continue;
+    if (p.platform !== platform) continue;
     const kind = KIND_OF[p.kind];
     if (!kind) continue;
     const { day, minutes } = sriLankaTime(p.createdAt);
@@ -280,10 +294,10 @@ export function slotSuggestions(byBand: Group[], slots: Slot[]): SlotSuggestion[
   return out;
 }
 
-export function feedbackReport(days = DEFAULT_WINDOW_DAYS, today = todaySriLanka()): FeedbackReport {
+export function feedbackReport(days = DEFAULT_WINDOW_DAYS, today = todaySriLanka(), platform: PlannerPlatform = "facebook"): FeedbackReport {
   const to = addDays(today, -SETTLE_DAYS);
   const from = addDays(to, -(days - 1));
-  const { samples, scoreBy } = collectSamples(from, to);
+  const { samples, scoreBy } = collectSamples(from, to, platform);
   const slots = listSlots();
   const pillars = listPillars();
   const slotName = new Map(slots.map((s) => [s.id, `${s.label} (${s.id} ${s.timeFrom}-${s.timeTo})`]));
@@ -308,6 +322,7 @@ export function feedbackReport(days = DEFAULT_WINDOW_DAYS, today = todaySriLanka
       return true;
     });
   return {
+    platform,
     from,
     to,
     days,
@@ -321,7 +336,8 @@ export function feedbackReport(days = DEFAULT_WINDOW_DAYS, today = todaySriLanka
     byBook,
     top: sorted.slice(0, 5),
     bottom: sorted.length > 10 ? sorted.slice(-5).reverse() : [],
-    weights: pillarWeights(byPillar, pillars),
+    // Only Facebook numbers move the plan (the main platform); other platforms are shown, not used.
+    weights: pillarWeights(platform === "facebook" ? byPillar : [], pillars),
     suggestions: slotSuggestions(byBand, slots),
   };
 }

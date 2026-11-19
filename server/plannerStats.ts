@@ -2,7 +2,8 @@ import { db } from "./db";
 import { getConnectedPage } from "./facebook";
 import { listPlatformPosts, savePlatformPosts } from "./analytics/store";
 import type { AccountPost, PostKind as StatsKind } from "../src/analytics/types";
-import { addDays, getPost, normLine, todaySriLanka, updatePost, type PlannerPost, type PostStatus } from "./planner";
+import { addDays, getPost, normLine, postTargets, todaySriLanka, updatePost, type PlannerPlatform, type PlannerPost, type PostStatus } from "./planner";
+import { platformCaption } from "./platformCaptions";
 
 /**
  * P3 (studypal-lms docs/16 §7): which Facebook post a Planner post went out
@@ -191,6 +192,8 @@ export interface MatchResult {
   updated: number;
   /** Planner posts from past days that went out (scheduled/published) but have no Facebook post yet. */
   missing: { postId: string; date: string; slotId: string | null; title: string }[];
+  /** P6: newly linked posts on Instagram, TikTok and YouTube. */
+  linkedOther: { postId: string; platform: PlannerPlatform; remoteId: string; score: number }[];
 }
 
 export function nextStatus(p: Pick<PlannerPost, "status" | "date">, hasMetrics: boolean, today = todaySriLanka()): PostStatus {
@@ -226,7 +229,7 @@ export function matchPublished(today = todaySriLanka()): MatchResult {
   }
   pairs.sort((a, b) => b.score - a.score || a.gap - b.gap);
 
-  const result: MatchResult = { linked: [], updated: 0, missing: [] };
+  const result: MatchResult = { linked: [], updated: 0, missing: [], linkedOther: [] };
   const done = new Set<string>();
   for (const pr of pairs) {
     if (done.has(pr.post.id) || taken.has(pr.remoteId)) continue;
@@ -261,7 +264,53 @@ export function matchPublished(today = todaySriLanka()): MatchResult {
   for (const post of posts)
     if (!post.remoteId && post.date && post.date < today && (post.status === "scheduled" || post.status === "published"))
       result.missing.push({ postId: post.id, date: post.date, slotId: post.slotId, title: post.title });
+  result.linkedOther = matchOtherPlatforms(posts.map((p) => getPost(p.id)!).filter(Boolean));
   return result;
+}
+
+type OtherPlatform = Exclude<PlannerPlatform, "facebook">;
+const OTHER: OtherPlatform[] = ["instagram", "tiktok", "youtube"];
+
+/**
+ * P6: links Planner posts to their copies on Instagram, TikTok and YouTube
+ * (posted by hand), the same way as Facebook: ±1 Sri Lanka day and caption
+ * overlap (YouTube: title or description). Only for platforms the post goes
+ * to. The links feed What worked per platform; the post's status still
+ * follows Facebook.
+ */
+export function matchOtherPlatforms(posts: PlannerPost[]): MatchResult["linkedOther"] {
+  const out: MatchResult["linkedOther"] = [];
+  const all = listPlatformPosts();
+  for (const platform of OTHER) {
+    const remote = all.filter((p) => p.platform === platform);
+    const taken = new Set(posts.map((p) => p.remoteIds?.[platform]).filter((x): x is string => !!x));
+    const pairs: { post: PlannerPost; remoteId: string; score: number; gap: number }[] = [];
+    for (const post of posts) {
+      if (!post.date || post.remoteIds?.[platform] || !postTargets(post).includes(platform)) continue;
+      const mine = platformCaption(post, platform);
+      for (const f of remote) {
+        if (taken.has(f.remoteId)) continue;
+        const day = sriLankaDay(f.createdAt);
+        if (day < addDays(post.date, -1) || day > addDays(post.date, 1)) continue;
+        const score = Math.max(captionScore(mine.caption, f.caption), mine.title ? captionScore(mine.title, f.title) : 0, captionScore(mine.caption, f.title));
+        if (score >= MIN_SCORE) pairs.push({ post, remoteId: f.remoteId, score, gap: day === post.date ? 0 : 1 });
+      }
+    }
+    pairs.sort((a, b) => b.score - a.score || a.gap - b.gap);
+    const done = new Set<string>();
+    for (const pr of pairs) {
+      if (done.has(pr.post.id) || taken.has(pr.remoteId)) continue;
+      done.add(pr.post.id);
+      taken.add(pr.remoteId);
+      const cur = getPost(pr.post.id);
+      if (!cur) continue;
+      const remoteIds = { ...cur.remoteIds, [platform]: pr.remoteId };
+      updatePost(cur.id, { remoteIds }, "stats");
+      pr.post.remoteIds = remoteIds;
+      out.push({ postId: cur.id, platform, remoteId: pr.remoteId, score: Math.round(pr.score * 100) / 100 });
+    }
+  }
+  return out;
 }
 
 /** Stats for the Planner page: linked Facebook posts' permalink + latest numbers. */

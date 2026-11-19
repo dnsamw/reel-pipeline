@@ -64,6 +64,10 @@ export interface PlannerPost {
   remoteId: string | null;
   /** The last auto-approval review (P4). */
   review: PostReview | null;
+  /** P6: platforms chosen; null = the default for its type. */
+  targets?: PlannerPlatform[] | null;
+  /** P6: the post on the other platforms, once matched. */
+  remoteIds?: Partial<Record<"instagram" | "tiktok" | "youtube", string>>;
   createdAt: string;
   updatedAt: string;
 }
@@ -184,6 +188,8 @@ export interface PackItem {
   media: string;
   file: string;
   comment: { variant: string; text: string; image: string | null } | null;
+  /** P6: one per platform the post goes to. */
+  platforms?: { platform: PlannerPlatform; title: string | null; caption: string; comment: boolean; tooLong: boolean }[];
 }
 
 export interface PackPlan {
@@ -198,6 +204,7 @@ export interface PackPlan {
 
 export interface MatchResult {
   linked: { postId: string; remoteId: string; score: number }[];
+  linkedOther?: { postId: string; platform: PlannerPlatform; remoteId: string; score: number }[];
   updated: number;
   missing: { postId: string; date: string; slotId: string | null; title: string }[];
 }
@@ -258,6 +265,18 @@ export interface BatchJob {
 
 export type SampleKind = "reel" | "image";
 
+// --- P6 platforms (server/planner.ts, server/platformCaptions.ts) ---
+
+export const PLANNER_PLATFORMS = ["facebook", "instagram", "tiktok", "youtube"] as const;
+export type PlannerPlatform = (typeof PLANNER_PLATFORMS)[number];
+export const PLATFORM_LABELS: Record<PlannerPlatform, string> = { facebook: "Facebook", instagram: "Instagram", tiktok: "TikTok", youtube: "YouTube Shorts" };
+export const platformTakes = (platform: PlannerPlatform, kind: string) => platform === "facebook" || platform === "instagram" || kind === "reel" || kind === "video";
+/** Same rule as the server's postTargets(). */
+export function postTargets(p: { kind: string; targets?: PlannerPlatform[] | null }): PlannerPlatform[] {
+  const chosen = p.targets ? p.targets.filter((x) => platformTakes(x, p.kind)) : PLANNER_PLATFORMS.filter((x) => platformTakes(x, p.kind));
+  return PLANNER_PLATFORMS.filter((x) => x === "facebook" || chosen.includes(x));
+}
+
 export interface FeedbackSample {
   remoteId: string;
   permalink: string | null;
@@ -286,6 +305,7 @@ export interface FeedbackGroup {
 }
 
 export interface FeedbackReport {
+  platform: PlannerPlatform;
   from: string;
   to: string;
   days: number;

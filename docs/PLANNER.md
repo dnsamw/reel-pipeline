@@ -2,7 +2,7 @@
 
 The Planner page (`/planner` in the GUI, "Plan → Planner" in the sidebar) is the one calendar for every social
 post. The plan behind it is `studypal-lms/docs/16-social-content-pipeline.md` in the StudyPal workspace; this
-file only covers the code. Status: **P1** (calendar, stock, pillars, slots, reserve), **P2** (book lines as post source, repeat guard), **P3** (week pack, stats matching, Facebook posting off) **P4** (Claude drafts the empty slots, auto-approval, Grok scout, stock-photo picker, Insights on Claude) and **P5** (feedback loop: the Page's numbers shape the next plan, evergreen reserve kept at 10). Approved posts are rendered automatically: image posts with the Hook photo template, reels **silent with music only** (owner 2026-11-18).
+file only covers the code. Status: **P1** (calendar, stock, pillars, slots, reserve), **P2** (book lines as post source, repeat guard), **P3** (week pack, stats matching, Facebook posting off) **P4** (Claude drafts the empty slots, auto-approval, Grok scout, stock-photo picker, Insights on Claude) **P5** (feedback loop: the Page's numbers shape the next plan, evergreen reserve kept at 10) and **P6** (Instagram, TikTok and YouTube Shorts targets per post, all posted by hand from the week pack). Approved posts are rendered automatically: image posts with the Hook photo template, reels **silent with music only** (owner 2026-11-18).
 
 ## Rules it enforces
 
@@ -50,6 +50,21 @@ file only covers the code. Status: **P1** (calendar, stock, pillars, slots, rese
   in a temp folder; every call is logged in `ai_calls`. The batch asks before it runs and shows the call count.
 - Rejecting (Weekly batch tab or the editor) needs a reason and moves a ready reserve post into the slot (same post type first).
 
+## More platforms (P6, owner 2026-11-19: by hand, no API posting anywhere)
+
+- Each post has **targets**: reels go to Facebook, Instagram, TikTok and YouTube Shorts; image posts to Facebook and
+  Instagram (`defaultTargets()`). The editor's "Goes to" checkboxes override it per post (`targets_json`; null =
+  default). TikTok and YouTube take videos only; Facebook is always in.
+- Captions per platform by code (`server/platformCaptions.ts`): Instagram/TikTok add "(link in bio)" to the link
+  line; YouTube gets the hook as its title (≤ 100 chars) and the caption as description; captions over the
+  platform's limit (2200 on Instagram/TikTok) are flagged, not cut. The first comment is for Facebook and Instagram.
+- Week pack: per post `NN_..._caption.txt` (Facebook) plus `_instagram.txt`, `_tiktok.txt`, `_youtube.txt` (title,
+  blank line, description); the checklist has one block and one tick box per platform and counts per platform.
+  Instagram is scheduled in Business Suite next to Facebook; TikTok and YouTube in their own apps.
+- Stats: `matchOtherPlatforms()` (runs inside `matchPublished()`) links Planner posts to their Instagram, TikTok
+  and YouTube copies by day and caption/title (`remote_ids_json`); What worked has a platform picker. Only
+  Facebook's numbers move the plan; the post's status follows Facebook. Same posting time on every platform for now.
+
 ## Feedback loop (P5, `server/planLearn.ts`, Planner → What worked)
 
 No AI call; all code. Each Facebook post with numbers (Insights refresh or the Business Suite CSV) gets a **score
@@ -90,6 +105,7 @@ What the batch does with it:
 | `server/planReview.ts` | Code checks + Claude critic (a separate call, 6 posts per call) → `saveReview()`; `composeCaption()`, `expectedSales()`, `BANNED` (add a rule here when a rejection shows a gap) |
 | `server/planRender.ts` | `renderPlannerPost()`, `renderApproved()`, `renderBlocker()`, `templateUsedBefore()`; routes `POST /api/planner/posts/:id/render`, `GET/POST /api/planner/render` (background run over a range) |
 | `server/planLearn.ts` | P5: `feedbackReport()`, `collectSamples()`, `hookStyle()`, `pillarWeights()`, `slotSuggestions()`, `learningNotes()`, `bestPlannerPosts()`; `GET /api/planner/feedback?days`, `POST /api/planner/reserve/fill`; GUI `gui/src/pages/PlannerFeedback.tsx` |
+| `server/platformCaptions.ts` | P6: `platformCaption()`, `postCaptions()`, `youtubeTitle()`; targets in `planner.ts` (`PLANNER_PLATFORMS`, `defaultTargets()`, `postTargets()`); matching in `plannerStats.ts` (`matchOtherPlatforms()`) |
 | `server/planReel.ts` | `renderPlannerReel()`, `reelPhrases()`, `reelTexts()`, `plannerMusic()`, `musicStart()` (ffprobe) |
 | `server/salesBlock.ts` | Prices from `products.ts`, the 2-line sales block per subject, `learnPath()` |
 | `server/photoPicker.ts` | `stock-images/<subject>/<book folder>` (book 4 → `english/04-…`, J3 → `japanese/n5-j2-j4`, K4 → `korean/k4-…`) then `_shared`; not used in 30 days, least used first, `ai-grok-` last; `photoStock()` (under 6 free = low); `stockPhotoPath()` for serving |
@@ -110,4 +126,4 @@ What the batch does with it:
 
 ## Next phases (docs/16 §11)
 
-~~P2~~ · ~~P3~~ · ~~P4 Claude + Grok batch~~ (done) · ~~image post rendering~~ · ~~silent Planner reels~~ · ~~P5 feedback loop~~ · **Next:** P6 more platforms · later: reels with voice-over (TTS quota).
+~~P2~~ · ~~P3~~ · ~~P4 Claude + Grok batch~~ (done) · ~~image post rendering~~ · ~~silent Planner reels~~ · ~~P5 feedback loop~~ · ~~P6 more platforms (by hand)~~ · later: reels with voice-over (TTS quota), own slots per platform.

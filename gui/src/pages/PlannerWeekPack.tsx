@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { CalendarCheck, Download, Link2, Upload } from "lucide-react";
 import { api } from "../api";
-import type { CsvImportResult, MatchResult, PackPlan, PlannerView } from "../plannerTypes";
+import { PLATFORM_LABELS, type CsvImportResult, type MatchResult, type PackPlan, type PlannerView } from "../plannerTypes";
 
 /**
  * Week pack + stats (docs/16 §7, P3). The pack is what the owner loads by
@@ -141,6 +141,7 @@ export function WeekPack({ view, onChanged }: { view: PlannerView; onChanged: ()
                     <th>Day</th>
                     <th>Time</th>
                     <th>Post</th>
+                    <th>Platforms</th>
                     <th>File</th>
                     <th>First comment</th>
                   </tr>
@@ -154,6 +155,9 @@ export function WeekPack({ view, onChanged }: { view: PlannerView; onChanged: ()
                         <strong>{it.time}</strong> <span className="hint">{it.slotId}</span>
                       </td>
                       <td>{it.title}</td>
+                      <td className="hint">
+                        {(it.platforms ?? []).map((pc) => PLATFORM_LABELS[pc.platform] + (pc.tooLong ? " (too long!)" : "")).join(", ")}
+                      </td>
                       <td className="hint">{it.file}</td>
                       <td>{it.comment ? `Variant ${it.comment.variant}` : <span className="hint">none</span>}</td>
                     </tr>
@@ -203,7 +207,7 @@ export function WeekPack({ view, onChanged }: { view: PlannerView; onChanged: ()
         {match && (
           <>
             <p>
-              {match.linked.length} newly linked, {match.updated} status updates.
+              {match.linked.length} newly linked, {match.updated} status updates{match.linkedOther?.length ? `, ${match.linkedOther.length} linked on Instagram / TikTok / YouTube` : ""}.
             </p>
             {match.linked.length > 0 && (
               <ul>
